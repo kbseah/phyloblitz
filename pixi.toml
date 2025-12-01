@@ -8,6 +8,7 @@ preview = ["pixi-build"]
 
 [dependencies]
 phyloblitz = { path = "." }
+pyfastx = ">=2.2.0,<3"
 
 [package]
 name = "phyloblitz"

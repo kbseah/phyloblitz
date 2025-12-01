@@ -5,6 +5,7 @@ import pysam
 import os.path
 import sys
 import re
+import pyfastx
 
 from subprocess import Popen, PIPE
 
@@ -108,6 +109,39 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
     return proc.wait()
 
 
+def cluster_seqs(mcl_out, reads, cluster_prefix):
+    counter = 0
+    cluster_files = []
+    fastq_handles = {}
+    seq2cluster = {}
+    cluster_fns = {}
+    with open(mcl_out, "r") as fh:
+        for line in fh:
+            seqs = line.rstrip().split("\t")
+            for seq in seqs:
+                seq2cluster[seq] = counter # assume each seq in only one cluster
+            cluster_fn = cluster_prefix + str(counter) + ".fastq"
+            fastq_handles[counter] = open(cluster_fn, "w")
+            cluster_fns[counter] = cluster_fn
+            counter += 1
+    for name, seq, qual in pyfastx.Fastx(reads):
+        if name in seq2cluster:
+            fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
+            fastq_handles[seq2cluster[name]].write(fastq_rec)
+    for i in fastq_handles:
+        fastq_handles[i].close()
+    return cluster_fns
+
+
+def spoa_assemble(fastq):
+    cmd = [
+        "spoa",
+        fastq,
+    ]
+    proc = Popen(cmd, stdout=PIPE, text=True)
+    return proc.communicate()[0]
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="phyloblitz",
@@ -150,3 +184,14 @@ def main():
 
     if not check_run_file(args, "mcl_cluster"):
         mcl_ret = mcl_cluster(pathto(args, "ava_mci"), pathto(args, "ava_seqtab"), pathto(args, "mcl_cluster"))
+
+    cluster_fns = cluster_seqs(pathto(args, "mcl_cluster"), pathto(args, "mapped_segments"), "test.cluster_prefix_")
+
+    cluster_cons = {}
+    for c in cluster_fns:
+        cluster_cons[c] = spoa_assemble(cluster_fns[c])
+
+    with open("test.spoa_all.fasta", "w") as fh:
+        for c in cluster_cons:
+            fh.write(">" + str(c) + "\n")
+            fh.write(cluster_cons[c])
