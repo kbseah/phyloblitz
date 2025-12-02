@@ -18,6 +18,15 @@ pixi run phyloblitz
 Required inputs are a preprocessed SILVA reference database and the long read
 files in fastq(.gz) format.
 
+## Reference database
+
+Download the database files from https://doi.org/10.5281/zenodo.7892522
+
+These have been formatted and indexed for use with
+[phyloFlash](https://hrgv.github.io/phyloFlash/). However for `phyloblitz`,
+only the Fasta file with trimmed, dereplicated sequences is necessary:
+`SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta`.
+
 ## License
 
 `phyloblitz` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
@@ -37,3 +46,9 @@ files in fastq(.gz) format.
  * Get consensus sequence per read cluster with spoa
  * Generate metrics per consensus cluster for diagnostics: expect similar error
    rate per read vs. consensus, identify clusters with too few reads
+
+
+## TODO
+
+ * Investigate effect of dv cutoff values and clustering methods
+ * Can we set thresholds more naturally by bootstrapping read metrics from mapping steps?
