@@ -212,7 +212,7 @@ def cluster_seqs(mcl_out, reads):
             logger.info(f"Cluster {str(counter)} comprises {str(len(seqs))} sequences")
             for seq in seqs:
                 seq2cluster[seq] = counter  # assume each seq in only one cluster
-            fastq_handles[counter] = NamedTemporaryFile(suffix=".fastq", mode="w", delete=False)
+            fastq_handles[counter] = NamedTemporaryFile(suffix=".fastq", mode="w", delete=True, delete_on_close=False)
             counter += 1
     for name, seq, qual in pyfastx.Fastx(reads):
         if name in seq2cluster:
