@@ -53,3 +53,18 @@ only the Fasta file with trimmed, dereplicated sequences is necessary:
 
  * Investigate effect of dv cutoff values and clustering methods
  * Can we set thresholds more naturally by bootstrapping read metrics from mapping steps?
+
+## Citations
+
+Please cite the following dependencies:
+
+ * [`spoa`](https://github.com/rvaser/spoa)
+ * [`mcl`](https://micans.org/mcl/) Stijn van Dongen, Graph Clustering Via a Discrete Uncoupling Process, SIAM Journal on Matrix Analysis and Applications, 30(1):121-141, 2008. http://link.aip.org/link/?SJMAEL/30/121/1
+ * [`minimap2`](https://github.com/lh3/minimap2) Heng Li, Minimap2: pairwise alignment for nucleotide sequences, Bioinformatics, 34(18):3094-3100, 2018. https://doi.org/10.1093/bioinformatics/bty191
+ * [`pyfastx`](https://pyfastx.readthedocs.io/)
+ * [`samtools`](https://www.htslib.org/)
+ * [`pysam`](https://github.com/pysam-developers/pysam)
+
+Please cite the SILVA reference database if you use it:
+
+ * [SILVA](https://www.arb-silva.de/) Maria Chuvochina, Jan Gerken, et al. SILVA in 2026: a global core biodata resource for rRNA within the DSMZ digital diversity. Nucleic Acids Research, gkaf1247, 2026. https://doi.org/10.1093/nar/gkaf1247
