@@ -7,11 +7,13 @@ import sys
 import re
 import pyfastx
 import logging
+import json
 
 from subprocess import Popen, PIPE
 from multiprocessing import Pool
 from os import makedirs
 from tempfile import NamedTemporaryFile
+from collections import defaultdict
 
 
 OUTFILE_SUFFIX = {
@@ -23,6 +25,7 @@ OUTFILE_SUFFIX = {
     "ava_seqtab": "_ava_seq.tab",
     "mcl_cluster": "_mcl.out",
     "cluster_asm": "_final.fasta",
+    "report_json": "_report.json",
 }
 
 logger = logging.getLogger(__name__)
@@ -90,7 +93,7 @@ def sam_seq_generator(sam_file, minlen=1200):
     logger.info(
         f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}"
     )
-    sam = pysam.AlignmentFile(sam_file, "r")  # TODO BAM?
+    sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
             # Primary mappings only to ensure only one mapping per input read
@@ -126,6 +129,20 @@ def ava_map(reads, paf_file, mode="ava-ont", threads=12):
         logger.debug("minimap command: " + " ".join(cmd))
         proc = Popen(cmd, stdout=paf_fh)
         return proc.wait()
+
+
+def paf_get_dvs(paf_file):
+    dvs = defaultdict(list)
+    with open(paf_file, "rt") as fh:
+        for line in fh:
+            spl = line.rstrip().split("\t")
+            query = spl[0]
+            dv = re.findall(r"dv:f:([\d\.]+)", line)
+            assert (
+                len(dv) == 1
+            ), "Problem in PAF file {paf_file}: more than one dv tag in entry"
+            dvs[query].append(float(dv[0]))
+    return dvs
 
 
 def paf_abc(paf_file, abc_file, dv_max=0.03):
@@ -212,15 +229,20 @@ def cluster_seqs(mcl_out, reads):
             logger.info(f"Cluster {str(counter)} comprises {str(len(seqs))} sequences")
             for seq in seqs:
                 seq2cluster[seq] = counter  # assume each seq in only one cluster
-            fastq_handles[counter] = NamedTemporaryFile(suffix=".fastq", mode="w", delete=True, delete_on_close=False)
+            fastq_handles[counter] = NamedTemporaryFile(
+                suffix=".fastq", mode="w", delete=True, delete_on_close=False
+            )
             counter += 1
     for name, seq, qual in pyfastx.Fastx(reads):
         if name in seq2cluster:
             fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
             fastq_handles[seq2cluster[name]].write(fastq_rec)
+    cluster2seq = defaultdict(list)
+    for seq in seq2cluster:
+        cluster2seq[seq2cluster[seq]].append(seq)
     for i in fastq_handles:
         fastq_handles[i].close()
-    return fastq_handles
+    return fastq_handles, cluster2seq
 
 
 def spoa_assemble(fastq):
@@ -238,6 +260,19 @@ def spoa_assemble(fastq):
     logger.debug("spoa command: " + " ".join(cmd))
     proc = Popen(cmd, stdout=PIPE, text=True)
     return proc.communicate()[0]
+
+
+def db_taxonomy(silvadb):
+    """Get taxonomy string from SILVA headers in database Fasta file"""
+    acc2tax = {}
+    with open(silvadb, "r") as fh:
+        for line in fh:
+            if line.startswith(">"):
+                spl = line.rstrip().split(" ")
+                acc = spl[0]
+                taxstring = " ".join(spl[1:]).split(";")
+                acc2tax[acc] = taxstring
+    return acc2tax
 
 
 def main():
@@ -279,6 +314,9 @@ def main():
     )
     args = parser.parse_args()
 
+    stats = {}
+    stats["args"] = vars(args)
+
     logger.debug("Arguments:")
     for i in vars(args):
         logger.debug(f" {i} : {str(vars(args)[i])}")
@@ -311,6 +349,10 @@ def main():
         else:
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
+    logger.info("Reading taxonomy from SILVA database file")
+    acc2tax = db_taxonomy(args.db)
+    logger.debug(f" Accessions read: {str(len(acc2tax))}")
+
     if not check_run_file(args, "initial_map"):
         map_ret = run_minimap(
             args.db,
@@ -323,7 +365,9 @@ def main():
     if not check_run_file(args, "mapped_segments"):
         counter = 0
         with open(pathto(args, "mapped_segments"), "w") as fq_fh:
-            for name, seq, quals in sam_seq_generator(pathto(args, "initial_map")):
+            for name, seq, quals in sam_seq_generator(
+                pathto(args, "initial_map"), minlen=args.align_minlen
+            ):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")
@@ -338,6 +382,7 @@ def main():
             mode="ava-" + args.platform,
             threads=args.threads,
         )
+        stats["dvs"] = paf_get_dvs(pathto(args, "ava_map"))
 
     if not check_run_file(args, "ava_abc"):
         abc_ret = paf_abc(pathto(args, "ava_map"), pathto(args, "ava_abc"), dv_max=0.03)
@@ -355,15 +400,18 @@ def main():
         )
 
     if not check_run_file(args, "cluster_asm"):
-        fastq_handles = cluster_seqs(
+        fastq_handles, cluster2seq = cluster_seqs(
             pathto(args, "mcl_cluster"),
             pathto(args, "mapped_segments"),
         )
+        stats["cluster2seq"] = cluster2seq
 
         with Pool(args.threads) as pool:
-            cluster_cons = pool.map(spoa_assemble, [i.name for i in fastq_handles.values()])
+            cluster_cons = pool.map(
+                spoa_assemble, [i.name for i in fastq_handles.values()]
+            )
 
-        for i in fastq_handles.values(): # close NamedTemporaryFile handles
+        for i in fastq_handles.values():  # close NamedTemporaryFile handles
             i.close()
 
         with open(pathto(args, "cluster_asm"), "w") as fh:
@@ -372,7 +420,13 @@ def main():
                     re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
                 )
             logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
-            logger.info("-------------- phyloblitz run complete --------------")
+
+    if not check_run_file(args, "report_json"):
+        with open(pathto(args, "report_json"), "w") as fh:
+            logger.info("Writing report stats to " + pathto(args, "report_json"))
+            json.dump(stats, fh, indent=4)
+
+    logger.info("-------------- phyloblitz run complete --------------")
 
     if args.log:
         logfh.close()
