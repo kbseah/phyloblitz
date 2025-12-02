@@ -6,9 +6,11 @@ import os.path
 import sys
 import re
 import pyfastx
+import logging
 
 from subprocess import Popen, PIPE
 from multiprocessing import Pool
+from os import makedirs
 
 
 OUTFILE_SUFFIX = {
@@ -22,6 +24,8 @@ OUTFILE_SUFFIX = {
     "cluster_asm": "_final.fasta",
 }
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(format='%(levelname)s: %(asctime)s : %(message)s', level=logging.DEBUG, datefmt="%Y-%m-%d %H:%M:%S")
 
 def check_run_file(args, stage):
     return os.path.isfile(
@@ -38,9 +42,10 @@ def pathto(args, stage):
 
 def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
     # TODO use mappy
+    logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
         cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref] + reads
-        print(" ".join(cmd1))
+        logger.info("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
             ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
@@ -50,6 +55,7 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
 
 
 def sam_seq_generator(sam_file, minlen=1200):
+    logger.info(f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}")
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
@@ -73,14 +79,16 @@ def sam_seq_generator(sam_file, minlen=1200):
 
 
 def ava_map(reads, paf_file, mode="ava-ont", threads=12):
+    logger.info("All-vs-all mapping of mapped reads with minimap2")
     with open(paf_file, "w") as paf_fh:
         cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
-        print(" ".join(cmd))
+        logger.info("minimap command: " + " ".join(cmd))
         proc = Popen(cmd, stdout=paf_fh)
         return proc.wait()
 
 
 def paf_abc(paf_file, abc_file, dv_max=0.03):
+    logger.info("Converting PAF ava alignment to ABC format for clustering")
     fh_abc = open(abc_file, "w")
     with open(paf_file, "rt") as fh_paf:
         for line in fh_paf:
@@ -95,6 +103,7 @@ def paf_abc(paf_file, abc_file, dv_max=0.03):
 
 
 def mcxload(abc_file, mci_file, tab_file):
+    logger.info("Preparing clustering files with mcxload")
     cmd = [
         "mcxload",
         "-abc",
@@ -105,11 +114,13 @@ def mcxload(abc_file, mci_file, tab_file):
         "-write-tab",
         tab_file,
     ]
+    logger.info("mcxload command: " + " ".join(cmd))
     proc = Popen(cmd)
     return proc.wait()
 
 
 def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
+    logger.info(f"Clustering with mcl and inflation parameter {str(inflation)}")
     cmd = [
         "mcl",
         mci_file,
@@ -120,6 +131,7 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
         "-o",
         mcl_out,
     ]
+    logger.info("mcl command: " + " ".join(cmd))
     proc = Popen(cmd)
     return proc.wait()
 
@@ -153,6 +165,7 @@ def spoa_assemble(fastq):
 
     Returns assembled sequence in Fasta format (stdout from spoa) as string.
     """
+    logger.info("Assemble consensus sequence for cluster with spoa")
     cmd = [
         "spoa",
         fastq,
@@ -180,11 +193,35 @@ def main():
     parser.add_argument(
         "--align_minlen", help="Minimum length of aligned segment", default=1200
     )
+    parser.add_argument(
+        "--resume", help="Resume partially completed run based on expected filenames", default=False
+    ),
+    parser.add_argument(
+        "--log", help="Write logging messages to this file",
+    )
     args = parser.parse_args()
 
     if not args.db or not args.reads:
         parser.print_help(sys.stderr)
         sys.exit(1)
+
+    if args.log:
+        logfh = logging.FileHandler(args.log)
+        formatter = logging.Formatter('%(levelname)s: %(asctime)s : %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
+        logfh.setFormatter(formatter)
+        logger.addHandler(logfh)
+
+    logger.info("Starting phyloblitz run ... ")
+
+    logger.info(f"Creating output folder {args.outdir}")
+    try:
+        makedirs(args.outdir, exist_ok=False)
+    except FileExistsError:
+        if not args.resume:
+            logger.error(f"Output folder {args.outdir} already exists, and option --resume not used")
+            sys.exit(1)
+        else:
+            logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
     if not check_run_file(args, "initial_map"):
         map_ret = run_minimap(
@@ -203,7 +240,7 @@ def main():
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
-        print(f"Reads extracted: {str(counter)}")  # TODO proper logging
+        logger.info(f"Read segments extracted by initial mapping: {str(counter)}")
 
     if not check_run_file(args, "ava_map"):
         ava_ret = ava_map(
@@ -229,7 +266,7 @@ def main():
         )
 
     if not check_run_file(args, "cluster_asm"):
-        cluster_fns = cluster_seqs(
+        cluster_fns = cluster_seqs( # TODO use tempfile
             pathto(args, "mcl_cluster"),
             pathto(args, "mapped_segments"),
             "test.cluster_prefix_",
@@ -241,3 +278,6 @@ def main():
         with open(pathto(args, "cluster_asm"), "w") as fh:
             for cluster, seq in zip(cluster_fns.keys(), cluster_cons):
                 fh.write(re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq))
+
+    if args.log:
+        logfh.close()
