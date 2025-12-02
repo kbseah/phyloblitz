@@ -28,6 +28,10 @@ These have been formatted and indexed for use with
 only the Fasta file with trimmed, dereplicated sequences is necessary:
 `SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta`.
 
+If you build your own database, low complexity regions should be masked (e.g.
+with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
+phyloFlash paper for details.
+
 ## License
 
 `phyloblitz` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
@@ -53,6 +57,9 @@ only the Fasta file with trimmed, dereplicated sequences is necessary:
 
  * Investigate effect of dv cutoff values and clustering methods
  * Can we set thresholds more naturally by bootstrapping read metrics from mapping steps?
+ * Report metrics into a user-friendly file like phyloFlash:
+     * Numbers of reads mapped and taxonomic summary
+     * Assembled sequences, top hits, and respective read coverage and cluster metrics (plus heuristic assembly quality score)
 
 ## Citations
 
