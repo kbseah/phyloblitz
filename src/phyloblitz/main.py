@@ -213,6 +213,7 @@ def main():
     parser.add_argument(
         "-r", "--reads", help="Comma-separated list of read files to screen"
     )
+    parser.add_argument("--platform", help="Sequencing platform used, either `pb` or `ont`", default="ont")
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
     parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
     parser.add_argument(
@@ -239,6 +240,8 @@ def main():
     if not args.db or not args.reads:
         parser.print_help(sys.stderr)
         sys.exit(1)
+
+    assert args.platform in ["ont", "pb"], "--platform must be either ont or pb"
 
     if args.log:
         logfh = logging.FileHandler(args.log)
@@ -267,6 +270,7 @@ def main():
             args.db,
             args.reads.split(","),
             pathto(args, "initial_map"),
+            mode="map-" + args.platform,
             threads=args.threads,
         )
 
@@ -285,7 +289,7 @@ def main():
         ava_ret = ava_map(
             pathto(args, "mapped_segments"),
             pathto(args, "ava_map"),
-            mode="ava-ont",
+            mode="ava-" + args.platform,
             threads=args.threads,
         )
 
