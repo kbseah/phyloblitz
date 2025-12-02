@@ -17,7 +17,9 @@ from collections import defaultdict
 
 
 OUTFILE_SUFFIX = {
-    "initial_map": "_minimap.sam",
+    "initial_map": "_minimap_initial.sam",
+    "intervals_fastq": "_intervals.fastq",
+    "second_map": "_minimap_second.sam",
     "mapped_segments": "_mapped.fastq",
     "ava_map": "_ava.paf",
     "ava_abc": "_ava.abc",
@@ -65,7 +67,7 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
     Filter with samtools -F 4 to discard reads that are not mapped.
 
     :param ref: Path to reference sequence file
-    :param reads: Paths to read files
+    :param reads: Path to read file
     :type reads: list
     :param sam_file: Path to write SAM file output from mapping
     :param threads: Number of threads for minimap2 to use
@@ -74,7 +76,7 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
     # Don't use mappy because it doesn't support all-vs-all yet
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
-        cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref] + reads
+        cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref, reads]
         logger.debug("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
@@ -82,6 +84,68 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
         )
         proc1.stdout.close()
         return proc2.wait()
+
+
+def alignment_first_pass(sam_file, minlen=1200):
+    """Filter initial alignment to get primary mappings for all-vs-all mapping
+
+    :param sam_file: Path to SAM file from initial mapping step
+    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
+    :returns: Lists of intervals with hits per read, keyed by read name
+    :rtype: dict
+    """
+    logger.info(f"Filtering initial alignment to get aligned regions to extract")
+    regions = defaultdict(list)
+    sam = pysam.AlignmentFile(sam_file, "r")
+    for i in sam.fetch():
+        if i.query_alignment_length >= minlen:
+            # include secondary and supplementary alignments
+            # if sequence is left-hardclipped, correct the coordinates
+            # because pysam's query_alignment_start does not count hardclips!
+            qstart, qend = i.query_alignment_start, i.query_alignment_end
+            if i.cigartuples[0][0] == 5:
+                qstart += i.cigartuples[0][1]
+                qend += i.cigartuples[0][1]
+            regions[i.query_name].append((qstart, qend))
+    logger.debug(f"Reads processed {str(len(regions))}")
+    # merge intervals for each read
+    merged_intervals = {i: merge_intervals(regions[i]) for i in regions}
+    return merged_intervals
+
+
+def merge_intervals(intervals: list):
+    """Merge overlapping numerical intervals
+
+    :param intervals: List of tuples of (start, end) coordinates
+    :returns: List of tuples of intervals with overlaps merged
+    :rtype: list
+    """
+    intervals.sort(key=lambda i: i[0])  # sort in place
+    merged = [intervals[0]]
+    for curr in intervals[1:]:
+        if curr[0] < merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(curr[1], merged[-1][1]))
+        else:
+            merged.append(curr)
+    return merged
+
+
+def extract_fastq_read_intervals(intervals, in_file, out_file):
+    logger.info(
+        f"Extract read intervals that align with reference database to {out_file}"
+    )
+    counter = 0
+    with open(out_file, "w") as fh:
+        for name, seq, qual in pyfastx.Fastx(in_file):
+            if name in intervals:
+                for start, end in intervals[name]:
+                    newname = ":".join([str(i) for i in [name, start, end]])
+                    fh.write("@" + newname + "\n")
+                    fh.write(seq[start:end] + "\n")
+                    fh.write("+\n")
+                    fh.write(qual[start:end] + "\n")
+                    counter += 1
+    logger.info(f"Read intervals extracted: {str(counter)}")
 
 
 def sam_seq_generator(sam_file, minlen=1200):
@@ -283,9 +347,7 @@ def main():
     parser.add_argument(
         "-d", "--db", help="Path to preprocessed SILVA database fasta file"
     )
-    parser.add_argument(
-        "-r", "--reads", help="Comma-separated list of read files to screen"
-    )
+    parser.add_argument("-r", "--reads", help="Fastq or Fastq.gz read file to screen")
     parser.add_argument(
         "--platform",
         help="Sequencing platform used, either `pb` or `ont`",
@@ -307,7 +369,10 @@ def main():
         help="Resume partially completed run based on expected filenames",
         default=False,
         action="store_true",
-    ),
+    )
+    parser.add_argument(
+        "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
+    )
     parser.add_argument(
         "--log",
         help="Write logging messages to this file",
@@ -354,10 +419,29 @@ def main():
     logger.debug(f" Accessions read: {str(len(acc2tax))}")
 
     if not check_run_file(args, "initial_map"):
+        logger.info("Initial mapping of reads to identify target intervals")
         map_ret = run_minimap(
             args.db,
-            args.reads.split(","),
+            args.reads,
             pathto(args, "initial_map"),
+            mode="map-" + args.platform,
+            threads=args.threads,
+        )
+
+    if not check_run_file(args, "intervals_fastq"):
+        logger.info("Retrieve aligned intervals on reads")
+        merged_intervals = alignment_first_pass(pathto(args, "initial_map"))
+        stats["merged_intervals"] = merged_intervals
+        extract_fastq_read_intervals(
+            merged_intervals, args.reads, pathto(args, "intervals_fastq")
+        )
+
+    if not check_run_file(args, "second_map"):
+        logger.info("Second mapping of extracted intervals for taxonomic summary")
+        map_ret = run_minimap(
+            args.db,
+            pathto(args, "intervals_fastq"),
+            pathto(args, "second_map"),
             mode="map-" + args.platform,
             threads=args.threads,
         )
@@ -366,14 +450,14 @@ def main():
         counter = 0
         with open(pathto(args, "mapped_segments"), "w") as fq_fh:
             for name, seq, quals in sam_seq_generator(
-                pathto(args, "initial_map"), minlen=args.align_minlen
+                pathto(args, "second_map"), minlen=args.align_minlen
             ):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
-        logger.info(f"Read segments extracted by initial mapping: {str(counter)}")
+        logger.info(f"Read segments extracted by second mapping: {str(counter)}")
 
     if not check_run_file(args, "ava_map"):
         ava_ret = ava_map(
