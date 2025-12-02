@@ -33,12 +33,14 @@ logging.basicConfig(
 
 
 def check_run_file(args, stage):
+    """Check if intermediate output file has been created"""
     return os.path.isfile(
         os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
     )
 
 
 def pathto(args, stage):
+    """Combine output directory prefix and filenames to intermediate file path"""
     try:
         return os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
     except KeyError:
@@ -46,6 +48,7 @@ def pathto(args, stage):
 
 
 def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
+    """Map reads to reference database with minimap2"""
     # TODO use mappy
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
@@ -60,10 +63,15 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
 
 
 def sam_seq_generator(sam_file, minlen=1200):
+    """Filter initial alignment to get primary mappings for all-vs-all mapping
+
+    :param sam_file: Path to SAM file from initial mapping step
+    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
+    """
     logger.info(
         f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}"
     )
-    sam = pysam.AlignmentFile(sam_file, "r")
+    sam = pysam.AlignmentFile(sam_file, "r")  # TODO BAM?
     for i in sam.fetch():
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
             # Primary mappings only to ensure only one mapping per input read
@@ -86,6 +94,7 @@ def sam_seq_generator(sam_file, minlen=1200):
 
 
 def ava_map(reads, paf_file, mode="ava-ont", threads=12):
+    """All-vs-all mapping with minimap2 to generate clusters for assembly"""
     logger.info("All-vs-all mapping of mapped reads with minimap2")
     with open(paf_file, "w") as paf_fh:
         cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
@@ -95,6 +104,7 @@ def ava_map(reads, paf_file, mode="ava-ont", threads=12):
 
 
 def paf_abc(paf_file, abc_file, dv_max=0.03):
+    """Convert PAF alignment to ABC format for MCL clustering"""
     logger.info("Converting PAF ava alignment to ABC format for clustering")
     fh_abc = open(abc_file, "w")
     with open(paf_file, "rt") as fh_paf:
@@ -110,6 +120,7 @@ def paf_abc(paf_file, abc_file, dv_max=0.03):
 
 
 def mcxload(abc_file, mci_file, tab_file):
+    """Convert ABC file to cluster input files for MCL"""
     logger.info("Preparing clustering files with mcxload")
     cmd = [
         "mcxload",
@@ -127,6 +138,13 @@ def mcxload(abc_file, mci_file, tab_file):
 
 
 def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
+    """Clustering with MCL to get sequence clusters for assembly
+
+    :param mci_file: Path to MCI file produced by mcxload from previous step
+    :param tab_file: Path to tab file produced by mcxload from previous step
+    :param mcl_out: Path to write MCL output
+    :param inflation: Inflation parameter passed to mcl -I option
+    """
     logger.info(f"Clustering with mcl and inflation parameter {str(inflation)}")
     cmd = [
         "mcl",
@@ -144,6 +162,7 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
 
 
 def cluster_seqs(mcl_out, reads, cluster_prefix):
+    """Cluster sequences with MCL and write to Fastq files"""
     counter = 0
     cluster_files = []
     fastq_handles = {}
@@ -170,7 +189,9 @@ def cluster_seqs(mcl_out, reads, cluster_prefix):
 def spoa_assemble(fastq):
     """Run SPOA assembly on a Fastq input file
 
-    Returns assembled sequence in Fasta format (stdout from spoa) as string.
+    :param fastq: Path to Fastq file with reads to assemble
+    :returns: Assembled sequence in Fasta format (stdout from spoa)
+    :rtype: str
     """
     logger.info("Assemble consensus sequence for cluster with spoa")
     cmd = [
