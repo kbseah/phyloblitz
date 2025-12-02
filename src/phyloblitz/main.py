@@ -33,14 +33,22 @@ logging.basicConfig(
 
 
 def check_run_file(args, stage):
-    """Check if intermediate output file has been created"""
-    return os.path.isfile(
-        os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
-    )
+    """Check if intermediate output file has been created
+
+    :param args: Command line arguments parsed by ArgumentParser.parse_args
+    :param stage: Name of run stage, must be a key of OUTFILE_SUFFIX
+    :returns: True if file already exists at expected path
+    """
+    return os.path.isfile(pathto(args, stage))
 
 
 def pathto(args, stage):
-    """Combine output directory prefix and filenames to intermediate file path"""
+    """Combine output directory prefix and filenames to intermediate file path
+
+    :param args: Command line arguments parsed by ArgumentParser.parse_args
+    :param stage: Name of run stage, must be a key of OUTFILE_SUFFIX
+    :returns: Expected path to intermediate output file
+    """
     try:
         return os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
     except KeyError:
@@ -48,8 +56,18 @@ def pathto(args, stage):
 
 
 def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
-    """Map reads to reference database with minimap2"""
-    # TODO use mappy
+    """Map reads to reference database with minimap2
+
+    Filter with samtools -F 4 to discard reads that are not mapped.
+
+    :param ref: Path to reference sequence file
+    :param reads: Paths to read files
+    :type reads: list
+    :param sam_file: Path to write SAM file output from mapping
+    :param threads: Number of threads for minimap2 to use
+    :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+    """
+    # Don't use mappy because it doesn't support all-vs-all yet
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
         cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref] + reads
@@ -94,7 +112,13 @@ def sam_seq_generator(sam_file, minlen=1200):
 
 
 def ava_map(reads, paf_file, mode="ava-ont", threads=12):
-    """All-vs-all mapping with minimap2 to generate clusters for assembly"""
+    """All-vs-all mapping with minimap2 to generate clusters for assembly
+
+    :param reads: Path to Fastq reads to be clustered
+    :param paf_file: Path to write output PAF alignment
+    :param mode: Mapping preset mode, either `ava-ont` or `ava-pb`
+    :param threads: Number of threads for minimap2 to use
+    """
     logger.info("All-vs-all mapping of mapped reads with minimap2")
     with open(paf_file, "w") as paf_fh:
         cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
@@ -104,7 +128,12 @@ def ava_map(reads, paf_file, mode="ava-ont", threads=12):
 
 
 def paf_abc(paf_file, abc_file, dv_max=0.03):
-    """Convert PAF alignment to ABC format for MCL clustering"""
+    """Convert PAF alignment to ABC format for MCL clustering
+
+    :param paf_file: Path to PAF alignment from previous all-vs-all mapping step
+    :param abc_file: Path to write ABC file
+    :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
+    """
     logger.info("Converting PAF ava alignment to ABC format for clustering")
     fh_abc = open(abc_file, "w")
     with open(paf_file, "rt") as fh_paf:
@@ -120,7 +149,12 @@ def paf_abc(paf_file, abc_file, dv_max=0.03):
 
 
 def mcxload(abc_file, mci_file, tab_file):
-    """Convert ABC file to cluster input files for MCL"""
+    """Convert ABC file to cluster input files for MCL
+
+    :param abc_file: Path to ABC file from previous conversion step
+    :param mci_file: Path to write MCI file
+    :param tab_file: Path to write Tab file
+    """
     logger.info("Preparing clustering files with mcxload")
     cmd = [
         "mcxload",
@@ -162,7 +196,12 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
 
 
 def cluster_seqs(mcl_out, reads, cluster_prefix):
-    """Cluster sequences with MCL and write to Fastq files"""
+    """Cluster sequences with MCL and write to Fastq files
+
+    :param mcl_out: Path to write MCL output
+    :param reads: Path to reads from sam_seq_generator step
+    :param cluster_prefix: File name prefix for each cluster Fastq file
+    """
     counter = 0
     cluster_files = []
     fastq_handles = {}
