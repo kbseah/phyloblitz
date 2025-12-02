@@ -210,6 +210,7 @@ def cluster_seqs(mcl_out, reads, cluster_prefix):
     with open(mcl_out, "r") as fh:
         for line in fh:
             seqs = line.rstrip().split("\t")
+            logger.info(f"Cluster {str(counter)} comprises {str(len(seqs))} sequences")
             for seq in seqs:
                 seq2cluster[seq] = counter  # assume each seq in only one cluster
             cluster_fn = cluster_prefix + str(counter) + ".fastq"
@@ -252,7 +253,11 @@ def main():
     parser.add_argument(
         "-r", "--reads", help="Comma-separated list of read files to screen"
     )
-    parser.add_argument("--platform", help="Sequencing platform used, either `pb` or `ont`", default="ont")
+    parser.add_argument(
+        "--platform",
+        help="Sequencing platform used, either `pb` or `ont`",
+        default="ont",
+    )
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
     parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
     parser.add_argument(
@@ -275,6 +280,10 @@ def main():
         help="Write logging messages to this file",
     )
     args = parser.parse_args()
+
+    logger.debug("Arguments:")
+    for i in vars(args):
+        logger.debug(f" {i} : {str(vars(args)[i])}")
 
     if not args.db or not args.reads:
         parser.print_help(sys.stderr)
