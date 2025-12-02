@@ -9,10 +9,11 @@ The name is a reference to precursor tool
 ## Usage
 
 Dependencies are managed with [pixi](https://pixi.sh/). Run without arguments
-to view help message.
+or with the `--help` parameter to view help message. When run for the first
+time, pixi will resolve and install dependencies.
 
 ```console
-pixi run phyloblitz
+pixi run phyloblitz --help
 ```
 
 Required inputs are a preprocessed SILVA reference database and the long read
