@@ -8,6 +8,7 @@ import re
 import pyfastx
 
 from subprocess import Popen, PIPE
+from multiprocessing import Pool
 
 
 OUTFILE_SUFFIX = {
@@ -134,6 +135,10 @@ def cluster_seqs(mcl_out, reads, cluster_prefix):
 
 
 def spoa_assemble(fastq):
+    """Run SPOA assembly on a Fastq input file
+
+    Returns assembled sequence in Fasta format (stdout from spoa) as string.
+    """
     cmd = [
         "spoa",
         fastq,
@@ -187,11 +192,8 @@ def main():
 
     cluster_fns = cluster_seqs(pathto(args, "mcl_cluster"), pathto(args, "mapped_segments"), "test.cluster_prefix_")
 
-    cluster_cons = {}
-    for c in cluster_fns:
-        cluster_cons[c] = spoa_assemble(cluster_fns[c])
+    with Pool(args.threads) as pool:
+        cluster_cons = pool.map(spoa_assemble, cluster_fns.values())
 
     with open("test.spoa_all.fasta", "w") as fh:
-        for c in cluster_cons:
-            fh.write(">" + str(c) + "\n")
-            fh.write(cluster_cons[c])
+        fh.write("\n".join(cluster_cons))
