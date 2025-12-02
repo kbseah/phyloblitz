@@ -72,7 +72,7 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
         cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref] + reads
-        logger.info("minimap command: " + " ".join(cmd1))
+        logger.debug("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
             ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
@@ -123,7 +123,7 @@ def ava_map(reads, paf_file, mode="ava-ont", threads=12):
     logger.info("All-vs-all mapping of mapped reads with minimap2")
     with open(paf_file, "w") as paf_fh:
         cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
-        logger.info("minimap command: " + " ".join(cmd))
+        logger.debug("minimap command: " + " ".join(cmd))
         proc = Popen(cmd, stdout=paf_fh)
         return proc.wait()
 
@@ -167,7 +167,7 @@ def mcxload(abc_file, mci_file, tab_file):
         "-write-tab",
         tab_file,
     ]
-    logger.info("mcxload command: " + " ".join(cmd))
+    logger.debug("mcxload command: " + " ".join(cmd))
     proc = Popen(cmd)
     return proc.wait()
 
@@ -191,7 +191,7 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
         "-o",
         mcl_out,
     ]
-    logger.info("mcl command: " + " ".join(cmd))
+    logger.debug("mcl command: " + " ".join(cmd))
     proc = Popen(cmd)
     return proc.wait()
 
@@ -235,6 +235,7 @@ def spoa_assemble(fastq):
         "spoa",
         fastq,
     ]
+    logger.debug("spoa command: " + " ".join(cmd))
     proc = Popen(cmd, stdout=PIPE, text=True)
     return proc.communicate()[0]
 
@@ -370,6 +371,8 @@ def main():
                 fh.write(
                     re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
                 )
+            logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
+            logger.info("-------------- phyloblitz run complete --------------")
 
     if args.log:
         logfh.close()
