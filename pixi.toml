@@ -8,7 +8,6 @@ preview = ["pixi-build"]
 
 [dependencies]
 phyloblitz = { path = "." }
-pyfastx = ">=2.2.0,<3"
 
 [package]
 name = "phyloblitz"
@@ -25,11 +24,10 @@ main = "main"
 hatchling = ">=1.16.1"
 
 [package.run-dependencies]
+python = ">=3.10,<3.14"
 minimap2 = ">=2.30,<3"
 samtools = ">=1.22.1,<2"
-python = ">=3.10,<3.14"
 pysam = ">=0.23.3,<0.24"
-miniasm = ">=0.3,<0.4"
-seqtk = ">=1.5,<2"
 spoa = ">=4.1.5,<5"
 mcl = ">=22.282,<23"
+pyfastx = ">=2.2.0,<3"
