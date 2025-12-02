@@ -4,5 +4,6 @@
 
 from phyloblitz import main
 
+
 def echo():
     print("This is phyloblitz")

@@ -25,7 +25,12 @@ OUTFILE_SUFFIX = {
 }
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(format='%(levelname)s: %(asctime)s : %(message)s', level=logging.DEBUG, datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(
+    format="%(levelname)s: %(asctime)s : %(message)s",
+    level=logging.DEBUG,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 
 def check_run_file(args, stage):
     return os.path.isfile(
@@ -55,7 +60,9 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
 
 
 def sam_seq_generator(sam_file, minlen=1200):
-    logger.info(f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}")
+    logger.info(
+        f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}"
+    )
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
@@ -188,16 +195,23 @@ def main():
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
     parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
     parser.add_argument(
-        "-t", "--threads", help="Number of parallel threads", default=12
+        "-t", "--threads", help="Number of parallel threads", default=12, type=int
     )
     parser.add_argument(
-        "--align_minlen", help="Minimum length of aligned segment", default=1200
+        "--align_minlen",
+        help="Minimum length of aligned segment",
+        default=1200,
+        type=int,
     )
     parser.add_argument(
-        "--resume", help="Resume partially completed run based on expected filenames", default=False
+        "--resume",
+        help="Resume partially completed run based on expected filenames",
+        default=False,
+        action="store_true",
     ),
     parser.add_argument(
-        "--log", help="Write logging messages to this file",
+        "--log",
+        help="Write logging messages to this file",
     )
     args = parser.parse_args()
 
@@ -207,7 +221,9 @@ def main():
 
     if args.log:
         logfh = logging.FileHandler(args.log)
-        formatter = logging.Formatter('%(levelname)s: %(asctime)s : %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
+        formatter = logging.Formatter(
+            "%(levelname)s: %(asctime)s : %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
         logfh.setFormatter(formatter)
         logger.addHandler(logfh)
 
@@ -218,7 +234,9 @@ def main():
         makedirs(args.outdir, exist_ok=False)
     except FileExistsError:
         if not args.resume:
-            logger.error(f"Output folder {args.outdir} already exists, and option --resume not used")
+            logger.error(
+                f"Output folder {args.outdir} already exists, and option --resume not used"
+            )
             sys.exit(1)
         else:
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
@@ -266,7 +284,7 @@ def main():
         )
 
     if not check_run_file(args, "cluster_asm"):
-        cluster_fns = cluster_seqs( # TODO use tempfile
+        cluster_fns = cluster_seqs(  # TODO use tempfile
             pathto(args, "mcl_cluster"),
             pathto(args, "mapped_segments"),
             "test.cluster_prefix_",
@@ -277,7 +295,9 @@ def main():
 
         with open(pathto(args, "cluster_asm"), "w") as fh:
             for cluster, seq in zip(cluster_fns.keys(), cluster_cons):
-                fh.write(re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq))
+                fh.write(
+                    re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
+                )
 
     if args.log:
         logfh.close()
