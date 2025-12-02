@@ -3,3 +3,4 @@
 !.pixi/config.toml
 # caches
 __pycache__
+/pbz_test*
