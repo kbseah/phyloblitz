@@ -11,6 +11,7 @@ import logging
 from subprocess import Popen, PIPE
 from multiprocessing import Pool
 from os import makedirs
+from tempfile import NamedTemporaryFile
 
 
 OUTFILE_SUFFIX = {
@@ -195,27 +196,23 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
     return proc.wait()
 
 
-def cluster_seqs(mcl_out, reads, cluster_prefix):
-    """Cluster sequences with MCL and write to Fastq files
+def cluster_seqs(mcl_out, reads):
+    """Cluster sequences with MCL and write to temporary Fastq files
 
     :param mcl_out: Path to write MCL output
     :param reads: Path to reads from sam_seq_generator step
-    :param cluster_prefix: File name prefix for each cluster Fastq file
     """
     counter = 0
     cluster_files = []
     fastq_handles = {}
     seq2cluster = {}
-    cluster_fns = {}
     with open(mcl_out, "r") as fh:
         for line in fh:
             seqs = line.rstrip().split("\t")
             logger.info(f"Cluster {str(counter)} comprises {str(len(seqs))} sequences")
             for seq in seqs:
                 seq2cluster[seq] = counter  # assume each seq in only one cluster
-            cluster_fn = cluster_prefix + str(counter) + ".fastq"
-            fastq_handles[counter] = open(cluster_fn, "w")
-            cluster_fns[counter] = cluster_fn
+            fastq_handles[counter] = NamedTemporaryFile(suffix=".fastq", mode="w", delete=False)
             counter += 1
     for name, seq, qual in pyfastx.Fastx(reads):
         if name in seq2cluster:
@@ -223,7 +220,7 @@ def cluster_seqs(mcl_out, reads, cluster_prefix):
             fastq_handles[seq2cluster[name]].write(fastq_rec)
     for i in fastq_handles:
         fastq_handles[i].close()
-    return cluster_fns
+    return fastq_handles
 
 
 def spoa_assemble(fastq):
@@ -357,17 +354,19 @@ def main():
         )
 
     if not check_run_file(args, "cluster_asm"):
-        cluster_fns = cluster_seqs(  # TODO use tempfile
+        fastq_handles = cluster_seqs(
             pathto(args, "mcl_cluster"),
             pathto(args, "mapped_segments"),
-            "test.cluster_prefix_",
         )
 
         with Pool(args.threads) as pool:
-            cluster_cons = pool.map(spoa_assemble, cluster_fns.values())
+            cluster_cons = pool.map(spoa_assemble, [i.name for i in fastq_handles.values()])
+
+        for i in fastq_handles.values(): # close NamedTemporaryFile handles
+            i.close()
 
         with open(pathto(args, "cluster_asm"), "w") as fh:
-            for cluster, seq in zip(cluster_fns.keys(), cluster_cons):
+            for cluster, seq in zip(fastq_handles.keys(), cluster_cons):
                 fh.write(
                     re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
                 )
