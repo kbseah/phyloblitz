@@ -40,6 +40,7 @@ def generate_report_md(stats):
     out.append("phyloblitz [homepage](https://github.com/kbseah/phyloblitz)")
     out.append("")
     out.append("## Argument string\n")
+    out.append("phyloblitz was called with the following command line arguments:\n")
     out.append("```")
     out.append(
         " ".join([" ".join(["--" + i, str(stats["args"][i])]) for i in stats["args"]])
@@ -47,6 +48,9 @@ def generate_report_md(stats):
     out.append("```")
     out.append("")
     out.append("## Cluster stats\n")
+    out.append(
+        "Summary of assembled sequence clusters and their top hits in reference database. Cluster sequences with few underlying reads and many mismatches/indels to the reference hits are lower quality because of insufficient coverage, and should not be used for phylogenetics or probe design.\n"
+    )
     cluster_table_dict = per_cluster_summarize(stats)
     cluster_table_fields = [
         "numseq",
