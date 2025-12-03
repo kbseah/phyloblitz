@@ -339,7 +339,7 @@ def db_taxonomy(silvadb):
     return acc2tax
 
 
-def main():
+def init_args():
     parser = argparse.ArgumentParser(
         prog="phyloblitz",
         description="SSU rRNA profile from ONT or PacBio long reads",
@@ -351,6 +351,7 @@ def main():
     parser.add_argument(
         "--platform",
         help="Sequencing platform used, either `pb` or `ont`",
+        choices=["ont","pb"],
         default="ont",
     )
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
@@ -377,20 +378,25 @@ def main():
         "--log",
         help="Write logging messages to this file",
     )
+
     args = parser.parse_args()
-
-    stats = {}
-    stats["args"] = vars(args)
-
-    logger.debug("Arguments:")
-    for i in vars(args):
-        logger.debug(f" {i} : {str(vars(args)[i])}")
 
     if not args.db or not args.reads:
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    assert args.platform in ["ont", "pb"], "--platform must be either ont or pb"
+    return args
+
+
+def main():
+    args = init_args()
+
+    stats = {} # Collect data and metadata for reporting stats
+    stats["args"] = vars(args)
+
+    logger.debug("Arguments:")
+    for i in vars(args):
+        logger.debug(f" {i} : {str(vars(args)[i])}")
 
     if args.log:
         logfh = logging.FileHandler(args.log)
