@@ -65,12 +65,13 @@ def pathto(args, stage):
         raise Exception(f"Unknown intermediate file {stage}")
 
 
-def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
+def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
     """Map reads to reference database with minimap2
 
     Filter with samtools -F 4 to discard reads that are not mapped.
 
     :param ref: Path to reference sequence file
+    :param refindex: Path to reference index file (optional)
     :param reads: Path to read file
     :type reads: list
     :param sam_file: Path to write SAM file output from mapping
@@ -80,7 +81,10 @@ def run_minimap(ref, reads, sam_file, threads=12, mode="map-ont"):
     # Don't use mappy because it doesn't support all-vs-all yet
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
-        cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref, reads]
+        if refindex is not None:
+            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", refindex, reads]
+        else:
+            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref, reads]
         logger.debug("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
@@ -351,6 +355,11 @@ def init_args():
     parser.add_argument(
         "-d", "--db", help="Path to preprocessed SILVA database fasta file"
     )
+    parser.add_argument(
+        "--dbindex",
+        help="Path to minimap2 index of database file (optional)",
+        default=None,
+    )
     parser.add_argument("-r", "--reads", help="Fastq or Fastq.gz read file to screen")
     parser.add_argument(
         "--platform",
@@ -439,6 +448,7 @@ def main():
         logger.info("Initial mapping of reads to identify target intervals")
         map_ret = run_minimap(
             args.db,
+            args.dbindex,
             args.reads,
             pathto(args, "initial_map"),
             mode="map-" + args.platform,
@@ -458,6 +468,7 @@ def main():
             logger.info("Second mapping of extracted intervals for taxonomic summary")
             map_ret = run_minimap(
                 args.db,
+                args.dbindex,
                 pathto(args, "intervals_fastq"),
                 pathto(args, "second_map"),
                 mode="map-" + args.platform,
