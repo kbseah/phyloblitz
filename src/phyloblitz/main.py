@@ -16,7 +16,11 @@ from tempfile import NamedTemporaryFile
 from collections import defaultdict
 from datetime import datetime
 
-from phyloblitz.report import generate_report_md, generate_report_html
+from phyloblitz.report import (
+    generate_report_md,
+    generate_report_html,
+    summarize_tophit_paf,
+)
 
 OUTFILE_SUFFIX = {
     "initial_map": "_minimap_initial.sam",
@@ -83,7 +87,11 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
         cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
-        cmd1.extend([refindex, reads]) if refindex is not None else cmd1.extend([ref, reads])
+        (
+            cmd1.extend([refindex, reads])
+            if refindex is not None
+            else cmd1.extend([ref, reads])
+        )
         logger.debug("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
@@ -342,8 +350,23 @@ def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):
     :param threads: Number of threads for minimap2 to use
     """
     logger.info("Mapping assembled sequences to reference database with minimap2")
-    cmd = ["minimap2", "-x", "asm5", "-c", "--eqx", "--secondary=no", "-t", str(threads), "-o", paf_file]
-    cmd.extend([refindex, fasta_file]) if refindex is not None else cmd.extend([ref, fasta_file])
+    cmd = [
+        "minimap2",
+        "-x",
+        "asm5",
+        "-c",
+        "--eqx",
+        "--secondary=no",
+        "-t",
+        str(threads),
+        "-o",
+        paf_file,
+    ]
+    (
+        cmd.extend([refindex, fasta_file])
+        if refindex is not None
+        else cmd.extend([ref, fasta_file])
+    )
     logger.debug("minimap command: " + " ".join(cmd))
     proc = Popen(cmd)  # TODO pipe stderr to log file
     return proc.wait()
@@ -414,7 +437,7 @@ def init_args():
         "--noreport",
         help="Do not generate report file",
         default=False,
-        action="store_true"
+        action="store_true",
     )
     parser.add_argument(  # TODO not yet implemented
         "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
@@ -566,6 +589,7 @@ def main():
             pathto(args, "cluster_tophits"),
             threads=args.threads,
         )
+        stats["cluster_tophits"] = summarize_tophit_paf(pathto(args, "cluster_tophits"))
 
     stats["endtime"] = str(datetime.now())
     # comes after stats["endtime"] because it writes this information to report
