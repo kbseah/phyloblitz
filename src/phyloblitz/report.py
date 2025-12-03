@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 
 import re
+import logging
 
 from phyloblitz.__about__ import __version__
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune import create_markdown, html
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format="%(levelname)s: %(asctime)s : %(message)s",
+    level=logging.DEBUG,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 CIGAROPS = {
     "M": "match",
@@ -45,6 +53,7 @@ def generate_report_md(stats):
         "qstart",
         "qend",
         "tname",
+        "tophit taxonomy",
         "tstart",
         "tend",
         "seq match",
@@ -82,6 +91,19 @@ def generate_report_html(stats):
     return html(generate_report_md(stats))
 
 
+def db_taxonomy(silva_fasta):
+    """Get taxonomy string from SILVA headers in database Fasta file"""
+    acc2tax = {}
+    with open(silva_fasta, "r") as fh:
+        for line in fh:
+            if line.startswith(">"):
+                spl = line.lstrip(">").rstrip().split(" ")
+                acc = spl[0]
+                taxstring = " ".join(spl[1:]).split(";")
+                acc2tax[acc] = taxstring
+    return acc2tax
+
+
 def parse_cigar_ops(cigar):
     """Summarize operations in a CIGAR string"""
     summary = defaultdict(int)
@@ -91,8 +113,9 @@ def parse_cigar_ops(cigar):
     return summary
 
 
-def summarize_tophit_paf(paf_file):
+def summarize_tophit_paf(paf_file, silva_fasta):
     out = {}
+
     with open(paf_file, "r") as fh:
         for line in fh:
             spl = line.rstrip().split("\t")
@@ -106,6 +129,15 @@ def summarize_tophit_paf(paf_file):
             cigar_summary = parse_cigar_ops(cigar[5:])
             hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
             out[spl[0]] = hits
+
+    logger.info("Reading taxonomy from SILVA database file")
+    acc2tax = db_taxonomy(silva_fasta)
+    logger.debug(f" Accessions read: {str(len(acc2tax))}")
+    for c in out:
+        try:
+            out[c]["tophit taxonomy"] = ";".join(acc2tax[out[c]["tname"]])
+        except KeyError:
+            KeyError(f"Accession {out[c]['tname']} not found in database?")
     return out
 
 

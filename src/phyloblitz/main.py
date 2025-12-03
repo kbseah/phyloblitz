@@ -372,19 +372,6 @@ def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):
     return proc.wait()
 
 
-def db_taxonomy(silvadb):
-    """Get taxonomy string from SILVA headers in database Fasta file"""
-    acc2tax = {}
-    with open(silvadb, "r") as fh:
-        for line in fh:
-            if line.startswith(">"):
-                spl = line.rstrip().split(" ")
-                acc = spl[0]
-                taxstring = " ".join(spl[1:]).split(";")
-                acc2tax[acc] = taxstring
-    return acc2tax
-
-
 def init_args():
     parser = argparse.ArgumentParser(
         prog="phyloblitz",
@@ -482,10 +469,6 @@ def main():
             sys.exit(1)
         else:
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
-
-    #     logger.info("Reading taxonomy from SILVA database file")
-    #     acc2tax = db_taxonomy(args.db)
-    #     logger.debug(f" Accessions read: {str(len(acc2tax))}")
 
     if not check_run_file(args, "initial_map"):
         logger.info("Initial mapping of reads to identify target intervals")
@@ -589,7 +572,9 @@ def main():
             pathto(args, "cluster_tophits"),
             threads=args.threads,
         )
-        stats["cluster_tophits"] = summarize_tophit_paf(pathto(args, "cluster_tophits"))
+        stats["cluster_tophits"] = summarize_tophit_paf(
+            pathto(args, "cluster_tophits"), args.db
+        )
 
     stats["endtime"] = str(datetime.now())
     # comes after stats["endtime"] because it writes this information to report
