@@ -351,13 +351,19 @@ def init_args():
     parser.add_argument(
         "--platform",
         help="Sequencing platform used, either `pb` or `ont`",
-        choices=["ont","pb"],
+        choices=["ont", "pb"],
         default="ont",
     )
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
     parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
     parser.add_argument(
         "-t", "--threads", help="Number of parallel threads", default=12, type=int
+    )
+    parser.add_argument(
+        "--twopass",
+        help="[EXPERIMENTAL] Extract read segments and map again to reference",
+        default=False,
+        action="store_true",
     )
     parser.add_argument(
         "--align_minlen",
@@ -391,7 +397,7 @@ def init_args():
 def main():
     args = init_args()
 
-    stats = {} # Collect data and metadata for reporting stats
+    stats = {}  # Collect data and metadata for reporting stats
     stats["args"] = vars(args)
 
     logger.debug("Arguments:")
@@ -420,9 +426,9 @@ def main():
         else:
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
-    logger.info("Reading taxonomy from SILVA database file")
-    acc2tax = db_taxonomy(args.db)
-    logger.debug(f" Accessions read: {str(len(acc2tax))}")
+    #     logger.info("Reading taxonomy from SILVA database file")
+    #     acc2tax = db_taxonomy(args.db)
+    #     logger.debug(f" Accessions read: {str(len(acc2tax))}")
 
     if not check_run_file(args, "initial_map"):
         logger.info("Initial mapping of reads to identify target intervals")
@@ -434,36 +440,41 @@ def main():
             threads=args.threads,
         )
 
-    if not check_run_file(args, "intervals_fastq"):
-        logger.info("Retrieve aligned intervals on reads")
-        merged_intervals = alignment_first_pass(pathto(args, "initial_map"))
-        stats["merged_intervals"] = merged_intervals
-        extract_fastq_read_intervals(
-            merged_intervals, args.reads, pathto(args, "intervals_fastq")
-        )
+    if args.twopass:
+        if not check_run_file(args, "intervals_fastq"):
+            logger.info("Retrieve aligned intervals on reads")
+            merged_intervals = alignment_first_pass(pathto(args, "initial_map"))
+            stats["merged_intervals"] = merged_intervals
+            extract_fastq_read_intervals(
+                merged_intervals, args.reads, pathto(args, "intervals_fastq")
+            )
 
-    if not check_run_file(args, "second_map"):
-        logger.info("Second mapping of extracted intervals for taxonomic summary")
-        map_ret = run_minimap(
-            args.db,
-            pathto(args, "intervals_fastq"),
-            pathto(args, "second_map"),
-            mode="map-" + args.platform,
-            threads=args.threads,
-        )
+        if not check_run_file(args, "second_map"):
+            logger.info("Second mapping of extracted intervals for taxonomic summary")
+            map_ret = run_minimap(
+                args.db,
+                pathto(args, "intervals_fastq"),
+                pathto(args, "second_map"),
+                mode="map-" + args.platform,
+                threads=args.threads,
+            )
+        sam_for_read_extraction = pathto(args, "second_map")
+
+    else:
+        sam_for_read_extraction = pathto(args, "initial_map")
 
     if not check_run_file(args, "mapped_segments"):
         counter = 0
         with open(pathto(args, "mapped_segments"), "w") as fq_fh:
             for name, seq, quals in sam_seq_generator(
-                pathto(args, "second_map"), minlen=args.align_minlen
+                sam_for_read_extraction, minlen=args.align_minlen
             ):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
-        logger.info(f"Read segments extracted by second mapping: {str(counter)}")
+        logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
 
     if not check_run_file(args, "ava_map"):
         ava_ret = ava_map(
