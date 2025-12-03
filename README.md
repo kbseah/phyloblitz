@@ -55,11 +55,14 @@ phyloFlash paper for details.
 
 ## TODO
 
- * Investigate effect of dv cutoff values and clustering methods
- * Can we set thresholds more naturally by bootstrapping read metrics from mapping steps?
- * Report metrics into a user-friendly file like phyloFlash:
-     * Numbers of reads mapped and taxonomic summary
-     * Assembled sequences, top hits, and respective read coverage and cluster metrics (plus heuristic assembly quality score)
+ - [ ] Investigate effect of dv cutoff values and clustering methods
+ - [ ] Can we set thresholds more naturally by bootstrapping read metrics from mapping steps?
+ - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
+ - [ ] Report metrics into a user-friendly file like phyloFlash
+     - [x] Numbers of reads mapped and taxonomic summary
+     - [x] Assembled sequences, top hits, and respective read coverage and cluster metrics (plus heuristic assembly quality score)
+     - [ ] Link SILVA record by accession
+     - [ ] Percentage sequence ID (using vsearch metric?)
 
 ## Citations
 
