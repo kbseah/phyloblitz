@@ -82,10 +82,8 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
     # Don't use mappy because it doesn't support all-vs-all yet
     logger.info("Mapping reads to reference database with minimap2")
     with open(sam_file, "w") as sam_fh:
-        if refindex is not None:
-            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", refindex, reads]
-        else:
-            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}", ref, reads]
+        cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
+        cmd1.extend([refindex, reads]) if refindex is not None else cmd1.extend([ref, reads])
         logger.debug("minimap command: " + " ".join(cmd1))
         proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
         proc2 = Popen(
@@ -335,6 +333,22 @@ def spoa_assemble(fastq):
     return proc.communicate()[0]
 
 
+def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):
+    """Map assembled sequences to reference DB and get top hits
+
+    :param ref: Path to reference sequence file
+    :param refindex: Path to reference index file (optional)
+    :param paf_file: Path to write PAF file output from mapping
+    :param threads: Number of threads for minimap2 to use
+    """
+    logger.info("Mapping assembled sequences to reference database with minimap2")
+    cmd = ["minimap2", "-x", "asm5", "-c", "--eqx", "--secondary=no", "-t", str(threads), "-o", paf_file]
+    cmd.extend([refindex, fasta_file]) if refindex is not None else cmd.extend([ref, fasta_file])
+    logger.debug("minimap command: " + " ".join(cmd))
+    proc = Popen(cmd)  # TODO pipe stderr to log file
+    return proc.wait()
+
+
 def db_taxonomy(silvadb):
     """Get taxonomy string from SILVA headers in database Fasta file"""
     acc2tax = {}
@@ -395,6 +409,12 @@ def init_args():
         help="Resume partially completed run based on expected filenames",
         default=False,
         action="store_true",
+    )
+    parser.add_argument(
+        "--noreport",
+        help="Do not generate report file",
+        default=False,
+        action="store_true"
     )
     parser.add_argument(  # TODO not yet implemented
         "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
@@ -538,6 +558,15 @@ def main():
                 )
             logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
 
+    if not check_run_file(args, "cluster_tophits"):
+        cluster_asm_tophits(
+            args.db,
+            args.dbindex,
+            pathto(args, "cluster_asm"),
+            pathto(args, "cluster_tophits"),
+            threads=args.threads,
+        )
+
     stats["endtime"] = str(datetime.now())
     # comes after stats["endtime"] because it writes this information to report
     if not check_run_file(args, "report_json"):
@@ -545,15 +574,16 @@ def main():
             logger.info("Writing report stats to " + pathto(args, "report_json"))
             json.dump(stats, fh, indent=4)
 
-    if not check_run_file(args, "report_md"):
-        with open(pathto(args, "report_md"), "w") as fh:
-            logger.info("Writing report markdown to " + pathto(args, "report_md"))
-            fh.write(generate_report_md(stats))
+    if not args.noreport:
+        if not check_run_file(args, "report_md"):
+            with open(pathto(args, "report_md"), "w") as fh:
+                logger.info("Writing report markdown to " + pathto(args, "report_md"))
+                fh.write(generate_report_md(stats))
 
-    if not check_run_file(args, "report_html"):
-        with open(pathto(args, "report_html"), "w") as fh:
-            logger.info("Writing report HTML to " + pathto(args, "report_html"))
-            fh.write(generate_report_html(stats))
+        if not check_run_file(args, "report_html"):
+            with open(pathto(args, "report_html"), "w") as fh:
+                logger.info("Writing report HTML to " + pathto(args, "report_html"))
+                fh.write(generate_report_html(stats))
 
     logger.info("-------------- phyloblitz run complete --------------")
 
