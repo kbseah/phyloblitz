@@ -204,7 +204,7 @@ def paf_get_dvs(paf_file):
             dv = re.findall(r"dv:f:([\d\.]+)", line)
             assert (
                 len(dv) == 1
-            ), "Problem in PAF file {paf_file}: more than one dv tag in entry"
+            ), f"Problem in PAF file {paf_file}: more than one dv tag in entry"
             dvs[query].append(float(dv[0]))
     return dvs
 
