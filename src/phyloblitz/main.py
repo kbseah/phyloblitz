@@ -353,14 +353,19 @@ def init_args():
         description="SSU rRNA profile from ONT or PacBio long reads",
     )
     parser.add_argument(
-        "-d", "--db", help="Path to preprocessed SILVA database fasta file"
+        "-d",
+        "--db",
+        help="Path to preprocessed SILVA database fasta file",
+        required=True,
     )
     parser.add_argument(
         "--dbindex",
         help="Path to minimap2 index of database file (optional)",
         default=None,
     )
-    parser.add_argument("-r", "--reads", help="Fastq or Fastq.gz read file to screen")
+    parser.add_argument(
+        "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
+    )
     parser.add_argument(
         "--platform",
         help="Sequencing platform used, either `pb` or `ont`",
@@ -390,7 +395,7 @@ def init_args():
         default=False,
         action="store_true",
     )
-    parser.add_argument(
+    parser.add_argument(  # TODO not yet implemented
         "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
     )
     parser.add_argument(
@@ -398,13 +403,7 @@ def init_args():
         help="Write logging messages to this file",
     )
 
-    args = parser.parse_args()
-
-    if not args.db or not args.reads:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-
-    return args
+    return parser.parse_args()
 
 
 def main():
