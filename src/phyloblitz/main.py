@@ -29,6 +29,7 @@ OUTFILE_SUFFIX = {
     "ava_seqtab": "_ava_seq.tab",
     "mcl_cluster": "_mcl.out",
     "cluster_asm": "_final.fasta",
+    "cluster_tophits": "_final_tophits.paf",
     "report_json": "_report.json",
     "report_md": "_report.md",
     "report_html": "_report.html",
@@ -94,7 +95,7 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
         return proc2.wait()
 
 
-def alignment_first_pass(sam_file, minlen=1200):
+def get_firstpass_intervals(sam_file, minlen=1200):
     """Filter initial alignment to get primary mappings for all-vs-all mapping
 
     :param sam_file: Path to SAM file from initial mapping step
@@ -457,7 +458,7 @@ def main():
     if args.twopass:
         if not check_run_file(args, "intervals_fastq"):
             logger.info("Retrieve aligned intervals on reads")
-            merged_intervals = alignment_first_pass(pathto(args, "initial_map"))
+            merged_intervals = get_firstpass_intervals(pathto(args, "initial_map"))
             stats["merged_intervals"] = merged_intervals
             extract_fastq_read_intervals(
                 merged_intervals, args.reads, pathto(args, "intervals_fastq")
