@@ -14,7 +14,9 @@ from multiprocessing import Pool
 from os import makedirs
 from tempfile import NamedTemporaryFile
 from collections import defaultdict
+from datetime import datetime
 
+from phyloblitz.report import generate_report_md, generate_report_html
 
 OUTFILE_SUFFIX = {
     "initial_map": "_minimap_initial.sam",
@@ -28,6 +30,8 @@ OUTFILE_SUFFIX = {
     "mcl_cluster": "_mcl.out",
     "cluster_asm": "_final.fasta",
     "report_json": "_report.json",
+    "report_md": "_report.md",
+    "report_html": "_report.html",
 }
 
 logger = logging.getLogger(__name__)
@@ -413,6 +417,7 @@ def main():
         logger.addHandler(logfh)
 
     logger.info("Starting phyloblitz run ... ")
+    stats["starttime"] = str(datetime.now())
 
     logger.info(f"Creating output folder {args.outdir}")
     try:
@@ -522,10 +527,22 @@ def main():
                 )
             logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
 
+    stats["endtime"] = str(datetime.now())
+    # comes after stats["endtime"] because it writes this information to report
     if not check_run_file(args, "report_json"):
         with open(pathto(args, "report_json"), "w") as fh:
             logger.info("Writing report stats to " + pathto(args, "report_json"))
             json.dump(stats, fh, indent=4)
+
+    if not check_run_file(args, "report_md"):
+        with open(pathto(args, "report_md"), "w") as fh:
+            logger.info("Writing report markdown to " + pathto(args, "report_md"))
+            fh.write(generate_report_md(stats))
+
+    if not check_run_file(args, "report_html"):
+        with open(pathto(args, "report_html"), "w") as fh:
+            logger.info("Writing report HTML to " + pathto(args, "report_html"))
+            fh.write(generate_report_html(stats))
 
     logger.info("-------------- phyloblitz run complete --------------")
 
