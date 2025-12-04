@@ -15,9 +15,9 @@ from datetime import datetime
 
 
 def main():
-    logging.basicConfig( level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
-    root_logger.handlers.clear() # avoid duplicate handlers
+    root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
     args = pipeline.init_args()
