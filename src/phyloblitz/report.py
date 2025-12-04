@@ -83,26 +83,6 @@ def generate_report_md(stats):
     :returns: Report in markdown format
     :rtype: str
     """
-    out = []
-    out.append("# phyloblitz run report\n")
-    out.append("* Run started: " + str(stats["starttime"]))
-    out.append("* Run ended: " + str(stats["endtime"]))
-    out.append("* phyloblitz version: " + __version__)
-    out.append("")
-    out.append("phyloblitz [homepage](https://github.com/kbseah/phyloblitz)")
-    out.append("")
-    out.append("## Argument string\n")
-    out.append("phyloblitz was called with the following command line arguments:\n")
-    out.append(dict2markdowntable(stats["args"]))
-    out.append("")
-    out.append("## Cluster stats\n")
-    out.append(
-        """Summary of assembled sequence clusters and their top hits in
-        reference database. Cluster sequences with few underlying reads and
-        many mismatches/indels to the reference hits are lower quality because
-        of insufficient coverage, and should not be used for phylogenetics or
-        probe design.\n"""
-    )
     cluster_table_fields = [
         "numseq",
         "tname",
@@ -117,14 +97,33 @@ def generate_report_md(stats):
         "insertion",
         "deletion",
     ]
-    out.append(
-        dod2markdowntable(
-            per_cluster_summarize(stats), cluster_table_fields, col1="Cluster ID"
-        )
-    )
-    out.append("")
 
-    raw = "\n".join(out)
+    raw = f"""# phyloblitz run report
+
+* Run started: {str(stats["starttime"])}
+* Run ended: {str(stats["endtime"])}
+* phyloblitz version: {__version__}
+
+phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
+
+## Input parameters
+
+phyloblitz was called with the following parameters:
+
+{dict2markdowntable(stats["args"])}
+
+## Assembled sequence clusters
+
+Summary of assembled sequence clusters and their top hits in the reference
+database. Cluster sequences with few underlying reads and many
+mismatches/indels to the reference hits are lower quality because of
+insufficient coverage, and should not be used for phylogenetics or probe
+design.
+
+{dod2markdowntable(per_cluster_summarize(stats), cluster_table_fields, col1='Cluster ID')}
+
+"""
+
     format_md = create_markdown(renderer=MarkdownRenderer())
     return format_md(raw)
 
