@@ -440,6 +440,12 @@ def init_args():
         type=int,
     )
     parser.add_argument(
+        "--dv_max",
+        help="Maximum pairwise sequence divergence in all-vs-all mapping to retain for clustering",
+        default=0.03,
+        type=float,
+    )
+    parser.add_argument(
         "--resume",
         help="Resume partially completed run based on expected filenames",
         default=False,
@@ -556,7 +562,9 @@ def main():
         stats["dvs"] = paf_get_dvs(pathto(args, "ava_map"))
 
     if not check_run_file(args, "ava_abc"):
-        abc_ret = paf_abc(pathto(args, "ava_map"), pathto(args, "ava_abc"), dv_max=0.03)
+        abc_ret = paf_abc(
+            pathto(args, "ava_map"), pathto(args, "ava_abc"), dv_max=args.dv_max
+        )
 
     if not check_run_file(args, "ava_mci") and not check_run_file(args, "ava_seqtab"):
         mcx_ret = mcxload(
