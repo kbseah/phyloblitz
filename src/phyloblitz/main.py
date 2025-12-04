@@ -93,10 +93,12 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
             else cmd1.extend([ref, reads])
         )
         logger.debug("minimap command: " + " ".join(cmd1))
-        proc1 = Popen(cmd1, stdout=PIPE)  # TODO pipe stderr to log file
+        proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
         proc2 = Popen(
             ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
         )
+        for l in proc1.stderr:  # TODO capture number of reads in input for stats
+            logger.debug("  minimap log: " + l.decode().rstrip())  # output is in bytes
         proc1.stdout.close()
         return proc2.wait()
 
@@ -206,7 +208,9 @@ def ava_map(reads, paf_file, mode="ava-ont", threads=12):
     with open(paf_file, "w") as paf_fh:
         cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
         logger.debug("minimap command: " + " ".join(cmd))
-        proc = Popen(cmd, stdout=paf_fh)
+        proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
+        for l in proc.stderr:
+            logger.debug("  minimap log: " + l.decode().rstrip())
         return proc.wait()
 
 
@@ -264,7 +268,9 @@ def mcxload(abc_file, mci_file, tab_file):
         tab_file,
     ]
     logger.debug("mcxload command: " + " ".join(cmd))
-    proc = Popen(cmd)
+    proc = Popen(cmd, stderr=PIPE)
+    for l in proc.stderr:
+        logger.debug("  mcxload log: " + l.decode().rstrip())
     return proc.wait()
 
 
@@ -288,7 +294,9 @@ def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
         mcl_out,
     ]
     logger.debug("mcl command: " + " ".join(cmd))
-    proc = Popen(cmd)
+    proc = Popen(cmd, stderr=PIPE)
+    for l in proc.stderr:
+        logger.debug("  mcl log: " + l.decode().rstrip())
     return proc.wait()
 
 
@@ -337,7 +345,9 @@ def spoa_assemble(fastq):
         fastq,
     ]
     logger.debug("spoa command: " + " ".join(cmd))
-    proc = Popen(cmd, stdout=PIPE, text=True)
+    proc = Popen(cmd, stdout=PIPE, text=True, stderr=PIPE)
+    for l in proc.stderr:
+        logger.debug("  mcl log: " + l.decode().rstrip())
     return proc.communicate()[0]
 
 
@@ -368,7 +378,9 @@ def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):
         else cmd.extend([ref, fasta_file])
     )
     logger.debug("minimap command: " + " ".join(cmd))
-    proc = Popen(cmd)  # TODO pipe stderr to log file
+    proc = Popen(cmd, stderr=PIPE)
+    for l in proc.stderr:
+        logger.debug("  minimap log: " + l.decode().rstrip())
     return proc.wait()
 
 
