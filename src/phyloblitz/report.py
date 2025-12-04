@@ -192,11 +192,29 @@ def parse_cigar_ops(cigar):
     return summary
 
 
-def summarize_tophit_paf(paf_file, silva_fasta):
+def lists_common_prefix(lol):
+    """Get common prefix in a list of lists
+
+    :param lol: list of lists of strings
+    :returns: list of the common prefix
+    :rtype: list
+    """
+    out = []
+    for j in range(min([len(l) for l in lol])):
+        s = set([i[j] for i in lol])
+        if len(s) == 1:
+            out.append(s.pop())
+        else:
+            break
+    return out
+
+
+def summarize_tophit_paf(paf_file, silva_fasta, acc2tax):
     """Summarize top hits of assembled seqs mapped to SILVA database by minimap2
 
     :param paf_file: Path to PAF output from minimap2, must have CIGAR string
     :param silva_fasta: Path to Fasta formatted SILVA database
+    :param acc2tax: Dict of SILVA taxonomy strings keyed by ref db sequence id
     :returns: Dict of summary stats for each hit, keyed by query sequence name
     :rtype: dict
     """
@@ -241,9 +259,6 @@ def summarize_tophit_paf(paf_file, silva_fasta):
             out[spl[0]] = hits
 
     # Taxonomy of hit targets
-    logger.info("Reading taxonomy from SILVA database file")
-    acc2tax = db_taxonomy(silva_fasta)
-    logger.debug(f" Accessions read: {str(len(acc2tax))}")
     for c in out:
         try:
             # hyperlink to ENA record

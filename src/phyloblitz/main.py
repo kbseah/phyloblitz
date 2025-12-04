@@ -21,6 +21,7 @@ from phyloblitz.report import (
     generate_report_md,
     generate_report_html,
     summarize_tophit_paf,
+    db_taxonomy,
 )
 
 OUTFILE_SUFFIX = {
@@ -604,6 +605,10 @@ def main():
                 )
             logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
 
+    logger.info("Reading taxonomy from SILVA database file")
+    acc2tax = db_taxonomy(args.db)
+    logger.debug(f" Accessions read: {str(len(acc2tax))}")
+
     if not check_run_file(args, "cluster_tophits"):
         cluster_asm_tophits(
             args.db,
@@ -613,7 +618,7 @@ def main():
             threads=args.threads,
         )
         stats["cluster_tophits"] = summarize_tophit_paf(
-            pathto(args, "cluster_tophits"), args.db
+            pathto(args, "cluster_tophits"), args.db, acc2tax
         )
 
     stats["endtime"] = str(datetime.now())
