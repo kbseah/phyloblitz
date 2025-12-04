@@ -3,4 +3,5 @@
 !.pixi/config.toml
 # caches
 __pycache__
-/pbz_test*
+# test run folder
+/test_run
