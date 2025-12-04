@@ -1,10 +1,23 @@
 # phyloblitz 🌳🌩️
 
+Rapid SSU rRNA marker gene screening of long read metagenomes
+
 -----
 
-The name refers to the precursor tool
-[phyloFlash](https://hrgv.github.io/phyloFlash/) and to
-[bioblitz](https://en.wikipedia.org/wiki/BioBlitz) events.
+`phyloblitz` is a tool to rapidly screen long read metagenomes with ribosomal
+RNA genes, generating a taxonomic summary and targeted assemblies of
+full-length SSU rRNA sequences.
+
+ * Quickly check the composition and complexity of metagenomes before
+     committing time and resources to de novo assembly.
+ * Leverage the broad phylogenetic coverage of the SILVA rRNA database to
+     detect taxa underrepresented in genome databases.
+ * Use assembled gene sequences for phylogenetics and probe design.
+
+The rRNA-targeted screening approach for metagenomes was originally implemented
+for Illumina reads in the software tool
+[phyloFlash](https://hrgv.github.io/phyloFlash/); the name `phyloblitz`
+references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 
 ## Usage
@@ -20,6 +33,7 @@ pixi run phyloblitz --help
 Required inputs are a preprocessed SILVA reference database and the long read
 files in fastq(.gz) format.
 
+
 ## Reference database
 
 Download the database files from https://doi.org/10.5281/zenodo.7892522
@@ -34,43 +48,48 @@ with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
 phyloFlash paper for details.
 
 
-## License
+## Pipeline overview
 
-`phyloblitz` is distributed under the terms of the
-[MIT](https://spdx.org/licenses/MIT.html) license.
-
-
-## Pipeline
-
- * Map to SILVA with minimap2 and output SAM
- * Taxonomic summary per read with primary + secondary alignments
- * Extract aligned portion of mapped reads (optionally with flanking
-     sequence?), use primary alignment only otherwise we get duplicate read
-     segments with slightly differing boundaries
- * All-vs-all mapping of extracted reads with minimap2
- * Define read clusters: Filter out all-vs-all mappings where per-base sequence
-     divergence reported by minimap (dv: tag) is less than expected sequence
-     divergence from sequencing platform; use mcl to generate clusters
- * Get consensus sequence per read cluster with spoa
- * Generate metrics per consensus cluster for diagnostics: expect similar error
-     rate per read vs. consensus, identify clusters with too few reads
+ * Map reads to SILVA with minimap2 and retain only mapped reads
+ * Summarize taxonomy across mapped reads, using consensus taxonomy of each read
+ * Extract aligned portion of mapped reads, use primary alignment only
+     otherwise we get duplicate read segments with slightly differing
+     boundaries
+ * All-vs-all mapping of extracted read segments with minimap2
+ * Filter out all-vs-all mappings where per-base sequence divergence reported
+     by minimap (dv: tag) is too low; this parameter should be adjusted,
+     depending on the expected read accuracy of the sequencing platform
+ * Cluster sequences with mcl
+ * Assemble consensus sequence per read cluster with spoa
+ * Generate metrics per cluster for diagnostics: expect similar error rate per
+     read vs. consensus, identify clusters with too few reads
 
 
 ## TODO
 
+v0.1.0 targets:
+
  - [x] Taxonomy summary from initial mapping
  - [x] Reads in input, number mapped, number used for cluster assembly
- - [ ] Investigate effect of dv cutoff values and clustering methods
- - [ ] Can we set thresholds more naturally by bootstrapping read metrics from
-     mapping steps?
+ - [ ] Choose dv_max threshold from observed values in all-vs-all mapping
  - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
+ - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
+ - [ ] Check if tool works on PacBio data
  - [x] Report metrics into a user-friendly file like phyloFlash
      - [x] Numbers of reads mapped and taxonomic summary
      - [x] Assembled sequences, top hits, and respective read coverage and
          cluster metrics (plus heuristic assembly quality score)
      - [x] Link SILVA record by accession
      - [x] Alignment identity (using Blast-like % id definition)
-     - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
+
+Future steps:
+
+ - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
+ - [ ] Investigate effect of dv cutoff values and clustering methods
+ - [ ] Benchmarking against defined test datasets
+ - [ ] MultiQC integration
+ - [ ] Detailed documentation
+ - [ ] Object orientation 🫠
 
 
 ## Citations
@@ -95,3 +114,9 @@ Please cite the SILVA reference database if you use it:
      SILVA in 2026: a global core biodata resource for rRNA within the DSMZ
      digital diversity. Nucleic Acids Research, gkaf1247, 2026.
      https://doi.org/10.1093/nar/gkaf1247
+
+
+## License
+
+`phyloblitz` is distributed under the terms of the
+[MIT](https://spdx.org/licenses/MIT.html) license.
