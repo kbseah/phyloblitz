@@ -10,7 +10,7 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    format="%(levelname)s: %(asctime)s : %(message)s",
+    format="%(levelname)s : %(module)s : %(asctime)s : %(message)s",
     level=logging.DEBUG,
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -49,17 +49,22 @@ def generate_report_md(stats):
     out.append("")
     out.append("## Cluster stats\n")
     out.append(
-        "Summary of assembled sequence clusters and their top hits in reference database. Cluster sequences with few underlying reads and many mismatches/indels to the reference hits are lower quality because of insufficient coverage, and should not be used for phylogenetics or probe design.\n"
+        """Summary of assembled sequence clusters and their top hits in
+        reference database. Cluster sequences with few underlying reads and
+        many mismatches/indels to the reference hits are lower quality because
+        of insufficient coverage, and should not be used for phylogenetics or
+        probe design.\n"""
     )
     cluster_table_dict = per_cluster_summarize(stats)
     cluster_table_fields = [
         "numseq",
-        "qstart",
-        "qend",
         "tname",
-        "tophit taxonomy",
-        "tstart",
-        "tend",
+        "higher taxonomy",
+        "tophit species",
+        "align %id",
+        "alnlen",
+        "query %aln",
+        "target %aln",
         "seq match",
         "seq mismatch",
         "insertion",
@@ -67,7 +72,7 @@ def generate_report_md(stats):
     ]
     out.append("| cluster name | " + " | ".join(cluster_table_fields) + " |")
     out.append(
-        "| ------ | " + " | ".join(["------" for f in cluster_table_fields]) + " |"
+        "| :----: | " + " | ".join([":----:" for f in cluster_table_fields]) + " |"
     )
     for c in cluster_table_dict:
         out.append(
@@ -125,13 +130,36 @@ def summarize_tophit_paf(paf_file, silva_fasta):
             spl = line.rstrip().split("\t")
             hits = dict(
                 zip(
-                    ["qname", "qstart", "qend", "tname", "tstart", "tend"],
-                    [spl[0], spl[2], spl[3], spl[5], spl[7], spl[8]],
+                    [
+                        "qname",
+                        "qlen",
+                        "qstart",
+                        "qend",
+                        "strand",
+                        "tname",
+                        "tlen",
+                        "tstart",
+                        "tend",
+                        "alnmatch",
+                        "alnlen",
+                    ],
+                    spl[0:11],
                 )
             )
             cigar = [i for i in spl if i.startswith("cg:Z:")][0]
             cigar_summary = parse_cigar_ops(cigar[5:])
             hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
+            hits["align %id"] = "{:.2%}".format(
+                int(hits["alnmatch"]) / int(hits["alnlen"])
+            ).rstrip(
+                "%"
+            )  # remove redundant % sign for display
+            hits["query %aln"] = "{:.2%}".format(
+                (int(hits["qend"]) - int(hits["qstart"])) / int(hits["qlen"])
+            ).rstrip("%")
+            hits["target %aln"] = "{:.2%}".format(
+                (int(hits["tend"]) - int(hits["tstart"])) / int(hits["tlen"])
+            ).rstrip("%")
             out[spl[0]] = hits
 
     logger.info("Reading taxonomy from SILVA database file")
@@ -140,6 +168,17 @@ def summarize_tophit_paf(paf_file, silva_fasta):
     for c in out:
         try:
             out[c]["tophit taxonomy"] = ";".join(acc2tax[out[c]["tname"]])
+            out[c]["tophit species"] = acc2tax[out[c]["tname"]][-1]
+            if out[c]["tophit taxonomy"].startswith(
+                "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast"
+            ):
+                out[c]["higher taxonomy"] = "[Chloroplast]"
+            elif out[c]["tophit taxonomy"].startswith(
+                "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria"
+            ):
+                out[c]["higher taxonomy"] = "[Mitochondria]"
+            else:
+                out[c]["higher taxonomy"] = ";".join(acc2tax[out[c]["tname"]][0:3])
         except KeyError:
             KeyError(f"Accession {out[c]['tname']} not found in database?")
     return out

@@ -41,7 +41,7 @@ OUTFILE_SUFFIX = {
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    format="%(levelname)s: %(asctime)s : %(message)s",
+    format="%(levelname)s : %(module)s : %(asctime)s : %(message)s",
     level=logging.DEBUG,
     datefmt="%Y-%m-%d %H:%M:%S",
 )
