@@ -5,3 +5,4 @@
 __pycache__
 # test run folder
 /test_run
+test.log
