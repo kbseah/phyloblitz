@@ -85,7 +85,7 @@ def generate_report_md(stats):
     """
     cluster_table_fields = [
         "numseq",
-        "tname",
+        "tophit",
         "higher taxonomy",
         "tophit species",
         "align %id",
@@ -193,6 +193,7 @@ def summarize_tophit_paf(paf_file, silva_fasta):
                 )
             )
             cigar = [i for i in spl if i.startswith("cg:Z:")][0]
+            # Calculate derived metrics from PAF fields
             cigar_summary = parse_cigar_ops(cigar[5:])
             hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
             hits["align %id"] = "{:.2%}".format(
@@ -208,11 +209,20 @@ def summarize_tophit_paf(paf_file, silva_fasta):
             ).rstrip("%")
             out[spl[0]] = hits
 
+    # Taxonomy of hit targets
     logger.info("Reading taxonomy from SILVA database file")
     acc2tax = db_taxonomy(silva_fasta)
     logger.debug(f" Accessions read: {str(len(acc2tax))}")
     for c in out:
         try:
+            # hyperlink to ENA record
+            out[c]["tophit"] = (
+                "["
+                + out[c]["tname"]
+                + "](https://www.ebi.ac.uk/ena/browser/view/"
+                + out[c]["tname"].split(".")[0]
+                + ")"
+            )
             out[c]["tophit taxonomy"] = ";".join(acc2tax[out[c]["tname"]])
             out[c]["tophit species"] = acc2tax[out[c]["tname"]][-1]
             # Higher taxonomy to class level, except for chloroplast and mitochondria
