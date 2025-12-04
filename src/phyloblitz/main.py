@@ -108,11 +108,11 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
         proc2 = Popen(
             ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
         )
-        nreads = None
+        nreads = 0
         for l in proc1.stderr:
             nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
             if nreads_s:
-                nreads = int(nreads_s.group(1))
+                nreads += int(nreads_s.group(1))
             logger.debug("  minimap log: " + l.decode().rstrip())  # output is in bytes
         proc1.stdout.close()
         return proc2.wait(), nreads
