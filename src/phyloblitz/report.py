@@ -28,9 +28,61 @@ CIGAROPS = {
 }
 
 
-def generate_report_md(stats):
-    """Generate markdown report from stats collected during phyloblitz run"""
+def dict2markdowntable(d, keys=None, col1="Parameter", col2="Value"):
+    """Convert dict to a markdown table
 
+    Key will be cast as row names
+
+    :param d: Dict to convert to table
+    :param keys: Keys to include in table; if None, all keys will be used
+    :param col1: Column header for first column
+    :param col2: Column header for second column
+    :returns: Text table in markdown format
+    :rtype: str
+    """
+    if keys is None:
+        keys = list(d.keys())
+    out = []
+    out.append(f"| {col1} | {col2} |")
+    out.append(f"| :----- | :----- |")
+    for k in keys:
+        try:
+            out.append(f"| {str(k)} | {str(d[k])} |")
+        except KeyError:
+            raise Exception(f"Key {k} not defined in dict")
+    return "\n".join(out)
+
+
+def dod2markdowntable(d, keys, col1="Name"):
+    """Convert dict of dicts to a markdown table
+
+    The first key will be cast as row names, second key as column names.
+
+    :param d: Dict of dicts
+    :param keys: Keys to use as columns, must be keys of the second-level dicts
+    :param col1: Column header to use for the first column
+    :returns: Text table in markdown format
+    :rtype: str
+    """
+    out = []
+    out.append(f"| {col1} | " + " | ".join(keys) + " |")
+    out.append("| :----: | " + " | ".join([":----:"] * len(keys)) + " |")
+    for c in d:
+        out.append(
+            f"| {str(c)} | "
+            + " | ".join([str(d[c][k]) if k in d[c] else "-" for k in keys])
+            + " |"
+        )
+    return "\n".join(out)
+
+
+def generate_report_md(stats):
+    """Generate markdown report from stats collected during phyloblitz run
+
+    :param stats: `stats` dict produced in phyloblitz.main.main
+    :returns: Report in markdown format
+    :rtype: str
+    """
     out = []
     out.append("# phyloblitz run report\n")
     out.append("* Run started: " + str(stats["starttime"]))
@@ -41,11 +93,7 @@ def generate_report_md(stats):
     out.append("")
     out.append("## Argument string\n")
     out.append("phyloblitz was called with the following command line arguments:\n")
-    out.append("```")
-    out.append(
-        " ".join([" ".join(["--" + i, str(stats["args"][i])]) for i in stats["args"]])
-    )
-    out.append("```")
+    out.append(dict2markdowntable(stats["args"]))
     out.append("")
     out.append("## Cluster stats\n")
     out.append(
@@ -55,7 +103,6 @@ def generate_report_md(stats):
         of insufficient coverage, and should not be used for phylogenetics or
         probe design.\n"""
     )
-    cluster_table_dict = per_cluster_summarize(stats)
     cluster_table_fields = [
         "numseq",
         "tname",
@@ -70,23 +117,11 @@ def generate_report_md(stats):
         "insertion",
         "deletion",
     ]
-    out.append("| cluster name | " + " | ".join(cluster_table_fields) + " |")
     out.append(
-        "| :----: | " + " | ".join([":----:" for f in cluster_table_fields]) + " |"
-    )
-    for c in cluster_table_dict:
-        out.append(
-            "| "
-            + c
-            + " | "
-            + " | ".join(
-                [
-                    str(cluster_table_dict[c][k]) if k in cluster_table_dict[c] else "-"
-                    for k in cluster_table_fields
-                ]
-            )
-            + " |"
+        dod2markdowntable(
+            per_cluster_summarize(stats), cluster_table_fields, col1="Cluster ID"
         )
+    )
     out.append("")
 
     raw = "\n".join(out)
@@ -101,7 +136,12 @@ def generate_report_html(stats):
 
 
 def db_taxonomy(silva_fasta):
-    """Get taxonomy string from SILVA headers in database Fasta file"""
+    """Get taxonomy string from SILVA headers in database Fasta file
+
+    :param silva_fasta: Path to SILVA reference database in Fasta format; headers must follow SILVA format
+    :returns: Dict of taxonomy strings keyed by SILVA accession
+    :rtype: dict
+    """
     acc2tax = {}
     with open(silva_fasta, "r") as fh:
         for line in fh:
@@ -123,6 +163,13 @@ def parse_cigar_ops(cigar):
 
 
 def summarize_tophit_paf(paf_file, silva_fasta):
+    """Summarize top hits of assembled seqs mapped to SILVA database by minimap2
+
+    :param paf_file: Path to PAF output from minimap2, must have CIGAR string
+    :param silva_fasta: Path to Fasta formatted SILVA database
+    :returns: Dict of summary stats for each hit, keyed by query sequence name
+    :rtype: dict
+    """
     out = {}
 
     with open(paf_file, "r") as fh:
@@ -169,6 +216,8 @@ def summarize_tophit_paf(paf_file, silva_fasta):
         try:
             out[c]["tophit taxonomy"] = ";".join(acc2tax[out[c]["tname"]])
             out[c]["tophit species"] = acc2tax[out[c]["tname"]][-1]
+            # Higher taxonomy to class level, except for chloroplast and mitochondria
+            # Assumes SILVA taxonomy is in use
             if out[c]["tophit taxonomy"].startswith(
                 "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast"
             ):
