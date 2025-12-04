@@ -2,6 +2,7 @@
 
 import re
 import logging
+import pysam
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +11,7 @@ from phyloblitz.__about__ import __version__
 import phyloblitz.main as main
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune import create_markdown, html
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -32,7 +33,14 @@ CIGAROPS = {
 }
 
 
-def dict2markdowntable(d, keys=None, col1="Parameter", col2="Value"):
+def dict2markdowntable(
+    d,
+    keys=None,
+    col1="Parameter",
+    col2="Value",
+    order_by_value=False,
+    order_descending=True,
+):
     """Convert dict to a markdown table
 
     Key will be cast as row names
@@ -44,8 +52,18 @@ def dict2markdowntable(d, keys=None, col1="Parameter", col2="Value"):
     :returns: Text table in markdown format
     :rtype: str
     """
-    if keys is None:
-        keys = list(d.keys())
+    if order_by_value:
+        ordered_keys = (
+            sorted(d, key=lambda x: -d[x])
+            if order_descending
+            else sorted(d, key=lambda x: d[x])
+        )
+    else:
+        ordered_keys = list(d.keys())
+    if keys is not None:
+        keys = [i for i in ordered_keys if i in keys]
+    else:
+        keys = ordered_keys
     out = []
     out.append(f"| {col1} | {col2} |")
     out.append(f"| :----- | :----- |")
@@ -143,6 +161,12 @@ phyloblitz was called with the following parameters:
 
 ![]({main.pathto(args, 'report_dvs_hist', basename_only=True)})
 
+
+## Taxonomy summary from initial mapping
+
+{dict2markdowntable(stats['initial_taxonomy'], order_by_value=True)}
+
+
 ## Assembled sequence clusters
 
 Summary of assembled sequence clusters and their top hits in the reference
@@ -209,11 +233,33 @@ def lists_common_prefix(lol):
     return out
 
 
-def summarize_tophit_paf(paf_file, silva_fasta, acc2tax):
+def per_read_consensus_taxonomy(sam_file, acc2tax, minlen=1200):
+    """Summarize taxonomy from initial mapping with minimap2
+
+    :param sam_file: Path to SAM file of initial mapping
+    :param acc2tax: Dict of SILVA taxonomy strings keyed by ref db sequence id
+    """
+    all_taxstrings = defaultdict(list)
+    sam = pysam.AlignmentFile(sam_file, "r")
+    for i in sam.fetch():
+        if i.query_alignment_length >= minlen:
+            all_taxstrings[i.query_name].append(acc2tax[i.reference_name])
+    common_taxstrings = {
+        acc: lists_common_prefix(all_taxstrings[acc]) for acc in all_taxstrings
+    }
+    return common_taxstrings
+
+
+def summarize_initial_mapping_taxonomy(sam_file, acc2tax, minlen, taxlevel=4):
+    common_taxstrings = per_read_consensus_taxonomy(sam_file, acc2tax, minlen=minlen)
+    # TODO right-pad taxonomy strings if too short
+    return Counter([";".join(i[0:taxlevel]) for i in common_taxstrings.values()])
+
+
+def summarize_tophit_paf(paf_file, acc2tax):
     """Summarize top hits of assembled seqs mapped to SILVA database by minimap2
 
     :param paf_file: Path to PAF output from minimap2, must have CIGAR string
-    :param silva_fasta: Path to Fasta formatted SILVA database
     :param acc2tax: Dict of SILVA taxonomy strings keyed by ref db sequence id
     :returns: Dict of summary stats for each hit, keyed by query sequence name
     :rtype: dict

@@ -21,6 +21,7 @@ from phyloblitz.report import (
     generate_report_md,
     generate_report_html,
     summarize_tophit_paf,
+    summarize_initial_mapping_taxonomy,
     db_taxonomy,
 )
 
@@ -441,6 +442,12 @@ def init_args():
         type=int,
     )
     parser.add_argument(
+        "--summary_taxlevel",
+        help="Depth of taxonomy string for summary in report",
+        default=4,
+        type=int,
+    )
+    parser.add_argument(
         "--dv_max",
         help="Maximum pairwise sequence divergence in all-vs-all mapping to retain for clustering",
         default=0.03,
@@ -609,6 +616,13 @@ def main():
     acc2tax = db_taxonomy(args.db)
     logger.debug(f" Accessions read: {str(len(acc2tax))}")
 
+    stats["initial_taxonomy"] = summarize_initial_mapping_taxonomy(
+        pathto(args, "initial_map"),
+        acc2tax,
+        minlen=args.align_minlen,
+        taxlevel=args.summary_taxlevel,
+    )
+
     if not check_run_file(args, "cluster_tophits"):
         cluster_asm_tophits(
             args.db,
@@ -618,7 +632,7 @@ def main():
             threads=args.threads,
         )
         stats["cluster_tophits"] = summarize_tophit_paf(
-            pathto(args, "cluster_tophits"), args.db, acc2tax
+            pathto(args, "cluster_tophits"), acc2tax
         )
 
     stats["endtime"] = str(datetime.now())
