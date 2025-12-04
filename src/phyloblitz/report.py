@@ -8,17 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from phyloblitz.__about__ import __version__
-import phyloblitz.main as main
+import phyloblitz.utils as utils
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune import create_markdown, html
 from collections import defaultdict, Counter
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format="%(levelname)s : %(module)s : %(asctime)s : %(message)s",
-    level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 
 CIGAROPS = {
     "M": "match",
@@ -105,7 +100,7 @@ def generate_report_plots(stats, args):
     :param args: Command line arguments from ArgumentParser.parse_args()
     """
 
-    if not main.check_run_file(args, "report_dvs_hist"):
+    if not utils.check_run_file(args, "report_dvs_hist"):
         dvs = [min(stats["dvs"][r]) for r in stats["dvs"]]
         stats["runstats"]["ava min dvs median"] = "{:.4f}".format(np.median(dvs))
         fig, axs = plt.subplots(1, figsize=(3, 2))
@@ -113,7 +108,7 @@ def generate_report_plots(stats, args):
         axs.axvline(args.dv_max, color="red")
         axs.set_title("Histogram of ava min dvs")
         fig.tight_layout()
-        fig.savefig(main.pathto(args, "report_dvs_hist"))
+        fig.savefig(utils.pathto(args, "report_dvs_hist"))
 
 
 def generate_report_md(stats, args):
@@ -159,7 +154,7 @@ phyloblitz was called with the following parameters:
 
 {dict2markdowntable(stats["runstats"])}
 
-![]({main.pathto(args, 'report_dvs_hist', basename_only=True)})
+![]({utils.pathto(args, 'report_dvs_hist', basename_only=True)})
 
 
 ## Taxonomy summary from initial mapping
