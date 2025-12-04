@@ -85,6 +85,7 @@ v0.1.0 targets:
 Future steps:
 
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
+ - [ ] CSS stylesheet for HTML report
  - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Benchmarking against defined test datasets
  - [ ] MultiQC integration
