@@ -17,6 +17,7 @@ from collections import defaultdict
 from datetime import datetime
 
 from phyloblitz.report import (
+    generate_report_plots,
     generate_report_md,
     generate_report_html,
     summarize_tophit_paf,
@@ -37,6 +38,7 @@ OUTFILE_SUFFIX = {
     "report_json": "_report.json",
     "report_md": "_report.md",
     "report_html": "_report.html",
+    "report_dvs_hist": "_report_dvs_hist.png",
 }
 
 logger = logging.getLogger(__name__)
@@ -57,15 +59,19 @@ def check_run_file(args, stage):
     return os.path.isfile(pathto(args, stage))
 
 
-def pathto(args, stage):
+def pathto(args, stage, basename_only=False):
     """Combine output directory prefix and filenames to intermediate file path
 
     :param args: Command line arguments parsed by ArgumentParser.parse_args
     :param stage: Name of run stage, must be a key of OUTFILE_SUFFIX
+    :param basename_only: Only report the base filename if True
     :returns: Expected path to intermediate output file
     """
     try:
-        return os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
+        if basename_only:
+            return os.path.basename(args.prefix + OUTFILE_SUFFIX[stage])
+        else:
+            return os.path.join(args.outdir, args.prefix + OUTFILE_SUFFIX[stage])
     except KeyError:
         raise Exception(f"Unknown intermediate file {stage}")
 
@@ -82,6 +88,9 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
     :param sam_file: Path to write SAM file output from mapping
     :param threads: Number of threads for minimap2 to use
     :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+    :returns: return code for samtools and number of mapped sequences parsed
+    from minimap2 log message
+    :rtype: tuple
     """
     # Don't use mappy because it doesn't support all-vs-all yet
     logger.info("Mapping reads to reference database with minimap2")
@@ -97,10 +106,14 @@ def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
         proc2 = Popen(
             ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
         )
-        for l in proc1.stderr:  # TODO capture number of reads in input for stats
+        nreads = None
+        for l in proc1.stderr:
+            nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
+            if nreads_s:
+                nreads = int(nreads_s.group(1))
             logger.debug("  minimap log: " + l.decode().rstrip())  # output is in bytes
         proc1.stdout.close()
-        return proc2.wait()
+        return proc2.wait(), nreads
 
 
 def get_firstpass_intervals(sam_file, minlen=1200):
@@ -454,6 +467,7 @@ def main():
 
     stats = {}  # Collect data and metadata for reporting stats
     stats["args"] = vars(args)
+    stats["runstats"] = {}  # initialize dict to capture run statistics
 
     logger.debug("Arguments:")
     for i in vars(args):
@@ -484,7 +498,7 @@ def main():
 
     if not check_run_file(args, "initial_map"):
         logger.info("Initial mapping of reads to identify target intervals")
-        map_ret = run_minimap(
+        map_ret, nreads = run_minimap(
             args.db,
             args.dbindex,
             args.reads,
@@ -492,6 +506,7 @@ def main():
             mode="map-" + args.platform,
             threads=args.threads,
         )
+        stats["runstats"]["total input reads"] = nreads
 
     if args.twopass:
         if not check_run_file(args, "intervals_fastq"):
@@ -504,7 +519,7 @@ def main():
 
         if not check_run_file(args, "second_map"):
             logger.info("Second mapping of extracted intervals for taxonomic summary")
-            map_ret = run_minimap(
+            map_ret, nreads = run_minimap(
                 args.db,
                 args.dbindex,
                 pathto(args, "intervals_fastq"),
@@ -528,6 +543,7 @@ def main():
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
+        stats["runstats"]["mapped pass filter"] = counter
         logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
 
     if not check_run_file(args, "ava_map"):
@@ -560,6 +576,10 @@ def main():
             pathto(args, "mapped_segments"),
         )
         stats["cluster2seq"] = cluster2seq
+        stats["runstats"]["number of clusters"] = len(cluster2seq)
+        stats["runstats"]["total reads in clusters"] = sum(
+            [len(cluster2seq[c]) for c in cluster2seq]
+        )
 
         with Pool(args.threads) as pool:
             cluster_cons = pool.map(
@@ -596,15 +616,18 @@ def main():
             json.dump(stats, fh, indent=4)
 
     if not args.noreport:
+        if not check_run_file(args, "report_dvs_hist"):
+            logger.info("Generating plots for report")
+            generate_report_plots(stats, args)
         if not check_run_file(args, "report_md"):
             with open(pathto(args, "report_md"), "w") as fh:
                 logger.info("Writing report markdown to " + pathto(args, "report_md"))
-                fh.write(generate_report_md(stats))
+                fh.write(generate_report_md(stats, args))
 
         if not check_run_file(args, "report_html"):
             with open(pathto(args, "report_html"), "w") as fh:
                 logger.info("Writing report HTML to " + pathto(args, "report_html"))
-                fh.write(generate_report_html(stats))
+                fh.write(generate_report_html(stats, args))
 
     logger.info("-------------- phyloblitz run complete --------------")
 

@@ -3,7 +3,11 @@
 import re
 import logging
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 from phyloblitz.__about__ import __version__
+import phyloblitz.main as main
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune import create_markdown, html
 from collections import defaultdict
@@ -76,10 +80,26 @@ def dod2markdowntable(d, keys, col1="Name"):
     return "\n".join(out)
 
 
-def generate_report_md(stats):
+def generate_report_plots(stats, args):
+    """Generate plots for report file
+
+    :param stats: `stats` dict produced in phyloblitz.main.main
+    :param args: Command line arguments from ArgumentParser.parse_args()
+    """
+
+    if not main.check_run_file(args, "report_dvs_hist"):
+        dvs = [min(stats["dvs"][r]) for r in stats["dvs"]]
+        fig, axs = plt.subplots(1, figsize=(5, 4))
+        axs.hist(dvs, bins="auto")
+        fig.tight_layout()
+        fig.savefig(main.pathto(args, "report_dvs_hist"))
+
+
+def generate_report_md(stats, args):
     """Generate markdown report from stats collected during phyloblitz run
 
     :param stats: `stats` dict produced in phyloblitz.main.main
+    :param args: Command line arguments from ArgumentParser.parse_args()
     :returns: Report in markdown format
     :rtype: str
     """
@@ -106,11 +126,19 @@ def generate_report_md(stats):
 
 phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
+
 ## Input parameters
 
 phyloblitz was called with the following parameters:
 
 {dict2markdowntable(stats["args"])}
+
+
+## Run statistics
+
+{dict2markdowntable(stats["runstats"])}
+
+![]({main.pathto(args, 'report_dvs_hist', basename_only=True)})
 
 ## Assembled sequence clusters
 
@@ -128,10 +156,10 @@ design.
     return format_md(raw)
 
 
-def generate_report_html(stats):
+def generate_report_html(stats, args):
     """Generate HTML report from stats collected during phyloblitz run"""
 
-    return html(generate_report_md(stats))
+    return html(generate_report_md(stats, args))
 
 
 def db_taxonomy(silva_fasta):
