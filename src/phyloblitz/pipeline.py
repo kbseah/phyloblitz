@@ -7,9 +7,10 @@ import pyfastx
 import logging
 import os.path
 
+from phyloblitz.utils import CIGAROPS, lists_common_prefix, parse_cigar_ops
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
-from collections import defaultdict
+from collections import defaultdict, Counter
 from functools import wraps
 from multiprocessing import Pool
 
@@ -433,7 +434,7 @@ class Pipeline(object):
 
         with Pool(threads) as pool:
             cluster_cons = pool.map(
-                pipeline.spoa_assemble_fasta, [i.name for i in fastq_handles.values()]
+                spoa_assemble_fasta, [i.name for i in fastq_handles.values()]
             )
 
         for i in fastq_handles.values():  # close NamedTemporaryFile handles
@@ -446,38 +447,156 @@ class Pipeline(object):
                 )
             logger.info(f"Assembled sequences written to {self.pathto('cluster_asm')}")
 
+    def db_taxonomy(self):
+        """Get taxonomy string from SILVA headers in database Fasta file
 
-def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):
-    """Map assembled sequences to reference DB and get top hits
+        :returns: Dict of taxonomy strings keyed by SILVA accession
+        :rtype: dict
+        """
+        logger.info("Reading taxonomy from SILVA database file")
+        self._acc2tax = {}
+        with open(self._ref, "r") as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    spl = line.lstrip(">").rstrip().split(" ")
+                    acc = spl[0]
+                    taxstring = " ".join(spl[1:]).split(";")
+                    self._acc2tax[acc] = taxstring
+        logger.debug(f" Accessions read: {str(len(self._acc2tax))}")
 
-    :param ref: Path to reference sequence file
-    :param refindex: Path to reference index file (optional)
-    :param paf_file: Path to write PAF file output from mapping
-    :param threads: Number of threads for minimap2 to use
-    """
-    logger.info("Mapping assembled sequences to reference database with minimap2")
-    cmd = [
-        "minimap2",
-        "-x",
-        "asm5",
-        "-c",
-        "--eqx",
-        "--secondary=no",
-        "-t",
-        str(threads),
-        "-o",
-        paf_file,
-    ]
-    (
-        cmd.extend([refindex, fasta_file])
-        if refindex is not None
-        else cmd.extend([ref, fasta_file])
+    def _per_read_consensus_taxonomy(self, sam_file, minlen=1200):
+        """Summarize taxonomy from initial mapping with minimap2
+
+        :param sam_file: Path to SAM file of initial mapping
+        """
+        all_taxstrings = defaultdict(list)
+        sam = pysam.AlignmentFile(sam_file, "r")
+        for i in sam.fetch():
+            if i.query_alignment_length >= minlen:
+                all_taxstrings[i.query_name].append(self._acc2tax[i.reference_name])
+        common_taxstrings = {
+            acc: lists_common_prefix(all_taxstrings[acc]) for acc in all_taxstrings
+        }
+        return common_taxstrings
+
+    def summarize_initial_mapping_taxonomy(self, twopass, minlen, taxlevel=4):
+        sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
+        logger.info("Summarizing taxonomic composition of initial mapping")
+        common_taxstrings = self._per_read_consensus_taxonomy(sam_file, minlen)
+        # TODO right-pad taxonomy strings if too short
+        self._stats["initial_taxonomy"] = Counter(
+            [";".join(i[0:taxlevel]) for i in common_taxstrings.values()]
+        )
+        return
+
+    @check_stage_file(
+        stage="cluster_tophits",
+        message="Mapping assembled sequences to reference database with minimap2",
     )
-    logger.debug("minimap command: " + " ".join(cmd))
-    proc = Popen(cmd, stderr=PIPE)
-    for l in proc.stderr:
-        logger.debug("  minimap log: " + l.decode().rstrip())
-    return proc.wait()
+    def cluster_asm_tophits(self, threads=12):
+        """Map assembled sequences to reference DB and get top hits
+
+        :param threads: Number of threads for minimap2 to use
+        """
+        cmd = [
+            "minimap2",
+            "-x",
+            "asm5",
+            "-c",
+            "--eqx",
+            "--secondary=no",
+            "-t",
+            str(threads),
+            "-o",
+            self.pathto("cluster_tophits"),
+        ]
+        (
+            cmd.extend([self._refindex, self.pathto("cluster_asm")])
+            if self._refindex is not None
+            else cmd.extend([self._ref, self.pathto("cluster_asm")])
+        )
+        logger.debug("minimap command: " + " ".join(cmd))
+        proc = Popen(cmd, stderr=PIPE)
+        for l in proc.stderr:
+            logger.debug("  minimap log: " + l.decode().rstrip())
+        return proc.wait()
+
+    def summarize_tophit_paf(self):
+        """Summarize top hits of assembled seqs mapped to SILVA database by minimap2
+
+        :returns: Dict of summary stats for each hit, keyed by query sequence name
+        :rtype: dict
+        """
+        out = {}
+
+        with open(self.pathto("cluster_tophits"), "r") as fh:
+            for line in fh:
+                spl = line.rstrip().split("\t")
+                hits = dict(
+                    zip(
+                        [
+                            "qname",
+                            "qlen",
+                            "qstart",
+                            "qend",
+                            "strand",
+                            "tname",
+                            "tlen",
+                            "tstart",
+                            "tend",
+                            "alnmatch",
+                            "alnlen",
+                        ],
+                        spl[0:11],
+                    )
+                )
+                cigar = [i for i in spl if i.startswith("cg:Z:")][0]
+                # Calculate derived metrics from PAF fields
+                cigar_summary = parse_cigar_ops(cigar[5:])
+                hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
+                hits["align %id"] = "{:.2%}".format(
+                    int(hits["alnmatch"]) / int(hits["alnlen"])
+                ).rstrip(
+                    "%"
+                )  # remove redundant % sign for display
+                hits["query %aln"] = "{:.2%}".format(
+                    (int(hits["qend"]) - int(hits["qstart"])) / int(hits["qlen"])
+                ).rstrip("%")
+                hits["target %aln"] = "{:.2%}".format(
+                    (int(hits["tend"]) - int(hits["tstart"])) / int(hits["tlen"])
+                ).rstrip("%")
+                out[spl[0]] = hits
+
+        # Taxonomy of hit targets
+        for c in out:
+            try:
+                # hyperlink to ENA record
+                out[c]["tophit"] = (
+                    "["
+                    + out[c]["tname"]
+                    + "](https://www.ebi.ac.uk/ena/browser/view/"
+                    + out[c]["tname"].split(".")[0]
+                    + ")"
+                )
+                out[c]["tophit taxonomy"] = ";".join(self._acc2tax[out[c]["tname"]])
+                out[c]["tophit species"] = self._acc2tax[out[c]["tname"]][-1]
+                # Higher taxonomy to class level, except for chloroplast and mitochondria
+                # Assumes SILVA taxonomy is in use
+                if out[c]["tophit taxonomy"].startswith(
+                    "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast"
+                ):
+                    out[c]["higher taxonomy"] = "[Chloroplast]"
+                elif out[c]["tophit taxonomy"].startswith(
+                    "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria"
+                ):
+                    out[c]["higher taxonomy"] = "[Mitochondria]"
+                else:
+                    out[c]["higher taxonomy"] = ";".join(
+                        self._acc2tax[out[c]["tname"]][0:3]
+                    )
+            except KeyError:
+                KeyError(f"Accession {out[c]['tname']} not found in database?")
+        self._stats["cluster_tophits"] = out
 
 
 def init_args():
