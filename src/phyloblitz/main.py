@@ -63,6 +63,10 @@ def main():
         else:
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
+    p = pipeline.Pipeline(args)
+
+    p.run_minimap(threads=args.threads)
+
     if not check_run_file(args, "initial_map"):
         logger.info("Initial mapping of reads to identify target intervals")
         map_ret, nreads = pipeline.run_minimap(

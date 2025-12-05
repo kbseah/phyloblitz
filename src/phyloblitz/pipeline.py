@@ -5,52 +5,141 @@ import pysam
 import re
 import pyfastx
 import logging
+import os.path
 
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 from collections import defaultdict
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
 
-def run_minimap(ref, refindex, reads, sam_file, threads=12, mode="map-ont"):
-    """Map reads to reference database with minimap2
+class Pipeline(object):
+    """phyloblitz pipeline run object"""
 
-    Filter with samtools -F 4 to discard reads that are not mapped.
+    def __init__(self, args):
+        """Constructor for Pipeline"""
+        self._ref = args.db  # Path to reference database Fasta file
+        self._refindex = (
+            args.dbindex
+        )  # Path to reference database Minimap2 index (optional)
+        self._reads = (
+            args.reads
+        )  # Path to reads to be processed in Fastq or Fastq.gz format
+        self._outdir = args.outdir  # Path to output folder
+        self._prefix = args.prefix  # Filename prefix for output files
+        self._platform = args.platform  # Sequencing mode, ont or pb
+        self._resume = args.resume
+        self._stats = {}
+        self._stats["args"] = vars(args)
+        self._stats["runstats"] = {}
 
-    :param ref: Path to reference sequence file
-    :param refindex: Path to reference index file (optional)
-    :param reads: Path to read file
-    :type reads: list
-    :param sam_file: Path to write SAM file output from mapping
-    :param threads: Number of threads for minimap2 to use
-    :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
-    :returns: return code for samtools and number of mapped sequences parsed
-    from minimap2 log message
-    :rtype: tuple
-    """
-    # Don't use mappy because it doesn't support all-vs-all yet
-    logger.info("Mapping reads to reference database with minimap2")
-    with open(sam_file, "w") as sam_fh:
-        cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
-        (
-            cmd1.extend([refindex, reads])
-            if refindex is not None
-            else cmd1.extend([ref, reads])
-        )
-        logger.debug("minimap command: " + " ".join(cmd1))
-        proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
-        proc2 = Popen(
-            ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
-        )
-        nreads = 0
-        for l in proc1.stderr:
-            nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
-            if nreads_s:
-                nreads += int(nreads_s.group(1))
-            logger.debug("  minimap log: " + l.decode().rstrip())  # output is in bytes
-        proc1.stdout.close()
-        return proc2.wait(), nreads
+    OUTFILE_SUFFIX = {
+        "initial_map": "_minimap_initial.sam",
+        "intervals_fastq": "_intervals.fastq",
+        "second_map": "_minimap_second.sam",
+        "mapped_segments": "_mapped.fastq",
+        "ava_map": "_ava.paf",
+        "ava_abc": "_ava.abc",
+        "ava_mci": "_ava.mci",
+        "ava_seqtab": "_ava_seq.tab",
+        "mcl_cluster": "_mcl.out",
+        "cluster_asm": "_final.fasta",
+        "cluster_tophits": "_final_tophits.paf",
+        "report_json": "_report.json",
+        "report_md": "_report.md",
+        "report_html": "_report.html",
+        "report_dvs_hist": "_report_dvs_hist.png",
+    }
+
+    def check_run_file(self, stage):
+        """Check if intermediate output file has been created
+
+        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+        :returns: True if file already exists at expected path
+        """
+        return os.path.isfile(self.pathto(stage))
+
+    def pathto(self, stage, basename_only=False):
+        """Combine output directory prefix and filenames to intermediate file path
+
+        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+        :param basename_only: Only report the base filename if True
+        :returns: Expected path to intermediate output file
+        """
+        try:
+            if basename_only:
+                return os.path.basename(self._prefix + self.OUTFILE_SUFFIX[stage])
+            else:
+                return os.path.join(
+                    self._outdir, self._prefix + self.OUTFILE_SUFFIX[stage]
+                )
+        except KeyError:
+            raise Exception(f"Unknown intermediate file {stage}")
+
+    def check_stage_file(stage, message):  # TODO more than one stage file
+        def check_stage_decorator(func):
+            @wraps(func)
+            def wrapped_function(self, *args, **kwargs):
+                if self.check_run_file(stage):
+                    if self._resume:
+                        logger.info(
+                            "Stage {stage} file output already present, skipping"
+                        )
+                        return
+                    else:
+                        logger.error(
+                            "Stage {stage} file output already present and option --resume not used, exiting"
+                        )
+                        sys.exit()
+                else:
+                    logger.info(message)
+                    return func(self, *args, **kwargs)
+
+            return wrapped_function
+
+        return check_stage_decorator
+
+    @check_stage_file(
+        stage="initial_map",
+        message="Initial mapping of reads to identify target intervals",
+    )
+    def run_minimap(self, threads=12, mode="map-ont"):
+        """Map reads to reference database with minimap2
+
+        Filter with samtools -F 4 to discard reads that are not mapped.
+
+        :param threads: Number of threads for minimap2 to use
+        :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+        :returns: return code for samtools
+        :rtype: tuple
+        """
+        # Don't use mappy because it doesn't support all-vs-all yet
+        logger.info("Mapping reads to reference database with minimap2")
+        with open(self.pathto("initial_map"), "w") as sam_fh:
+            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
+            (
+                cmd1.extend([self._refindex, self._reads])
+                if self._refindex is not None
+                else cmd1.extend([self._ref, self._reads])
+            )
+            logger.debug("minimap command: " + " ".join(cmd1))
+            proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
+            proc2 = Popen(
+                ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
+            )
+            nreads = 0
+            for l in proc1.stderr:
+                nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
+                if nreads_s:
+                    nreads += int(nreads_s.group(1))
+                logger.debug(
+                    "  minimap log: " + l.decode().rstrip()
+                )  # output is in bytes
+            proc1.stdout.close()
+            self._stats["runstats"]["total input reads"] = nreads
+            return proc2.wait()
 
 
 def get_firstpass_intervals(sam_file, minlen=1200):
