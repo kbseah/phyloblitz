@@ -11,6 +11,7 @@ from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 from collections import defaultdict
 from functools import wraps
+from multiprocessing import Pool
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,25 @@ def sam_seq_generator(sam_file, minlen=1200):
                 yield (name, seq, quals)
 
 
+def spoa_assemble_fasta(fastq):
+    """Run SPOA assembly on a Fastq input file
+
+    :param fastq: Path to Fastq file with reads to assemble
+    :returns: Assembled sequence in Fasta format (stdout from spoa)
+    :rtype: str
+    """
+    logger.info("Assemble consensus sequence for cluster with spoa")
+    cmd = [
+        "spoa",
+        fastq,
+    ]
+    logger.debug("spoa command: " + " ".join(cmd))
+    proc = Popen(cmd, stdout=PIPE, text=True, stderr=PIPE)
+    for l in proc.stderr:
+        logger.debug("  mcl log: " + l.decode().rstrip())
+    return proc.communicate()[0]
+
+
 class Pipeline(object):
     """phyloblitz pipeline run object"""
 
@@ -171,7 +191,7 @@ class Pipeline(object):
         except KeyError:
             raise Exception(f"Unknown intermediate file {stage}")
 
-    def check_stage_file(stage, message):  # TODO more than one stage file
+    def check_stage_file(stage, message):  # TODO more than one input file
         def check_stage_decorator(func):
             @wraps(func)
             def wrapped_function(self, *args, **kwargs):
@@ -362,56 +382,69 @@ class Pipeline(object):
             logger.debug("  mcl log: " + l.decode().rstrip())
         return proc.wait()
 
+    def _cluster_seqs(self, mcl_out, reads):
+        """Extract sequences from each MCL cluster to separate Fastq files for assembly
 
-def cluster_seqs(mcl_out, reads):
-    """Cluster sequences with MCL and write to temporary Fastq files
+        :param mcl_out: Path MCL output file
+        :param reads: Path to reads from extract_reads_for_ava step
+        :returns: Dict of file handles to each Fastq file keyed by cluster ID
+        """
+        counter = 0
+        cluster_files = []
+        fastq_handles = {}
+        seq2cluster = {}
+        with open(mcl_out, "r") as fh:
+            for line in fh:
+                seqs = line.rstrip().split("\t")
+                logger.info(
+                    f"Cluster {str(counter)} comprises {str(len(seqs))} sequences"
+                )
+                for seq in seqs:
+                    seq2cluster[seq] = counter  # assume each seq in only one cluster
+                fastq_handles[counter] = NamedTemporaryFile(
+                    suffix=".fastq", mode="w", delete=True, delete_on_close=False
+                )
+                counter += 1
+        for name, seq, qual in pyfastx.Fastx(reads):
+            if name in seq2cluster:
+                fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
+                fastq_handles[seq2cluster[name]].write(fastq_rec)
+        cluster2seq = defaultdict(list)
+        for seq in seq2cluster:
+            cluster2seq[seq2cluster[seq]].append(seq)
+        for i in fastq_handles:
+            fastq_handles[i].close()
+        return fastq_handles, cluster2seq
 
-    :param mcl_out: Path to write MCL output
-    :param reads: Path to reads from extract_reads_for_ava step
-    """
-    counter = 0
-    cluster_files = []
-    fastq_handles = {}
-    seq2cluster = {}
-    with open(mcl_out, "r") as fh:
-        for line in fh:
-            seqs = line.rstrip().split("\t")
-            logger.info(f"Cluster {str(counter)} comprises {str(len(seqs))} sequences")
-            for seq in seqs:
-                seq2cluster[seq] = counter  # assume each seq in only one cluster
-            fastq_handles[counter] = NamedTemporaryFile(
-                suffix=".fastq", mode="w", delete=True, delete_on_close=False
+    @check_stage_file(
+        stage="cluster_asm",
+        message="Extract cluster sequences and assemble with SPOA",
+    )
+    def assemble_clusters(self, threads=12):
+        fastq_handles, cluster2seq = self._cluster_seqs(
+            self.pathto("mcl_cluster"),
+            self.pathto("mapped_segments"),
+        )
+        self._stats["cluster2seq"] = cluster2seq
+        self._stats["runstats"]["number of clusters"] = len(cluster2seq)
+        self._stats["runstats"]["total reads in clusters"] = sum(
+            [len(cluster2seq[c]) for c in cluster2seq]
+        )
+
+        with Pool(threads) as pool:
+            cluster_cons = pool.map(
+                pipeline.spoa_assemble_fasta, [i.name for i in fastq_handles.values()]
             )
-            counter += 1
-    for name, seq, qual in pyfastx.Fastx(reads):
-        if name in seq2cluster:
-            fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
-            fastq_handles[seq2cluster[name]].write(fastq_rec)
-    cluster2seq = defaultdict(list)
-    for seq in seq2cluster:
-        cluster2seq[seq2cluster[seq]].append(seq)
-    for i in fastq_handles:
-        fastq_handles[i].close()
-    return fastq_handles, cluster2seq
 
+        for i in fastq_handles.values():  # close NamedTemporaryFile handles
+            i.close()
 
-def spoa_assemble(fastq):
-    """Run SPOA assembly on a Fastq input file
-
-    :param fastq: Path to Fastq file with reads to assemble
-    :returns: Assembled sequence in Fasta format (stdout from spoa)
-    :rtype: str
-    """
-    logger.info("Assemble consensus sequence for cluster with spoa")
-    cmd = [
-        "spoa",
-        fastq,
-    ]
-    logger.debug("spoa command: " + " ".join(cmd))
-    proc = Popen(cmd, stdout=PIPE, text=True, stderr=PIPE)
-    for l in proc.stderr:
-        logger.debug("  mcl log: " + l.decode().rstrip())
-    return proc.communicate()[0]
+        with open(self.pathto("cluster_asm"), "w") as fh:
+            for cluster, seq in zip(fastq_handles.keys(), cluster_cons):
+                fh.write(
+                    re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
+                )
+            logger.info(f"Assembled sequences written to {self.pathto('cluster_asm')}")
 
 
 def cluster_asm_tophits(ref, refindex, fasta_file, paf_file, threads=12):

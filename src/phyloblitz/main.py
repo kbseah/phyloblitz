@@ -101,31 +101,32 @@ def main():
     p.mcxload()
     p.mcl_cluster()
 
-    if not check_run_file(args, "cluster_asm"):
-        fastq_handles, cluster2seq = pipeline.cluster_seqs(
-            pathto(args, "mcl_cluster"),
-            pathto(args, "mapped_segments"),
-        )
-        stats["cluster2seq"] = cluster2seq
-        stats["runstats"]["number of clusters"] = len(cluster2seq)
-        stats["runstats"]["total reads in clusters"] = sum(
-            [len(cluster2seq[c]) for c in cluster2seq]
-        )
+    p.assemble_clusters(threads=args.threads)
+    #     if not check_run_file(args, "cluster_asm"):
+    #         fastq_handles, cluster2seq = pipeline.cluster_seqs(
+    #             pathto(args, "mcl_cluster"),
+    #             pathto(args, "mapped_segments"),
+    #         )
+    #         stats["cluster2seq"] = cluster2seq
+    #         stats["runstats"]["number of clusters"] = len(cluster2seq)
+    #         stats["runstats"]["total reads in clusters"] = sum(
+    #             [len(cluster2seq[c]) for c in cluster2seq]
+    #         )
 
-        with Pool(args.threads) as pool:
-            cluster_cons = pool.map(
-                pipeline.spoa_assemble, [i.name for i in fastq_handles.values()]
-            )
+    #         with Pool(args.threads) as pool:
+    #             cluster_cons = pool.map(
+    #                 pipeline.spoa_assemble, [i.name for i in fastq_handles.values()]
+    #             )
 
-        for i in fastq_handles.values():  # close NamedTemporaryFile handles
-            i.close()
+    #         for i in fastq_handles.values():  # close NamedTemporaryFile handles
+    #             i.close()
 
-        with open(pathto(args, "cluster_asm"), "w") as fh:
-            for cluster, seq in zip(fastq_handles.keys(), cluster_cons):
-                fh.write(
-                    re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
-                )
-            logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
+    #         with open(pathto(args, "cluster_asm"), "w") as fh:
+    #             for cluster, seq in zip(fastq_handles.keys(), cluster_cons):
+    #                 fh.write(
+    #                     re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
+    #                 )
+    #             logger.info(f"Assembled sequences written to {pathto(args, 'cluster_asm')}")
 
     logger.info("Reading taxonomy from SILVA database file")
     acc2tax = report.db_taxonomy(args.db)
