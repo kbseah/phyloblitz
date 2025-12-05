@@ -15,6 +15,99 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 
+def get_firstpass_intervals(sam_file, minlen=1200):
+    """Filter initial alignment to get primary mappings for all-vs-all mapping
+
+    :param sam_file: Path to SAM file from initial mapping step
+    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
+    :returns: Lists of intervals with hits per read, keyed by read name
+    :rtype: dict
+    """
+    logger.info(f"Filtering initial alignment to get aligned regions to extract")
+    regions = defaultdict(list)
+    sam = pysam.AlignmentFile(sam_file, "r")
+    for i in sam.fetch():
+        if i.query_alignment_length >= minlen:
+            # include secondary and supplementary alignments
+            # if sequence is left-hardclipped, correct the coordinates
+            # because pysam's query_alignment_start does not count hardclips!
+            qstart, qend = i.query_alignment_start, i.query_alignment_end
+            if i.cigartuples[0][0] == 5:
+                qstart += i.cigartuples[0][1]
+                qend += i.cigartuples[0][1]
+            regions[i.query_name].append((qstart, qend))
+    logger.debug(f"Reads processed {str(len(regions))}")
+    # merge intervals for each read
+    merged_intervals = {i: merge_intervals(regions[i]) for i in regions}
+    return merged_intervals
+
+
+def merge_intervals(intervals: list):
+    """Merge overlapping numerical intervals
+
+    :param intervals: List of tuples of (start, end) coordinates
+    :returns: List of tuples of intervals with overlaps merged
+    :rtype: list
+    """
+    intervals.sort(key=lambda i: i[0])  # sort in place
+    merged = [intervals[0]]
+    for curr in intervals[1:]:
+        if curr[0] < merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(curr[1], merged[-1][1]))
+        else:
+            merged.append(curr)
+    return merged
+
+
+def extract_fastq_read_intervals(intervals, in_file, out_file):
+    logger.info(
+        f"Extract read intervals that align with reference database to {out_file}"
+    )
+    counter = 0
+    with open(out_file, "w") as fh:
+        for name, seq, qual in pyfastx.Fastx(in_file):
+            if name in intervals:
+                for start, end in intervals[name]:
+                    newname = ":".join([str(i) for i in [name, start, end]])
+                    fh.write("@" + newname + "\n")
+                    fh.write(seq[start:end] + "\n")
+                    fh.write("+\n")
+                    fh.write(qual[start:end] + "\n")
+                    counter += 1
+    logger.info(f"Read intervals extracted: {str(counter)}")
+
+
+def sam_seq_generator(sam_file, minlen=1200):
+    """Filter SAM alignment to get primary mappings for all-vs-all mapping
+
+    :param sam_file: Path to SAM file
+    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
+    """
+    logger.info(
+        f"Filtering alignment for primary mappings with length >= {str(minlen)}"
+    )
+    sam = pysam.AlignmentFile(sam_file, "r")
+    for i in sam.fetch():
+        if i.query_alignment_length >= minlen and i.query_alignment_sequence:
+            # Primary mappings only to ensure only one mapping per input read
+            if not i.is_secondary and not i.is_supplementary:
+                name = ":".join(
+                    [
+                        str(i)
+                        for i in [
+                            i.query_name,
+                            i.query_alignment_start,
+                            i.query_alignment_end,
+                        ]
+                    ]
+                )
+                seq = i.query_alignment_sequence
+                quals = i.query_qualities_str[
+                    i.query_alignment_start : i.query_alignment_end
+                ]
+                yield (name, seq, quals)
+
+
 class Pipeline(object):
     """phyloblitz pipeline run object"""
 
@@ -85,12 +178,12 @@ class Pipeline(object):
                 if self.check_run_file(stage):
                     if self._resume:
                         logger.info(
-                            "Stage {stage} file output already present, skipping"
+                            f"Stage {stage} file output already present, skipping"
                         )
                         return
                     else:
                         logger.error(
-                            "Stage {stage} file output already present and option --resume not used, exiting"
+                            f"Stage {stage} file output already present and option --resume not used, exiting"
                         )
                         sys.exit()
                 else:
@@ -141,209 +234,140 @@ class Pipeline(object):
             self._stats["runstats"]["total input reads"] = nreads
             return proc2.wait()
 
-
-def get_firstpass_intervals(sam_file, minlen=1200):
-    """Filter initial alignment to get primary mappings for all-vs-all mapping
-
-    :param sam_file: Path to SAM file from initial mapping step
-    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
-    :returns: Lists of intervals with hits per read, keyed by read name
-    :rtype: dict
-    """
-    logger.info(f"Filtering initial alignment to get aligned regions to extract")
-    regions = defaultdict(list)
-    sam = pysam.AlignmentFile(sam_file, "r")
-    for i in sam.fetch():
-        if i.query_alignment_length >= minlen:
-            # include secondary and supplementary alignments
-            # if sequence is left-hardclipped, correct the coordinates
-            # because pysam's query_alignment_start does not count hardclips!
-            qstart, qend = i.query_alignment_start, i.query_alignment_end
-            if i.cigartuples[0][0] == 5:
-                qstart += i.cigartuples[0][1]
-                qend += i.cigartuples[0][1]
-            regions[i.query_name].append((qstart, qend))
-    logger.debug(f"Reads processed {str(len(regions))}")
-    # merge intervals for each read
-    merged_intervals = {i: merge_intervals(regions[i]) for i in regions}
-    return merged_intervals
-
-
-def merge_intervals(intervals: list):
-    """Merge overlapping numerical intervals
-
-    :param intervals: List of tuples of (start, end) coordinates
-    :returns: List of tuples of intervals with overlaps merged
-    :rtype: list
-    """
-    intervals.sort(key=lambda i: i[0])  # sort in place
-    merged = [intervals[0]]
-    for curr in intervals[1:]:
-        if curr[0] < merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(curr[1], merged[-1][1]))
-        else:
-            merged.append(curr)
-    return merged
-
-
-def extract_fastq_read_intervals(intervals, in_file, out_file):
-    logger.info(
-        f"Extract read intervals that align with reference database to {out_file}"
+    @check_stage_file(
+        stage="mapped_segments",
+        message="Extracting read segments for all-vs-all mapping",
     )
-    counter = 0
-    with open(out_file, "w") as fh:
-        for name, seq, qual in pyfastx.Fastx(in_file):
-            if name in intervals:
-                for start, end in intervals[name]:
-                    newname = ":".join([str(i) for i in [name, start, end]])
-                    fh.write("@" + newname + "\n")
-                    fh.write(seq[start:end] + "\n")
-                    fh.write("+\n")
-                    fh.write(qual[start:end] + "\n")
-                    counter += 1
-    logger.info(f"Read intervals extracted: {str(counter)}")
+    def extract_reads_for_ava(self, twopass=False, align_minlen=1200):
+        sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
+        counter = 0
+        with open(self.pathto("mapped_segments"), "w") as fq_fh:
+            for name, seq, quals in sam_seq_generator(sam_file, minlen=align_minlen):
+                counter += 1
+                fq_fh.write("@" + name + "\n")
+                fq_fh.write(seq + "\n")
+                fq_fh.write("+" + "\n")
+                fq_fh.write(quals + "\n")
+        self._stats["runstats"]["mapped pass filter"] = counter
+        logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
 
-
-def sam_seq_generator(sam_file, minlen=1200):
-    """Filter initial alignment to get primary mappings for all-vs-all mapping
-
-    :param sam_file: Path to SAM file from initial mapping step
-    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
-    """
-    logger.info(
-        f"Filtering initial alignment to get primary mappings with length >= {str(minlen)}"
+    @check_stage_file(
+        stage="ava_map",
+        message="All-vs-all mapping of mapped reads with minimap2",
     )
-    sam = pysam.AlignmentFile(sam_file, "r")
-    for i in sam.fetch():
-        if i.query_alignment_length >= minlen and i.query_alignment_sequence:
-            # Primary mappings only to ensure only one mapping per input read
-            if not i.is_secondary and not i.is_supplementary:
-                name = ":".join(
-                    [
-                        str(i)
-                        for i in [
-                            i.query_name,
-                            i.query_alignment_start,
-                            i.query_alignment_end,
-                        ]
-                    ]
-                )
-                seq = i.query_alignment_sequence
-                quals = i.query_qualities_str[
-                    i.query_alignment_start : i.query_alignment_end
-                ]
-                yield (name, seq, quals)
+    def ava_map(self, mode="ava-ont", threads=12):
+        """All-vs-all mapping with minimap2 to generate clusters for assembly
 
+        :param mode: Mapping preset mode, either `ava-ont` or `ava-pb`
+        :param threads: Number of threads for minimap2 to use
+        """
+        with open(self.pathto("ava_map"), "w") as paf_fh:
+            cmd = [
+                "minimap2",
+                "-x",
+                mode,
+                "-t",
+                str(threads),
+                self.pathto("mapped_segments"),
+                self.pathto("mapped_segments"),
+            ]
+            logger.debug("minimap command: " + " ".join(cmd))
+            proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
+            for l in proc.stderr:
+                logger.debug("  minimap log: " + l.decode().rstrip())
+            return proc.wait()
 
-def ava_map(reads, paf_file, mode="ava-ont", threads=12):
-    """All-vs-all mapping with minimap2 to generate clusters for assembly
+    def paf_get_dvs(self):
+        logger.info("Reading dvs data from ava mapping")
+        dvs = defaultdict(list)
+        with open(self.pathto("ava_map"), "rt") as fh:
+            for line in fh:
+                spl = line.rstrip().split("\t")
+                query = spl[0]
+                dv = re.findall(r"dv:f:([\d\.]+)", line)
+                assert (
+                    len(dv) == 1
+                ), f"Problem in PAF file {self.pathto('ava_map')}: more than one dv tag in entry"
+                dvs[query].append(float(dv[0]))
+        self._stats["dvs"] = dvs
 
-    :param reads: Path to Fastq reads to be clustered
-    :param paf_file: Path to write output PAF alignment
-    :param mode: Mapping preset mode, either `ava-ont` or `ava-pb`
-    :param threads: Number of threads for minimap2 to use
-    """
-    logger.info("All-vs-all mapping of mapped reads with minimap2")
-    with open(paf_file, "w") as paf_fh:
-        cmd = ["minimap2", "-x", mode, "-t", str(threads), reads, reads]
-        logger.debug("minimap command: " + " ".join(cmd))
-        proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
+    @check_stage_file(
+        stage="ava_abc",
+        message="Converting PAF ava alignment to ABC format for clustering",
+    )
+    def paf_abc(self, dv_max=0.03):
+        """Convert PAF alignment to ABC format for MCL clustering
+
+        :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
+        """
+        fh_abc = open(self.pathto("ava_abc"), "w")
+        with open(self.pathto("ava_map"), "rt") as fh_paf:
+            for line in fh_paf:
+                spl = line.rstrip().split("\t")
+                query = spl[0]
+                target = spl[5]
+                dv = re.findall(r"dv:f:([\d\.]+)", line)
+                if len(dv) == 1 and float(dv[0]) < dv_max:
+                    score = 1 - float(dv[0])
+                    fh_abc.write(
+                        "\t".join([str(i) for i in [query, target, score]]) + "\n"
+                    )
+        return fh_abc.close()
+
+    @check_stage_file(
+        stage="ava_mci",  # and ava_seqtab
+        message="Preparing clustering files with mcxload",
+    )
+    def mcxload(self):
+        """Convert ABC file to cluster input files for MCL"""
+        cmd = [
+            "mcxload",
+            "-abc",
+            self.pathto("ava_abc"),
+            "--stream-mirror",
+            "-o",
+            self.pathto("ava_mci"),
+            "-write-tab",
+            self.pathto("ava_seqtab"),
+        ]
+        logger.debug("mcxload command: " + " ".join(cmd))
+        proc = Popen(cmd, stderr=PIPE)
         for l in proc.stderr:
-            logger.debug("  minimap log: " + l.decode().rstrip())
+            logger.debug("  mcxload log: " + l.decode().rstrip())
         return proc.wait()
 
+    @check_stage_file(
+        stage="mcl_cluster",
+        message="Clustering with mcl",
+    )
+    def mcl_cluster(self, inflation=2):
+        """Clustering with MCL to get sequence clusters for assembly
 
-def paf_get_dvs(paf_file):
-    dvs = defaultdict(list)
-    with open(paf_file, "rt") as fh:
-        for line in fh:
-            spl = line.rstrip().split("\t")
-            query = spl[0]
-            dv = re.findall(r"dv:f:([\d\.]+)", line)
-            assert (
-                len(dv) == 1
-            ), f"Problem in PAF file {paf_file}: more than one dv tag in entry"
-            dvs[query].append(float(dv[0]))
-    return dvs
-
-
-def paf_abc(paf_file, abc_file, dv_max=0.03):
-    """Convert PAF alignment to ABC format for MCL clustering
-
-    :param paf_file: Path to PAF alignment from previous all-vs-all mapping step
-    :param abc_file: Path to write ABC file
-    :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
-    """
-    logger.info("Converting PAF ava alignment to ABC format for clustering")
-    fh_abc = open(abc_file, "w")
-    with open(paf_file, "rt") as fh_paf:
-        for line in fh_paf:
-            spl = line.rstrip().split("\t")
-            query = spl[0]
-            target = spl[5]
-            dv = re.findall(r"dv:f:([\d\.]+)", line)
-            if len(dv) == 1 and float(dv[0]) < dv_max:
-                score = 1 - float(dv[0])
-                fh_abc.write("\t".join([str(i) for i in [query, target, score]]) + "\n")
-    return fh_abc.close()
-
-
-def mcxload(abc_file, mci_file, tab_file):
-    """Convert ABC file to cluster input files for MCL
-
-    :param abc_file: Path to ABC file from previous conversion step
-    :param mci_file: Path to write MCI file
-    :param tab_file: Path to write Tab file
-    """
-    logger.info("Preparing clustering files with mcxload")
-    cmd = [
-        "mcxload",
-        "-abc",
-        abc_file,
-        "--stream-mirror",
-        "-o",
-        mci_file,
-        "-write-tab",
-        tab_file,
-    ]
-    logger.debug("mcxload command: " + " ".join(cmd))
-    proc = Popen(cmd, stderr=PIPE)
-    for l in proc.stderr:
-        logger.debug("  mcxload log: " + l.decode().rstrip())
-    return proc.wait()
-
-
-def mcl_cluster(mci_file, tab_file, mcl_out, inflation=2):
-    """Clustering with MCL to get sequence clusters for assembly
-
-    :param mci_file: Path to MCI file produced by mcxload from previous step
-    :param tab_file: Path to tab file produced by mcxload from previous step
-    :param mcl_out: Path to write MCL output
-    :param inflation: Inflation parameter passed to mcl -I option
-    """
-    logger.info(f"Clustering with mcl and inflation parameter {str(inflation)}")
-    cmd = [
-        "mcl",
-        mci_file,
-        "-I",
-        str(inflation),
-        "-use-tab",
-        tab_file,
-        "-o",
-        mcl_out,
-    ]
-    logger.debug("mcl command: " + " ".join(cmd))
-    proc = Popen(cmd, stderr=PIPE)
-    for l in proc.stderr:
-        logger.debug("  mcl log: " + l.decode().rstrip())
-    return proc.wait()
+        :param inflation: Inflation parameter passed to mcl -I option
+        """
+        logger.info(f"Inflation parameter {str(inflation)}")
+        cmd = [
+            "mcl",
+            self.pathto("ava_mci"),
+            "-I",
+            str(inflation),
+            "-use-tab",
+            self.pathto("ava_seqtab"),
+            "-o",
+            self.pathto("mcl_cluster"),
+        ]
+        logger.debug("mcl command: " + " ".join(cmd))
+        proc = Popen(cmd, stderr=PIPE)
+        for l in proc.stderr:
+            logger.debug("  mcl log: " + l.decode().rstrip())
+        return proc.wait()
 
 
 def cluster_seqs(mcl_out, reads):
     """Cluster sequences with MCL and write to temporary Fastq files
 
     :param mcl_out: Path to write MCL output
-    :param reads: Path to reads from sam_seq_generator step
+    :param reads: Path to reads from extract_reads_for_ava step
     """
     counter = 0
     cluster_files = []

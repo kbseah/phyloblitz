@@ -67,19 +67,7 @@ def main():
 
     p.run_minimap(threads=args.threads)
 
-    if not check_run_file(args, "initial_map"):
-        logger.info("Initial mapping of reads to identify target intervals")
-        map_ret, nreads = pipeline.run_minimap(
-            args.db,
-            args.dbindex,
-            args.reads,
-            pathto(args, "initial_map"),
-            mode="map-" + args.platform,
-            threads=args.threads,
-        )
-        stats["runstats"]["total input reads"] = nreads
-
-    if args.twopass:
+    if args.twopass:  # TODO refactor this
         if not check_run_file(args, "intervals_fastq"):
             logger.info("Retrieve aligned intervals on reads")
             merged_intervals = pipeline.get_firstpass_intervals(
@@ -105,45 +93,13 @@ def main():
     else:
         sam_for_read_extraction = pathto(args, "initial_map")
 
-    if not check_run_file(args, "mapped_segments"):
-        counter = 0
-        with open(pathto(args, "mapped_segments"), "w") as fq_fh:
-            for name, seq, quals in pipeline.sam_seq_generator(
-                sam_for_read_extraction, minlen=args.align_minlen
-            ):
-                counter += 1
-                fq_fh.write("@" + name + "\n")
-                fq_fh.write(seq + "\n")
-                fq_fh.write("+" + "\n")
-                fq_fh.write(quals + "\n")
-        stats["runstats"]["mapped pass filter"] = counter
-        logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
+    p.extract_reads_for_ava(twopass=args.twopass, align_minlen=args.align_minlen)
+    p.ava_map(mode="ava-" + args.platform, threads=args.threads)
+    p.paf_get_dvs()
 
-    if not check_run_file(args, "ava_map"):
-        ava_ret = pipeline.ava_map(
-            pathto(args, "mapped_segments"),
-            pathto(args, "ava_map"),
-            mode="ava-" + args.platform,
-            threads=args.threads,
-        )
-        stats["dvs"] = pipeline.paf_get_dvs(pathto(args, "ava_map"))
-
-    if not check_run_file(args, "ava_abc"):
-        abc_ret = pipeline.paf_abc(
-            pathto(args, "ava_map"), pathto(args, "ava_abc"), dv_max=args.dv_max
-        )
-
-    if not check_run_file(args, "ava_mci") and not check_run_file(args, "ava_seqtab"):
-        mcx_ret = pipeline.mcxload(
-            pathto(args, "ava_abc"), pathto(args, "ava_mci"), pathto(args, "ava_seqtab")
-        )
-
-    if not check_run_file(args, "mcl_cluster"):
-        mcl_ret = pipeline.mcl_cluster(
-            pathto(args, "ava_mci"),
-            pathto(args, "ava_seqtab"),
-            pathto(args, "mcl_cluster"),
-        )
+    p.paf_abc(dv_max=args.dv_max)
+    p.mcxload()
+    p.mcl_cluster()
 
     if not check_run_file(args, "cluster_asm"):
         fastq_handles, cluster2seq = pipeline.cluster_seqs(
