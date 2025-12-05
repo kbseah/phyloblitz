@@ -89,8 +89,6 @@ def generate_report_plots(stats, args):
     """
 
     if not utils.check_run_file(args, "report_dvs_hist"):
-        dvs = [min(stats["dvs"][r]) for r in stats["dvs"]]  # TODO
-        stats["runstats"]["ava min dvs median"] = "{:.4f}".format(np.median(dvs))
         fig, axs = plt.subplots(1, figsize=(3, 2))
         axs.hist(dvs, bins="auto", density=True)
         axs.axvline(args.dv_max, color="red")

@@ -2,7 +2,7 @@
 
 import unittest
 
-from phyloblitz.report import lists_common_prefix
+from phyloblitz.utils import lists_common_prefix
 
 
 class TestReportFunctions(unittest.TestCase):

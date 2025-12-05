@@ -7,12 +7,15 @@ import pyfastx
 import logging
 import os.path
 
+import numpy as np
+
 from phyloblitz.utils import CIGAROPS, lists_common_prefix, parse_cigar_ops
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 from collections import defaultdict, Counter
 from functools import wraps
 from multiprocessing import Pool
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +151,7 @@ class Pipeline(object):
         self._stats = {}
         self._stats["args"] = vars(args)
         self._stats["runstats"] = {}
+        self._stats["starttime"] = str(datetime.now())
 
     OUTFILE_SUFFIX = {
         "initial_map": "_minimap_initial.sam",
@@ -311,6 +315,13 @@ class Pipeline(object):
                 ), f"Problem in PAF file {self.pathto('ava_map')}: more than one dv tag in entry"
                 dvs[query].append(float(dv[0]))
         self._stats["dvs"] = dvs
+        # min dv for each read, to get dv distribution and median to
+        # automatically set dv threshold for clustering
+        min_dvs = [min(dvs[r]) for r in dvs]
+        self._stats["runstats"]["ava min dvs median"] = "{:.4f}".format(
+            np.median(min_dvs)
+        )
+        return
 
     @check_stage_file(
         stage="ava_abc",
@@ -597,6 +608,16 @@ class Pipeline(object):
             except KeyError:
                 KeyError(f"Accession {out[c]['tname']} not found in database?")
         self._stats["cluster_tophits"] = out
+
+    @check_stage_file(
+        stage="report_json",
+        message="Writing report stats in JSON format",
+    )
+    def write_report_json(self):
+        self._stats["endtime"] = str(datetime.now())
+        with open(self.pathto("report_json"), "w") as fh:
+            json.dump(self._stats, fh, indent=4)
+        return
 
 
 def init_args():

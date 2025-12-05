@@ -49,8 +49,8 @@ def main():
         logger.debug(f" {i} : {str(vars(args)[i])}")
 
     logger.info("Starting phyloblitz run ... ")
-    stats["starttime"] = str(datetime.now())
 
+    # TODO put this in pipeline initialization
     logger.info(f"Creating output folder {args.outdir}")
     try:
         makedirs(args.outdir, exist_ok=False)
@@ -64,7 +64,6 @@ def main():
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
     p = pipeline.Pipeline(args)
-
     p.run_minimap(threads=args.threads)
 
     if args.twopass:  # TODO refactor this
@@ -93,34 +92,29 @@ def main():
     else:
         sam_for_read_extraction = pathto(args, "initial_map")
 
+    # All-vs-all mapping
     p.extract_reads_for_ava(twopass=args.twopass, align_minlen=args.align_minlen)
     p.ava_map(mode="ava-" + args.platform, threads=args.threads)
     p.paf_get_dvs()
-
     p.paf_abc(dv_max=args.dv_max)
+
+    # Clustering
     p.mcxload()
     p.mcl_cluster()
-
     p.assemble_clusters(threads=args.threads)
 
+    # Taxonomy summary
     p.db_taxonomy()
-
     p.summarize_initial_mapping_taxonomy(
         twopass=args.twopass,
         minlen=args.align_minlen,
         taxlevel=args.summary_taxlevel,
     )
-
     p.cluster_asm_tophits(threads=args.threads)
-
     p.summarize_tophit_paf()
 
-    # stats["endtime"] = str(datetime.now())
-    # comes after stats["endtime"] because it writes this information to report
-    if not check_run_file(args, "report_json"):
-        with open(pathto(args, "report_json"), "w") as fh:
-            logger.info("Writing report stats to " + pathto(args, "report_json"))
-            json.dump(stats, fh, indent=4)
+    # Write reports
+    p.write_report_json()
 
     if not args.noreport:
         if not check_run_file(args, "report_dvs_hist"):
