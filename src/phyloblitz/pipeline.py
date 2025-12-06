@@ -9,6 +9,7 @@ import os.path
 
 import numpy as np
 
+from phyloblitz.report import generate_histogram, generate_report_md, generate_report_html
 from phyloblitz.utils import CIGAROPS, lists_common_prefix, parse_cigar_ops
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
@@ -196,7 +197,8 @@ class Pipeline(object):
         except KeyError:
             raise Exception(f"Unknown intermediate file {stage}")
 
-    def check_stage_file(stage, message):  # TODO more than one input file
+    def check_stage_file(stage, message):
+        # TODO specify more than one output file; check required input files
         def check_stage_decorator(func):
             @wraps(func)
             def wrapped_function(self, *args, **kwargs):
@@ -318,6 +320,7 @@ class Pipeline(object):
         # min dv for each read, to get dv distribution and median to
         # automatically set dv threshold for clustering
         min_dvs = [min(dvs[r]) for r in dvs]
+        self._stats["runstats"]["min_dvs"] = min_dvs
         self._stats["runstats"]["ava min dvs median"] = "{:.4f}".format(
             np.median(min_dvs)
         )
@@ -614,9 +617,54 @@ class Pipeline(object):
         message="Writing report stats in JSON format",
     )
     def write_report_json(self):
+        """Dump run stats file in JSON format for troubleshooting"""
         self._stats["endtime"] = str(datetime.now())
         with open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
+        return
+
+    @check_stage_file(
+        stage="report_dvs_hist",
+        message="Generating plots for report",
+    )
+    def write_report_histogram(self):
+        """Write histogram graphic required for report"""
+        return generate_histogram(
+            vals=self._stats["runstats"]["min_dvs"],
+            vline=self._stats["args"]["dv_max"],
+            title="Histogram of ava min dvs",
+            self.pathto("report_dvs_hist"),
+            figsize=(3,2)
+        )
+
+    @check_stage_file(
+        stage="report_md",
+        message="Writing report markdown",
+    )
+    def write_report_markdown(self):
+        """Write final report in markdown format"""
+        with open(self.pathto("report_md"), "w") as fh:
+            fh.write(
+                generate_report_md(
+                    self._stats,
+                    self.pathto("report_dvs_hist", basename_only=True)
+                )
+            )
+        return
+
+    @check_stage_file(
+        stage="report_html",
+        message="Writing report HTML",
+    )
+    def write_report_markdown(self):
+        """Write final report in HTML format"""
+        with open(self.pathto("report_html"), "w") as fh:
+            fh.write(
+                generate_report_html(
+                    self._stats,
+                    self.pathto("report_dvs_hist", basename_only=True)
+                )
+            )
         return
 
 
@@ -625,7 +673,7 @@ def init_args():
         prog="phyloblitz",
         description="SSU rRNA profile from ONT or PacBio long reads",
     )
-    parser.add_argument(
+    parser.add_argument(vline
         "-d",
         "--db",
         help="Path to preprocessed SILVA database fasta file",

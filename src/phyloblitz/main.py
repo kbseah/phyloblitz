@@ -6,7 +6,6 @@ import sys
 import re
 
 import phyloblitz.pipeline as pipeline
-import phyloblitz.report as report
 
 from phyloblitz.utils import pathto, check_run_file
 from multiprocessing import Pool
@@ -31,17 +30,15 @@ def main():
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
+    # TODO remove this block
     stats = {}  # Collect data and metadata for reporting stats
     stats["args"] = vars(args)
     stats["runstats"] = {}  # initialize dict to capture run statistics
 
     if args.log:
         logfile_handler = logging.FileHandler(args.log)
-        formatter = logging.Formatter(
-            "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
         logfile_handler.setFormatter(formatter)
+        logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
     logger.debug("Arguments:")
@@ -50,7 +47,6 @@ def main():
 
     logger.info("Starting phyloblitz run ... ")
 
-    # TODO put this in pipeline initialization
     logger.info(f"Creating output folder {args.outdir}")
     try:
         makedirs(args.outdir, exist_ok=False)
@@ -117,18 +113,9 @@ def main():
     p.write_report_json()
 
     if not args.noreport:
-        if not check_run_file(args, "report_dvs_hist"):
-            logger.info("Generating plots for report")
-            report.generate_report_plots(stats, args)
-        if not check_run_file(args, "report_md"):
-            with open(pathto(args, "report_md"), "w") as fh:
-                logger.info("Writing report markdown to " + pathto(args, "report_md"))
-                fh.write(report.generate_report_md(stats, args))
-
-        if not check_run_file(args, "report_html"):
-            with open(pathto(args, "report_html"), "w") as fh:
-                logger.info("Writing report HTML to " + pathto(args, "report_html"))
-                fh.write(report.generate_report_html(stats, args))
+        p.write_report_histogram()
+        p.write_report_markdown()
+        p.write_report_html()
 
     logger.info("-------------- phyloblitz run complete --------------")
 
