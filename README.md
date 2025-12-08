@@ -39,13 +39,24 @@ files in fastq(.gz) format.
 Download the database files from https://doi.org/10.5281/zenodo.7892522
 
 These have been formatted and indexed for use with
-[phyloFlash](https://hrgv.github.io/phyloFlash/). However for `phyloblitz`,
-only the Fasta file with trimmed, dereplicated sequences is necessary:
+[phyloFlash](https://hrgv.github.io/phyloFlash/). For `phyloblitz`, only the
+Fasta file with trimmed, dereplicated sequences is necessary:
 `SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta`.
 
 If you build your own database, low complexity regions should be masked (e.g.
 with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
-phyloFlash paper for details.
+phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
+2021](https://doi.org/10.1128/mSystems.00920-20)) for details.
+
+
+### Test datasets
+
+To try out `phyloblitz`, you can use Nanopore metagenomic datasets from [Liu et
+al., 2022](https://doi.org/10.1186/s40168-022-01415-8), e.g.  SRR23926923,
+which sequenced the [ZymoBIOMICS Gut Microbiome
+Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard).
+
+A subsample of ~100k reads is sufficient for a quick overview.
 
 
 ## Pipeline overview
@@ -57,7 +68,7 @@ phyloFlash paper for details.
      boundaries
  * All-vs-all mapping of extracted read segments with minimap2
  * Filter out all-vs-all mappings where per-base sequence divergence reported
-     by minimap (dv: tag) is too low; this parameter should be adjusted,
+     by minimap (`dv:` tag) is too low; this parameter should be adjusted,
      depending on the expected read accuracy of the sequencing platform
  * Cluster sequences with mcl
  * Assemble consensus sequence per read cluster with spoa
@@ -90,7 +101,7 @@ Future steps:
  - [ ] Benchmarking against defined test datasets
  - [ ] MultiQC integration
  - [ ] Detailed documentation
- - [ ] Object orientation 🫠
+ - [x] Object orientation 🫠
 
 
 ## Citations
