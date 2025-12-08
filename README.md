@@ -84,7 +84,6 @@ v0.1.0 targets:
  - [x] Reads in input, number mapped, number used for cluster assembly
  - [x] Choose dv_max threshold from observed values in all-vs-all mapping
  - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
- - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
  - [ ] Check if tool works on PacBio data
  - [x] Report metrics into a user-friendly file like phyloFlash
      - [x] Numbers of reads mapped and taxonomic summary
@@ -96,6 +95,7 @@ v0.1.0 targets:
 Future steps:
 
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
+ - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
  - [ ] CSS stylesheet for HTML report
  - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Benchmarking against defined test datasets
