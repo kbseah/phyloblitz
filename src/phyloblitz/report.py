@@ -96,12 +96,39 @@ def generate_report_plots(stats, args):
         fig.tight_layout()
         fig.savefig(utils.pathto(args, "report_dvs_hist"))
 
+        generate_histogram(
+            vals=self._stats["min_dvs"],
+            vline=self._stats["args"]["dv_max"],
+            title="Histogram of ava min dvs",
+            outfile=self.pathto("report_dvs_hist"),
+            figsize=(3, 2),
+        )
 
-def generate_report_md(stats, args):
+
+def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
+    """Generate plots for report file
+
+    :param vals: Iterable of values to generate histogram for
+    :param vline: x-value to draw vertical red line
+    :param title: Title for the plot
+    :param outfile: Path to write output file
+    :param figsize: Dimensions of figure
+    """
+
+    fig, axs = plt.subplots(1, figsize=figsize)
+    axs.hist(vals, bins="auto", density=True)
+    axs.axvline(vline, color="red")
+    axs.set_title(title)
+    fig.tight_layout()
+    fig.savefig(outfile)
+    return
+
+
+def generate_report_md(stats, histogram_file_path):
     """Generate markdown report from stats collected during phyloblitz run
 
     :param stats: `stats` dict produced in phyloblitz.main.main
-    :param args: Command line arguments from ArgumentParser.parse_args()
+    :param histogram_file_path: Path to histogram image file, relative to report file path
     :returns: Report in markdown format
     :rtype: str
     """
@@ -140,7 +167,7 @@ phyloblitz was called with the following parameters:
 
 {dict2markdowntable(stats["runstats"])}
 
-![]({utils.pathto(args, 'report_dvs_hist', basename_only=True)})
+![]({histogram_file_path})
 
 
 ## Taxonomy summary from initial mapping
@@ -164,10 +191,16 @@ design.
     return format_md(raw)
 
 
-def generate_report_html(stats, args):
-    """Generate HTML report from stats collected during phyloblitz run"""
+def generate_report_html(stats, histogram_file_path):
+    """Generate HTML report from stats collected during phyloblitz run
 
-    return html(generate_report_md(stats, args))
+    Same parameters as `generate_report_md`
+
+    :returns: Report in HTML format
+    :rtype: str
+    """
+
+    return html(generate_report_md(stats, histogram_file_path))
 
 
 def per_cluster_summarize(stats):
