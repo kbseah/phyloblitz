@@ -7,7 +7,6 @@ import re
 
 import phyloblitz.pipeline as pipeline
 
-from phyloblitz.utils import pathto, check_run_file
 from multiprocessing import Pool
 from os import makedirs
 from datetime import datetime
@@ -29,11 +28,6 @@ def main():
     )
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
-
-    # TODO remove this block
-    stats = {}  # Collect data and metadata for reporting stats
-    stats["args"] = vars(args)
-    stats["runstats"] = {}  # initialize dict to capture run statistics
 
     if args.log:
         logfile_handler = logging.FileHandler(args.log)
@@ -60,33 +54,11 @@ def main():
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
     p = pipeline.Pipeline(args)
-    p.run_minimap(threads=args.threads)
+    p.run_minimap(threads=args.threads, mode="map-" + args.platform)
 
-    if args.twopass:  # TODO refactor this
-        if not check_run_file(args, "intervals_fastq"):
-            logger.info("Retrieve aligned intervals on reads")
-            merged_intervals = pipeline.get_firstpass_intervals(
-                pathto(args, "initial_map")
-            )
-            stats["merged_intervals"] = merged_intervals
-            pipeline.extract_fastq_read_intervals(
-                merged_intervals, args.reads, pathto(args, "intervals_fastq")
-            )
-
-        if not check_run_file(args, "second_map"):
-            logger.info("Second mapping of extracted intervals for taxonomic summary")
-            map_ret, nreads = pipeline.run_minimap(
-                args.db,
-                args.dbindex,
-                pathto(args, "intervals_fastq"),
-                pathto(args, "second_map"),
-                mode="map-" + args.platform,
-                threads=args.threads,
-            )
-        sam_for_read_extraction = pathto(args, "second_map")
-
-    else:
-        sam_for_read_extraction = pathto(args, "initial_map")
+    if args.twopass:
+        p.twopass_extract_read_intervals(minlen=args.align_minlen)
+        p.run_minimap_secondmap(threads=args.threads, mode="map-" + args.platform)
 
     # All-vs-all mapping
     p.extract_reads_for_ava(twopass=args.twopass, align_minlen=args.align_minlen)

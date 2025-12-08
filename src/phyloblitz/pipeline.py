@@ -70,24 +70,6 @@ def merge_intervals(intervals: list):
     return merged
 
 
-def extract_fastq_read_intervals(intervals, in_file, out_file):
-    logger.info(
-        f"Extract read intervals that align with reference database to {out_file}"
-    )
-    counter = 0
-    with open(out_file, "w") as fh:
-        for name, seq, qual in pyfastx.Fastx(in_file):
-            if name in intervals:
-                for start, end in intervals[name]:
-                    newname = ":".join([str(i) for i in [name, start, end]])
-                    fh.write("@" + newname + "\n")
-                    fh.write(seq[start:end] + "\n")
-                    fh.write("+\n")
-                    fh.write(qual[start:end] + "\n")
-                    counter += 1
-    logger.info(f"Read intervals extracted: {str(counter)}")
-
-
 def sam_seq_generator(sam_file, minlen=1200):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping
 
@@ -265,6 +247,69 @@ class Pipeline(object):
             proc1.stdout.close()
             self._stats["runstats"].update({"total input reads": nreads})
             return proc2.wait()
+
+    @check_stage_file(
+        stage="second_map",
+        message="Second mapping of extracted intervals for taxonomic summary",
+    )
+    def run_minimap_secondmap(self, threads=12, mode="map-ont"):
+        """Map reads to reference database with minimap2
+
+        Filter with samtools -F 4 to discard reads that are not mapped.
+
+        :param threads: Number of threads for minimap2 to use
+        :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+        :returns: return code for samtools
+        :rtype: tuple
+        """
+        # Don't use mappy because it doesn't support all-vs-all yet
+        logger.info("Mapping reads to reference database with minimap2")
+        with open(self.pathto("second_map"), "w") as sam_fh:
+            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
+            (
+                cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
+                if self._refindex is not None
+                else cmd1.extend([self._ref, self.pathto("intervals_fastq")])
+            )
+            logger.debug("minimap command: " + " ".join(cmd1))
+            proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
+            proc2 = Popen(
+                ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
+            )
+            nreads = 0
+            for l in proc1.stderr:
+                nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
+                if nreads_s:
+                    nreads += int(nreads_s.group(1))
+                logger.debug(
+                    "  minimap log: " + l.decode().rstrip()
+                )  # output is in bytes
+            proc1.stdout.close()
+            self._stats["runstats"].update({"total input reads secondmap": nreads})
+            return proc2.wait()
+
+    @check_stage_file(
+        stage="intervals_fastq",
+        message="Twopass mode: Extract aligned intervals on reads",
+    )
+    def twopass_extract_read_intervals(self, minlen=1200):
+        merged_intervals = get_firstpass_intervals(
+            self.pathto("initial_map"), minlen=minlen
+        )
+        self._stats.update({"merged_intervals": merged_intervals})
+        counter = 0
+        with open(self.pathto("intervals_fastq"), "w") as fh:
+            for name, seq, qual in pyfastx.Fastx(self._reads):
+                if name in merged_intervals:
+                    for start, end in merged_intervals[name]:
+                        newname = ":".join([str(i) for i in [name, start, end]])
+                        fh.write("@" + newname + "\n")
+                        fh.write(seq[start:end] + "\n")
+                        fh.write("+\n")
+                        fh.write(qual[start:end] + "\n")
+                        counter += 1
+        self._stats["runstats"].update({"firstpass intervals extracted": counter})
+        logger.info(f"Twopass mode: Read intervals extracted: {str(counter)}")
 
     @check_stage_file(
         stage="mapped_segments",
