@@ -73,7 +73,8 @@ def sam_seq_generator(sam_file, minlen=1200):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping
 
     :param sam_file: Path to SAM file
-    :param minlen: Minimum query alignment length; adjust if targeting a different gene, e.g. LSU rRNA
+    :param minlen: Minimum query alignment length; adjust if targeting a
+        different gene, e.g. LSU rRNA
     """
     logger.info(
         f"Filtering alignment for primary mappings with length >= {str(minlen)}"
@@ -104,7 +105,8 @@ def spoa_assemble_fasta(fastq):
     """Run SPOA assembly on a Fastq input file
 
     :param fastq: Path to Fastq file with reads to assemble
-    :returns: Assembled sequence in Fasta format (stdout from spoa)
+    :returns: Alignment of consensus and input sequences in Fasta format
+        (stdout from spoa -r 2)
     :rtype: str
     """
     logger.info("Assemble consensus sequence for cluster with spoa")
@@ -146,6 +148,15 @@ def parse_spoa_r2(fasta):
 
 
 def count_spoa_aln_vars(seqs):
+    """Count mismatches and gaps vs consensus for each sequence in a cluster
+
+    :param seqs: Dict of sequences parsed by parse_spoa_r2; the consensus
+        sequence must have key "Consensus"
+    :returns: Count of base matches and mismatches, gaps relative to query and
+        consensus, leading and trailing query gaps, for each sequence in the
+        dict relative to consensus
+    :rtype: dict
+    """
     var = defaultdict(lambda: defaultdict(int))
     for hdr in seqs:
         if hdr != "Consensus":
@@ -576,6 +587,7 @@ class Pipeline(object):
             i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
         }
         self._stats.update({"cluster variant counts": cluster_variant_counts})
+        self._stats.update({"cluster cons parsed": cluster_cons_parsed})
 
         with open(self.pathto("cluster_asm"), "w") as fh:
             for c in cluster_cons_parsed:
