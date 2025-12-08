@@ -181,6 +181,24 @@ def count_spoa_aln_vars(seqs):
     return var
 
 
+def count_spoa_aln_persite_vars(seqs):  # TODO WIP
+    """Count mismatches/gaps per alignment position for clustered sequences vs consensus
+
+    If mismatches/gaps between sequences and the consensus are solely due to
+    technical sequencing error, rather than erroneous clustering of divergent
+    underlying reads, we expect fraction of variants per site to be roughly the
+    sequencing error. If for example two sequences are misclustered, then we
+    should see a secondary peak of ~50% variant coverage.
+    """
+    var = {}
+    for i in range(len(seqs["Consensus"])):
+        column = [seqs[hdr][i] for hdr in seqs if hdr != "Consensus"]
+        values, counts = np.unique(column, return_counts=True)
+        counts_norm = counts / counts.sum()
+        var[i] = -(counts_norm * np.log(counts_norm) / np.log(2)).sum()
+    return var
+
+
 class Pipeline(object):
     """phyloblitz pipeline run object"""
 
@@ -586,9 +604,17 @@ class Pipeline(object):
         cluster_variant_counts = {
             i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
         }
-        self._stats.update({"cluster variant counts": cluster_variant_counts})
-        self._stats.update({"cluster cons parsed": cluster_cons_parsed})
-
+        cluster_persite_variant_counts = {  # TODO WIP
+            i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
+            for i in cluster_cons_parsed
+        }
+        self._stats.update(
+            {
+                "cluster variant counts": cluster_variant_counts,
+                "cluster persite variant counts": cluster_persite_variant_counts,  # TODO WIP
+                "cluster cons parsed": cluster_cons_parsed,
+            }
+        )
         with open(self.pathto("cluster_asm"), "w") as fh:
             for c in cluster_cons_parsed:
                 fh.write(
@@ -762,6 +788,18 @@ class Pipeline(object):
         self._stats.update({"endtime": str(datetime.now())})
         with open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
+        return
+
+    def write_cluster_alns(self):  # TODO WIP
+        """Dump cluster alignments for troubleshooting"""
+        try:
+            for c in self._stats["cluster cons parsed"]:
+                with open("test_cluster_" + str(c) + ".fasta", "w") as fh:
+                    for hdr in self._stats["cluster cons parsed"][c]:
+                        fh.write(">" + hdr + "\n")
+                        fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")
+        except KeyError:
+            raise Exception("Key `cluster cons parsed` not found, has SPOA been run?")
         return
 
     @check_stage_file(

@@ -175,6 +175,7 @@ def main():
 
     # Write reports
     p.write_report_json()
+    # p.write_cluster_alns() # TODO for troubleshooting
 
     if not args.noreport:
         p.write_report_histogram()
