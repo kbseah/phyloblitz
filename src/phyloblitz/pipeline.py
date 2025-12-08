@@ -6,10 +6,15 @@ import re
 import pyfastx
 import logging
 import os.path
+import json
 
 import numpy as np
 
-from phyloblitz.report import generate_histogram, generate_report_md, generate_report_html
+from phyloblitz.report import (
+    generate_histogram,
+    generate_report_md,
+    generate_report_html,
+)
 from phyloblitz.utils import CIGAROPS, lists_common_prefix, parse_cigar_ops
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
@@ -258,7 +263,7 @@ class Pipeline(object):
                     "  minimap log: " + l.decode().rstrip()
                 )  # output is in bytes
             proc1.stdout.close()
-            self._stats["runstats"]["total input reads"] = nreads
+            self._stats["runstats"].update({"total input reads": nreads})
             return proc2.wait()
 
     @check_stage_file(
@@ -275,8 +280,9 @@ class Pipeline(object):
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
-        self._stats["runstats"]["mapped pass filter"] = counter
+        self._stats["runstats"].update({"mapped pass filter": counter})
         logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
+        return
 
     @check_stage_file(
         stage="ava_map",
@@ -316,13 +322,15 @@ class Pipeline(object):
                     len(dv) == 1
                 ), f"Problem in PAF file {self.pathto('ava_map')}: more than one dv tag in entry"
                 dvs[query].append(float(dv[0]))
-        self._stats["dvs"] = dvs
+        self._stats.update({"dvs": dvs})
         # min dv for each read, to get dv distribution and median to
         # automatically set dv threshold for clustering
         min_dvs = [min(dvs[r]) for r in dvs]
-        self._stats["runstats"]["min_dvs"] = min_dvs
-        self._stats["runstats"]["ava min dvs median"] = "{:.4f}".format(
-            np.median(min_dvs)
+        self._stats.update({"min_dvs": min_dvs})
+        self._stats["runstats"].update(
+            {
+                "ava min dvs median": "{:.4f}".format(np.median(min_dvs)),
+            }
         )
         return
 
@@ -440,12 +448,15 @@ class Pipeline(object):
             self.pathto("mcl_cluster"),
             self.pathto("mapped_segments"),
         )
-        self._stats["cluster2seq"] = cluster2seq
-        self._stats["runstats"]["number of clusters"] = len(cluster2seq)
-        self._stats["runstats"]["total reads in clusters"] = sum(
-            [len(cluster2seq[c]) for c in cluster2seq]
+        self._stats.update({"cluster2seq": cluster2seq})
+        self._stats["runstats"].update(
+            {
+                "number of clusters": len(cluster2seq),
+                "total reads in clusters": sum(
+                    [len(cluster2seq[c]) for c in cluster2seq]
+                ),
+            }
         )
-
         with Pool(threads) as pool:
             cluster_cons = pool.map(
                 spoa_assemble_fasta, [i.name for i in fastq_handles.values()]
@@ -498,8 +509,12 @@ class Pipeline(object):
         logger.info("Summarizing taxonomic composition of initial mapping")
         common_taxstrings = self._per_read_consensus_taxonomy(sam_file, minlen)
         # TODO right-pad taxonomy strings if too short
-        self._stats["initial_taxonomy"] = Counter(
-            [";".join(i[0:taxlevel]) for i in common_taxstrings.values()]
+        self._stats.update(
+            {
+                "initial_taxonomy": Counter(
+                    [";".join(i[0:taxlevel]) for i in common_taxstrings.values()]
+                )
+            }
         )
         return
 
@@ -610,7 +625,7 @@ class Pipeline(object):
                     )
             except KeyError:
                 KeyError(f"Accession {out[c]['tname']} not found in database?")
-        self._stats["cluster_tophits"] = out
+        self._stats.update({"cluster_tophits": out})
 
     @check_stage_file(
         stage="report_json",
@@ -618,7 +633,7 @@ class Pipeline(object):
     )
     def write_report_json(self):
         """Dump run stats file in JSON format for troubleshooting"""
-        self._stats["endtime"] = str(datetime.now())
+        self._stats.update({"endtime": str(datetime.now())})
         with open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
         return
@@ -629,13 +644,14 @@ class Pipeline(object):
     )
     def write_report_histogram(self):
         """Write histogram graphic required for report"""
-        return generate_histogram(
-            vals=self._stats["runstats"]["min_dvs"],
+        generate_histogram(
+            vals=self._stats["min_dvs"],
             vline=self._stats["args"]["dv_max"],
             title="Histogram of ava min dvs",
-            self.pathto("report_dvs_hist"),
-            figsize=(3,2)
+            outfile=self.pathto("report_dvs_hist"),
+            figsize=(3, 2),
         )
+        return
 
     @check_stage_file(
         stage="report_md",
@@ -646,8 +662,7 @@ class Pipeline(object):
         with open(self.pathto("report_md"), "w") as fh:
             fh.write(
                 generate_report_md(
-                    self._stats,
-                    self.pathto("report_dvs_hist", basename_only=True)
+                    self._stats, self.pathto("report_dvs_hist", basename_only=True)
                 )
             )
         return
@@ -656,13 +671,12 @@ class Pipeline(object):
         stage="report_html",
         message="Writing report HTML",
     )
-    def write_report_markdown(self):
+    def write_report_html(self):
         """Write final report in HTML format"""
         with open(self.pathto("report_html"), "w") as fh:
             fh.write(
                 generate_report_html(
-                    self._stats,
-                    self.pathto("report_dvs_hist", basename_only=True)
+                    self._stats, self.pathto("report_dvs_hist", basename_only=True)
                 )
             )
         return
@@ -673,7 +687,7 @@ def init_args():
         prog="phyloblitz",
         description="SSU rRNA profile from ONT or PacBio long reads",
     )
-    parser.add_argument(vline
+    parser.add_argument(
         "-d",
         "--db",
         help="Path to preprocessed SILVA database fasta file",
