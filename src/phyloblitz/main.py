@@ -8,7 +8,6 @@ import re
 
 import phyloblitz.pipeline as pipeline
 
-from multiprocessing import Pool
 from os import makedirs
 from datetime import datetime
 
@@ -85,7 +84,7 @@ def init_args():
         default=False,
         action="store_true",
     )
-    parser.add_argument(  # TODO not yet implemented
+    parser.add_argument(
         "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
     )
     parser.add_argument(
@@ -93,7 +92,10 @@ def init_args():
         help="Write logging messages to this file",
     )
     parser.add_argument(
-        "--debug", help="Display logging DEBUG level messages to console"
+        "--debug",
+        help="Display logging DEBUG level messages to console",
+        default=False,
+        action="store_true",
     )
 
     return parser.parse_args()
@@ -159,7 +161,7 @@ def main():
     # Clustering
     p.mcxload()
     p.mcl_cluster()
-    p.assemble_clusters(threads=args.threads)
+    p.assemble_clusters(threads=args.threads, keeptmp=args.keeptmp)
 
     # Taxonomy summary
     p.db_taxonomy()

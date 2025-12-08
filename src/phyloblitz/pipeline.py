@@ -110,13 +110,59 @@ def spoa_assemble_fasta(fastq):
     logger.info("Assemble consensus sequence for cluster with spoa")
     cmd = [
         "spoa",
+        "-r",
+        "2",
         fastq,
     ]
     logger.debug("spoa command: " + " ".join(cmd))
-    proc = Popen(cmd, stdout=PIPE, text=True, stderr=PIPE)
-    for l in proc.stderr:
-        logger.debug("  mcl log: " + l.decode().rstrip())
+    proc = Popen(cmd, stdout=PIPE, text=True)
+    # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
+    # ignoring stderr from spoa for now
     return proc.communicate()[0]
+
+
+def parse_spoa_r2(fasta):
+    """Parse SPOA gapped alignment + consensus in Fasta format (-r 2 output)
+
+    :param fasta: Assembly from SPOA as list of strings
+    """
+    seqs = {}
+    prev_hdr = ""
+    prev_seq = ""
+    for line in fasta.split("\n"):
+        if line.startswith(">"):
+            if len(prev_hdr) == 0 and len(prev_seq) == 0:
+                prev_hdr = line.rstrip()[1:]
+            elif len(prev_hdr) > 0 and len(prev_seq) > 0:
+                seqs[prev_hdr] = prev_seq
+                prev_seq = ""
+                prev_hdr = line.rstrip()[1:]
+        else:
+            prev_seq += line.rstrip()
+    # catch last
+    if len(prev_hdr) > 0 and len(prev_seq) > 0:
+        seqs[prev_hdr] = prev_seq
+    return seqs
+
+
+def count_spoa_aln_vars(seqs):
+    var = defaultdict(lambda: defaultdict(int))
+    for hdr in seqs:
+        if hdr != "Consensus":  # TODO leading and trailing gaps
+            for i in range(len(seqs[hdr])):
+                if seqs[hdr][i] == seqs["Consensus"][i]:
+                    var[hdr]["match"] += 1
+                elif seqs[hdr][i] == "-" and seqs["Consensus"][i] != "-":
+                    var[hdr]["query_gap"] += 1
+                elif seqs[hdr][i] != "-" and seqs["Consensus"][i] == "-":
+                    var[hdr]["cons_gap"] += 1
+                elif (
+                    seqs[hdr][i] != "-"
+                    and seqs["Consensus"][i] != "-"
+                    and seqs[hdr][i] != seqs["Consensus"][i]
+                ):
+                    var[hdr]["mismatch"] += 1
+    return var
 
 
 class Pipeline(object):
@@ -453,11 +499,12 @@ class Pipeline(object):
             logger.debug("  mcl log: " + l.decode().rstrip())
         return proc.wait()
 
-    def _cluster_seqs(self, mcl_out, reads):
+    def _cluster_seqs(self, mcl_out, reads, keeptmp):
         """Extract sequences from each MCL cluster to separate Fastq files for assembly
 
         :param mcl_out: Path MCL output file
         :param reads: Path to reads from extract_reads_for_ava step
+        :param keeptmp: Keep temporary files?
         :returns: Dict of file handles to each Fastq file keyed by cluster ID
         """
         counter = 0
@@ -473,7 +520,10 @@ class Pipeline(object):
                 for seq in seqs:
                     seq2cluster[seq] = counter  # assume each seq in only one cluster
                 fastq_handles[counter] = NamedTemporaryFile(
-                    suffix=".fastq", mode="w", delete=True, delete_on_close=False
+                    suffix=".fastq",
+                    mode="w",
+                    delete=(not keeptmp),
+                    delete_on_close=False,
                 )
                 counter += 1
         for name, seq, qual in pyfastx.Fastx(reads):
@@ -491,10 +541,11 @@ class Pipeline(object):
         stage="cluster_asm",
         message="Extract cluster sequences and assemble with SPOA",
     )
-    def assemble_clusters(self, threads=12):
+    def assemble_clusters(self, threads=12, keeptmp=False):
         fastq_handles, cluster2seq = self._cluster_seqs(
             self.pathto("mcl_cluster"),
             self.pathto("mapped_segments"),
+            keeptmp,
         )
         self._stats.update({"cluster2seq": cluster2seq})
         self._stats["runstats"].update(
@@ -513,10 +564,16 @@ class Pipeline(object):
         for i in fastq_handles.values():  # close NamedTemporaryFile handles
             i.close()
 
+        cluster_cons_parsed = {
+            i: parse_spoa_r2(cluster_cons[i]) for i in range(len(cluster_cons))
+        }
+
         with open(self.pathto("cluster_asm"), "w") as fh:
-            for cluster, seq in zip(fastq_handles.keys(), cluster_cons):
+            for c in cluster_cons_parsed:
                 fh.write(
-                    re.sub(r"^>Consensus", f">cluster_{str(cluster)} Consensus", seq)
+                    f">cluster_{str(c)} Consensus\n"
+                    + cluster_cons_parsed[c]["Consensus"].replace("-", "")
+                    + "\n"
                 )
             logger.info(f"Assembled sequences written to {self.pathto('cluster_asm')}")
 
