@@ -17,7 +17,6 @@ version = "0.1.0"
 backend = { name = "pixi-build-python", version = "==0.4.0" }
 
 [tasks]
-echo = "myecho"
 main = "main"
 
 [package.host-dependencies]
