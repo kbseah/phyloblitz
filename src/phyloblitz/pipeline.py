@@ -148,9 +148,14 @@ def parse_spoa_r2(fasta):
 def count_spoa_aln_vars(seqs):
     var = defaultdict(lambda: defaultdict(int))
     for hdr in seqs:
-        if hdr != "Consensus":  # TODO leading and trailing gaps
-            for i in range(len(seqs[hdr])):
-                if seqs[hdr][i] == seqs["Consensus"][i]:
+        if hdr != "Consensus":
+            # get coordinates without trailing and leading gaps
+            span = re.search(r"^-*([^-].*[^-])-*$", seqs[hdr]).span(1)
+            var[hdr]["query_lead_gap"] = span[0]
+            var[hdr]["query_trail_gap"] = len(seqs[hdr]) - span[1]
+            for i in range(span[0], span[1]):
+                if seqs[hdr][i] == seqs["Consensus"][i] and seqs[hdr][i] != "-":
+                    # Matching base but not common gap
                     var[hdr]["match"] += 1
                 elif seqs[hdr][i] == "-" and seqs["Consensus"][i] != "-":
                     var[hdr]["query_gap"] += 1
@@ -567,6 +572,10 @@ class Pipeline(object):
         cluster_cons_parsed = {
             i: parse_spoa_r2(cluster_cons[i]) for i in range(len(cluster_cons))
         }
+        cluster_variant_counts = {
+            i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
+        }
+        self._stats.update({"cluster variant counts": cluster_variant_counts})
 
         with open(self.pathto("cluster_asm"), "w") as fh:
             for c in cluster_cons_parsed:
