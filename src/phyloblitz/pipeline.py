@@ -382,11 +382,14 @@ class Pipeline(object):
         stage="ava_abc",
         message="Converting PAF ava alignment to ABC format for clustering",
     )
-    def paf_abc(self, dv_max=0.03):
+    def paf_abc(self, dv_max=0.03, dv_max_auto=False):
         """Convert PAF alignment to ABC format for MCL clustering
 
         :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
+        :param dv_max_auto: Set dv_max to 2 * median all-vs-all sequence divergence; parameter `dv_max` will be ignored
         """
+        if dv_max_auto:
+            dv_max = 2 * float(self._stats["runstats"]["ava min dvs median"])
         fh_abc = open(self.pathto("ava_abc"), "w")
         with open(self.pathto("ava_map"), "rt") as fh_paf:
             for line in fh_paf:
@@ -399,6 +402,7 @@ class Pipeline(object):
                     fh_abc.write(
                         "\t".join([str(i) for i in [query, target, score]]) + "\n"
                     )
+        self._stats["runstats"].update({"dv_max applied": dv_max})
         return fh_abc.close()
 
     @check_stage_file(
@@ -690,7 +694,7 @@ class Pipeline(object):
         """Write histogram graphic required for report"""
         generate_histogram(
             vals=self._stats["min_dvs"],
-            vline=self._stats["args"]["dv_max"],
+            vline=self._stats["runstats"]["dv_max applied"],
             title="Histogram of ava min dvs",
             outfile=self.pathto("report_dvs_hist"),
             figsize=(3, 2),

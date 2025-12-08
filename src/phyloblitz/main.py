@@ -68,6 +68,12 @@ def init_args():
         type=float,
     )
     parser.add_argument(
+        "--dv_max_auto",
+        help="Set dv_max parameter automatically at 2 * median of all-vs-all divergence value",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "--resume",
         help="Resume partially completed run based on expected filenames",
         default=False,
@@ -148,7 +154,7 @@ def main():
     p.extract_reads_for_ava(twopass=args.twopass, align_minlen=args.align_minlen)
     p.ava_map(mode="ava-" + args.platform, threads=args.threads)
     p.paf_get_dvs()
-    p.paf_abc(dv_max=args.dv_max)
+    p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 
     # Clustering
     p.mcxload()

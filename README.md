@@ -82,7 +82,7 @@ v0.1.0 targets:
 
  - [x] Taxonomy summary from initial mapping
  - [x] Reads in input, number mapped, number used for cluster assembly
- - [ ] Choose dv_max threshold from observed values in all-vs-all mapping
+ - [x] Choose dv_max threshold from observed values in all-vs-all mapping
  - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
  - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
  - [ ] Check if tool works on PacBio data
