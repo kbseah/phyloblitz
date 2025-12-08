@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import argparse
 import json
 import sys
 import re
@@ -12,16 +13,99 @@ from os import makedirs
 from datetime import datetime
 
 
+def init_args():
+    parser = argparse.ArgumentParser(
+        prog="phyloblitz",
+        description="SSU rRNA profile from ONT or PacBio long reads",
+    )
+    parser.add_argument(
+        "-d",
+        "--db",
+        help="Path to preprocessed SILVA database fasta file",
+        required=True,
+    )
+    parser.add_argument(
+        "--dbindex",
+        help="Path to minimap2 index of database file (optional)",
+        default=None,
+    )
+    parser.add_argument(
+        "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
+    )
+    parser.add_argument(
+        "--platform",
+        help="Sequencing platform used, either `pb` or `ont`",
+        choices=["ont", "pb"],
+        default="ont",
+    )
+    parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
+    parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
+    parser.add_argument(
+        "-t", "--threads", help="Number of parallel threads", default=12, type=int
+    )
+    parser.add_argument(
+        "--twopass",
+        help="[EXPERIMENTAL] Extract read segments and map again to reference",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "--align_minlen",
+        help="Minimum length of aligned segment",
+        default=1200,
+        type=int,
+    )
+    parser.add_argument(
+        "--summary_taxlevel",
+        help="Depth of taxonomy string for summary in report",
+        default=4,
+        type=int,
+    )
+    parser.add_argument(
+        "--dv_max",
+        help="Maximum pairwise sequence divergence in all-vs-all mapping to retain for clustering",
+        default=0.03,
+        type=float,
+    )
+    parser.add_argument(
+        "--resume",
+        help="Resume partially completed run based on expected filenames",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "--noreport",
+        help="Do not generate report file",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(  # TODO not yet implemented
+        "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
+    )
+    parser.add_argument(
+        "--log",
+        help="Write logging messages to this file",
+    )
+    parser.add_argument(
+        "--debug", help="Display logging DEBUG level messages to console"
+    )
+
+    return parser.parse_args()
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    args = pipeline.init_args()
+    args = init_args()
 
     console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setLevel(logging.INFO)
+    if args.debug:
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        console_handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",

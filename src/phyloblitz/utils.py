@@ -45,4 +45,3 @@ def lists_common_prefix(lol):
         else:
             break
     return out
-

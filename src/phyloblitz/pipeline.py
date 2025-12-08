@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import argparse
 import pysam
 import re
 import pyfastx
@@ -725,80 +724,3 @@ class Pipeline(object):
                 )
             )
         return
-
-
-def init_args():
-    parser = argparse.ArgumentParser(
-        prog="phyloblitz",
-        description="SSU rRNA profile from ONT or PacBio long reads",
-    )
-    parser.add_argument(
-        "-d",
-        "--db",
-        help="Path to preprocessed SILVA database fasta file",
-        required=True,
-    )
-    parser.add_argument(
-        "--dbindex",
-        help="Path to minimap2 index of database file (optional)",
-        default=None,
-    )
-    parser.add_argument(
-        "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
-    )
-    parser.add_argument(
-        "--platform",
-        help="Sequencing platform used, either `pb` or `ont`",
-        choices=["ont", "pb"],
-        default="ont",
-    )
-    parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
-    parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
-    parser.add_argument(
-        "-t", "--threads", help="Number of parallel threads", default=12, type=int
-    )
-    parser.add_argument(
-        "--twopass",
-        help="[EXPERIMENTAL] Extract read segments and map again to reference",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--align_minlen",
-        help="Minimum length of aligned segment",
-        default=1200,
-        type=int,
-    )
-    parser.add_argument(
-        "--summary_taxlevel",
-        help="Depth of taxonomy string for summary in report",
-        default=4,
-        type=int,
-    )
-    parser.add_argument(
-        "--dv_max",
-        help="Maximum pairwise sequence divergence in all-vs-all mapping to retain for clustering",
-        default=0.03,
-        type=float,
-    )
-    parser.add_argument(
-        "--resume",
-        help="Resume partially completed run based on expected filenames",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--noreport",
-        help="Do not generate report file",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(  # TODO not yet implemented
-        "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
-    )
-    parser.add_argument(
-        "--log",
-        help="Write logging messages to this file",
-    )
-
-    return parser.parse_args()
