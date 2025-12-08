@@ -15,8 +15,14 @@ class TestReportFunctions(unittest.TestCase):
         s = {"S1": "---AT-CG-A--", "Consensus": "ATAA-ACG-TGC"}
         o = count_spoa_aln_vars(s)
         self.assertEqual(
-            [o["S1"]["query_lead_gap"], o["S1"]["query_trail_gap"], o["S1"]["match"]],
-            [3, 2, 3],
+            [
+                o["S1"]["query_lead_gap"],
+                o["S1"]["query_trail_gap"],
+                o["S1"]["match"],
+                o["S1"]["cons_gap"],
+                o["S1"]["query_gap"],
+            ],
+            [3, 2, 3, 1, 1],
         )
 
 
