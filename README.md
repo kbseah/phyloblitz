@@ -51,10 +51,13 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 
 ### Test datasets
 
-To try out `phyloblitz`, you can use Nanopore metagenomic datasets from [Liu et
-al., 2022](https://doi.org/10.1186/s40168-022-01415-8), e.g.  SRR23926923,
-which sequenced the [ZymoBIOMICS Gut Microbiome
-Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard).
+To try out `phyloblitz`, you can use published datasets of the [ZymoBIOMICS Gut
+Microbiome
+Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard):
+
+* Nanopore GridION R9.4.1 flowcells, Kit 9 and Q20+ chemistry: SRR23926923
+  ([Liu et al., 2022](https://doi.org/10.1186/s40168-022-01415-8))
+* PacBio Sequel II, Standard Input library: SRR13128014
 
 A subsample of ~100k reads is sufficient for a quick overview.
 
@@ -96,7 +99,7 @@ Future steps:
 
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
- - [ ] CSS stylesheet for HTML report
+ - [x] CSS stylesheet for HTML report
  - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Benchmarking against defined test datasets
  - [ ] MultiQC integration

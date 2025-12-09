@@ -15,6 +15,21 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>{{title}}</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css"/>
+</head>
+<body style="max-width:1200px">
+{{markdown_report}}
+</body>
+</html>
+"""
+
 
 def dict2markdowntable(
     d,
@@ -167,13 +182,24 @@ phyloblitz was called with the following parameters:
 
 {dict2markdowntable(stats["runstats"])}
 
+<figure>
+
 ![]({histogram_file_path})
 
+<figcaption>Histogram of the lowest non-self divergence score per read from
+all-vs-all mapping of extracted rRNA sequences.</figcaption>
+</figure>
 
 ## Taxonomy summary from initial mapping
 
-{dict2markdowntable(stats['initial_taxonomy'], order_by_value=True)}
+For each read in the initial mapping, the consensus taxonomy of top hits in
+reference database was taken; these are summarized here at the requested taxon
+level {str(stats["args"]["summary_taxlevel"])}. This should not be interpreted
+as a direct measure of abundance, because the number of copies of rRNA genes
+per genome is variable between species. Eukaryotes especially often have high
+copy rRNA copy numbers.
 
+{dict2markdowntable(stats['initial_taxonomy'], order_by_value=True, col1='Taxon', col2='Read count')}
 
 ## Assembled sequence clusters
 
@@ -200,7 +226,9 @@ def generate_report_html(stats, histogram_file_path):
     :rtype: str
     """
 
-    return html(generate_report_md(stats, histogram_file_path))
+    return HTML_TEMPLATE.replace(
+        "{{markdown_report}}", html(generate_report_md(stats, histogram_file_path))
+    ).replace("{{title}}", "phyloblitz run report")
 
 
 def per_cluster_summarize(stats):
