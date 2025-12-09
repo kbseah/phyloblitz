@@ -101,15 +101,16 @@ def sam_seq_generator(sam_file, minlen=1200):
                 yield (name, seq, quals)
 
 
-def spoa_assemble_fasta(fastq):
+def spoa_assemble_fasta(label_fastq):
     """Run SPOA assembly on a Fastq input file
 
-    :param fastq: Path to Fastq file with reads to assemble
+    :param label_fastq: Tuple of input label (str) and path to Fastq file with
+        reads to assemble
     :returns: Alignment of consensus and input sequences in Fasta format
         (stdout from spoa -r 2)
     :rtype: str
     """
-    logger.info("Assemble consensus sequence for cluster with spoa")
+    label, fastq = label_fastq
     cmd = [
         "spoa",
         "-r",
@@ -120,7 +121,9 @@ def spoa_assemble_fasta(fastq):
     proc = Popen(cmd, stdout=PIPE, text=True)
     # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
     # ignoring stderr from spoa for now
-    return proc.communicate()[0]
+    out = proc.communicate()[0]
+    logger.info(f"Assembly complete for cluster {str(label)}")
+    return out
 
 
 def parse_spoa_r2(fasta):
@@ -582,9 +585,11 @@ class Pipeline(object):
                 ),
             }
         )
+        logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons = pool.map(
-                spoa_assemble_fasta, [i.name for i in fastq_handles.values()]
+                spoa_assemble_fasta,
+                [(c, handle.name) for c, handle in fastq_handles.items()],
             )
 
         for i in fastq_handles.values():  # close NamedTemporaryFile handles
