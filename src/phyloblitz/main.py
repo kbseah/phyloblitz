@@ -32,6 +32,12 @@ def init_args():
         "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
     )
     parser.add_argument(
+        "--num_reads",
+        help="Use subsample of N reads; default is to use all reads",
+        default=None,
+        type=int,
+    )
+    parser.add_argument(
         "--platform",
         help="Sequencing platform used, either `pb` or `ont`",
         choices=["ont", "pb"],
@@ -74,7 +80,7 @@ def init_args():
     )
     parser.add_argument(
         "--dv_max_auto",
-        help="Set dv_max parameter automatically at 2 * median of all-vs-all divergence value",
+        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value)",
         default=False,
         action="store_true",
     )
@@ -152,7 +158,9 @@ def main():
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
     p = pipeline.Pipeline(args)
-    p.run_minimap(threads=args.threads, mode="map-" + args.platform)
+    p.run_minimap(
+        threads=args.threads, mode="map-" + args.platform, sample=args.num_reads
+    )
 
     if args.twopass:
         logger.info("[EXPERIMENTAL] Applying two-pass mode")

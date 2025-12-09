@@ -286,24 +286,47 @@ class Pipeline(object):
         stage="initial_map",
         message="Initial mapping of reads to identify target intervals",
     )
-    def run_minimap(self, threads=12, mode="map-ont"):
+    def run_minimap(self, threads=12, mode="map-ont", sample=None):
         """Map reads to reference database with minimap2
 
         Only report reads that are mapped.
 
         :param threads: Number of threads for minimap2 to use
         :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+        :param sample: Number of reads to sample; if None then use all reads;
+            also use this number as the random seed
         :returns: return code for samtools
         :rtype: tuple
         """
         # Don't use mappy because it doesn't support all-vs-all yet
+        infile = self._reads
+        if sample is not None:
+            logger.info(f"Taking sample of {str(sample)} reads")
+            temp_infile = NamedTemporaryFile()  # TODO keeptmp
+            cmd = [
+                "pyfastx",
+                "sample",
+                "--sequential-read",
+                "-n",
+                str(sample),
+                "-s",
+                str(sample),
+                "-o",
+                temp_infile.name,
+                self._reads,
+            ]
+            proc = Popen(cmd, stderr=PIPE)
+            proc.wait()
+            infile = temp_infile.name
+            logger.debug(f"Sampled reads in temporary file {temp_infile.name}")
+
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("initial_map"), "w") as sam_fh:
             cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
             (
-                cmd1.extend([self._refindex, self._reads])
+                cmd1.extend([self._refindex, infile])
                 if self._refindex is not None
-                else cmd1.extend([self._ref, self._reads])
+                else cmd1.extend([self._ref, infile])
             )
             logger.debug("minimap command: " + " ".join(cmd1))
             proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
@@ -456,10 +479,14 @@ class Pipeline(object):
         """Convert PAF alignment to ABC format for MCL clustering
 
         :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
-        :param dv_max_auto: Set dv_max to 2 * median all-vs-all sequence divergence; parameter `dv_max` will be ignored
+        :param dv_max_auto: Set dv_max to max(0.001, 2 * median all-vs-all
+            sequence divergence); parameter `dv_max` will be ignored). The value
+            0.001 is to account for cases where median divergence is zero.
         """
         if dv_max_auto:
-            dv_max = 2 * float(self._stats["runstats"]["ava min dvs median"])
+            dv_max = max(
+                0.001, 2 * float(self._stats["runstats"]["ava min dvs median"])
+            )
         fh_abc = open(self.pathto("ava_abc"), "w")
         with open(self.pathto("ava_map"), "rt") as fh_paf:
             for line in fh_paf:
