@@ -328,7 +328,7 @@ class Pipeline(object):
 
     @check_stage_file(
         stage="second_map",
-        message="Second mapping of extracted intervals for taxonomic summary",
+        message="[EXPERIMENTAL] Twopass mode: Second mapping of extracted intervals for taxonomic summary",
     )
     def run_minimap_secondmap(self, threads=12, mode="map-ont"):
         """Map reads to reference database with minimap2
@@ -341,7 +341,6 @@ class Pipeline(object):
         :rtype: tuple
         """
         # Don't use mappy because it doesn't support all-vs-all yet
-        logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("second_map"), "w") as sam_fh:
             cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
             (
@@ -364,7 +363,7 @@ class Pipeline(object):
 
     @check_stage_file(
         stage="intervals_fastq",
-        message="Twopass mode: Extract aligned intervals on reads",
+        message="[EXPERIMENTAL] Twopass mode: Extract aligned intervals on reads",
     )
     def twopass_extract_read_intervals(self, minlen=1200):
         merged_intervals = get_firstpass_intervals(
@@ -383,7 +382,7 @@ class Pipeline(object):
                         fh.write(qual[start:end] + "\n")
                         counter += 1
         self._stats["runstats"].update({"firstpass intervals extracted": counter})
-        logger.info(f"Twopass mode: Read intervals extracted: {str(counter)}")
+        logger.info(f"[EXPERIMENTAL] Twopass mode: Read intervals extracted: {str(counter)}")
 
     @check_stage_file(
         stage="mapped_segments",

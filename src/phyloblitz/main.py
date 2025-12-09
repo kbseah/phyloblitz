@@ -149,6 +149,7 @@ def main():
     p.run_minimap(threads=args.threads, mode="map-" + args.platform)
 
     if args.twopass:
+        logger.info("[EXPERIMENTAL] Applying two-pass mode")
         p.twopass_extract_read_intervals(minlen=args.align_minlen)
         p.run_minimap_secondmap(threads=args.threads, mode="map-" + args.platform)
 
