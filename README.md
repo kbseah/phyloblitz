@@ -86,8 +86,11 @@ v0.1.0 targets:
  - [x] Taxonomy summary from initial mapping
  - [x] Reads in input, number mapped, number used for cluster assembly
  - [x] Choose dv_max threshold from observed values in all-vs-all mapping
- - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
- - [ ] Check if tool works on PacBio data
+ - [x] Object orientation 🫠
+ - [x] CSS stylesheet for HTML report
+ - [x] Check if tool works on PacBio data
+ - [x] Option to map only a sample of reads
+ - [x] Fix dv_max at a minimal value if observed median is zero
  - [x] Report metrics into a user-friendly file like phyloFlash
      - [x] Numbers of reads mapped and taxonomic summary
      - [x] Assembled sequences, top hits, and respective read coverage and
@@ -99,12 +102,12 @@ Future steps:
 
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
- - [x] CSS stylesheet for HTML report
+ - [ ] Does extracting flanking sequence context improve strain resolution?
  - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Benchmarking against defined test datasets
+ - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
  - [ ] MultiQC integration
  - [ ] Detailed documentation
- - [x] Object orientation 🫠
 
 
 ## Citations
