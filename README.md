@@ -1,6 +1,11 @@
 # phyloblitz 🌳🌩️
 
-Rapid SSU rRNA marker gene screening of long read metagenomes
+**Rapid SSU rRNA marker gene screening of long read metagenomes.**
+
+Note: This tool is still under development. We appreciate any bug reports or
+feedback, please [create an issue on
+GitHub](https://github.com/kbseah/phyloblitz/issues/new). Please understand
+that, because of limited resources, we cannot guarantee a quick response.
 
 -----
 
@@ -132,6 +137,9 @@ Please cite the SILVA reference database if you use it:
      SILVA in 2026: a global core biodata resource for rRNA within the DSMZ
      digital diversity. Nucleic Acids Research, gkaf1247, 2026.
      https://doi.org/10.1093/nar/gkaf1247
+
+If you use `phyloblitz` in published research, please cite the GitHub
+repository URL and software version.
 
 
 ## License
