@@ -69,12 +69,13 @@ def merge_intervals(intervals: list):
     return merged
 
 
-def sam_seq_generator(sam_file, minlen=1200):
+def sam_seq_generator(sam_file, minlen=1200, flanking=0):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping
 
     :param sam_file: Path to SAM file
     :param minlen: Minimum query alignment length; adjust if targeting a
         different gene, e.g. LSU rRNA
+    :param flanking: [EXPERIMENTAL] Additional flanking sequence to extract
     """
     logger.info(
         f"Filtering alignment for primary mappings with length >= {str(minlen)}"
@@ -84,20 +85,11 @@ def sam_seq_generator(sam_file, minlen=1200):
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
             # Primary mappings only to ensure only one mapping per input read
             if not i.is_secondary and not i.is_supplementary:
-                name = ":".join(
-                    [
-                        str(i)
-                        for i in [
-                            i.query_name,
-                            i.query_alignment_start,
-                            i.query_alignment_end,
-                        ]
-                    ]
-                )
-                seq = i.query_alignment_sequence
-                quals = i.query_qualities_str[
-                    i.query_alignment_start : i.query_alignment_end
-                ]
+                mystart = max(0, i.query_alignment_start - flanking)
+                myend = min(i.query_length, i.query_alignment_end + flanking)
+                name = ":".join([str(i) for i in [i.query_name, mystart, myend]])
+                seq = i.query_sequence[mystart:myend]
+                quals = i.query_qualities_str[mystart:myend]
                 yield (name, seq, quals)
 
 
@@ -382,17 +374,21 @@ class Pipeline(object):
                         fh.write(qual[start:end] + "\n")
                         counter += 1
         self._stats["runstats"].update({"firstpass intervals extracted": counter})
-        logger.info(f"[EXPERIMENTAL] Twopass mode: Read intervals extracted: {str(counter)}")
+        logger.info(
+            f"[EXPERIMENTAL] Twopass mode: Read intervals extracted: {str(counter)}"
+        )
 
     @check_stage_file(
         stage="mapped_segments",
         message="Extracting read segments for all-vs-all mapping",
     )
-    def extract_reads_for_ava(self, twopass=False, align_minlen=1200):
+    def extract_reads_for_ava(self, twopass=False, align_minlen=1200, flanking=0):
         sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
         counter = 0
         with open(self.pathto("mapped_segments"), "w") as fq_fh:
-            for name, seq, quals in sam_seq_generator(sam_file, minlen=align_minlen):
+            for name, seq, quals in sam_seq_generator(
+                sam_file, minlen=align_minlen, flanking=flanking
+            ):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")

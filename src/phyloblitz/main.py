@@ -55,6 +55,12 @@ def init_args():
         type=int,
     )
     parser.add_argument(
+        "--flanking",
+        help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
+        default=1000,
+        type=int,
+    )
+    parser.add_argument(
         "--summary_taxlevel",
         help="Depth of taxonomy string for summary in report",
         default=4,
@@ -154,7 +160,9 @@ def main():
         p.run_minimap_secondmap(threads=args.threads, mode="map-" + args.platform)
 
     # All-vs-all mapping
-    p.extract_reads_for_ava(twopass=args.twopass, align_minlen=args.align_minlen)
+    p.extract_reads_for_ava(
+        twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
+    )
     p.ava_map(mode="ava-" + args.platform, threads=args.threads)
     p.paf_get_dvs()
     p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
@@ -176,7 +184,7 @@ def main():
 
     # Write reports
     p.write_report_json()
-    # p.write_cluster_alns() # TODO for troubleshooting
+    p.write_cluster_alns()  # TODO for troubleshooting
 
     if not args.noreport:
         p.write_report_histogram()
