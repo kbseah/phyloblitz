@@ -80,6 +80,10 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
     logger.info(
         f"Filtering alignment for primary mappings with length >= {str(minlen)}"
     )
+    if flanking > 0:
+        logger.info(
+            f"Including flanking {str(flanking)} bp sequence when extracting reads"
+        )
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
