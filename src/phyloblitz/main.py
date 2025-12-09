@@ -57,7 +57,7 @@ def init_args():
     parser.add_argument(
         "--flanking",
         help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
-        default=1000,
+        default=0,
         type=int,
     )
     parser.add_argument(
@@ -184,7 +184,7 @@ def main():
 
     # Write reports
     p.write_report_json()
-    p.write_cluster_alns()  # TODO for troubleshooting
+    # p.write_cluster_alns()  # TODO for troubleshooting
 
     if not args.noreport:
         p.write_report_histogram()
