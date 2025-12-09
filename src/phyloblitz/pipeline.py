@@ -294,7 +294,7 @@ class Pipeline(object):
     def run_minimap(self, threads=12, mode="map-ont"):
         """Map reads to reference database with minimap2
 
-        Filter with samtools -F 4 to discard reads that are not mapped.
+        Only report reads that are mapped.
 
         :param threads: Number of threads for minimap2 to use
         :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
@@ -304,17 +304,14 @@ class Pipeline(object):
         # Don't use mappy because it doesn't support all-vs-all yet
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("initial_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
             (
                 cmd1.extend([self._refindex, self._reads])
                 if self._refindex is not None
                 else cmd1.extend([self._ref, self._reads])
             )
             logger.debug("minimap command: " + " ".join(cmd1))
-            proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
-            proc2 = Popen(
-                ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
-            )
+            proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
             nreads = 0
             for l in proc1.stderr:
                 nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
@@ -323,9 +320,8 @@ class Pipeline(object):
                 logger.debug(
                     "  minimap log: " + l.decode().rstrip()
                 )  # output is in bytes
-            proc1.stdout.close()
             self._stats["runstats"].update({"total input reads": nreads})
-            return proc2.wait()
+            return proc1.wait()
 
     @check_stage_file(
         stage="second_map",
@@ -334,7 +330,7 @@ class Pipeline(object):
     def run_minimap_secondmap(self, threads=12, mode="map-ont"):
         """Map reads to reference database with minimap2
 
-        Filter with samtools -F 4 to discard reads that are not mapped.
+        Only report reads that are mapped.
 
         :param threads: Number of threads for minimap2 to use
         :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
@@ -344,7 +340,7 @@ class Pipeline(object):
         # Don't use mappy because it doesn't support all-vs-all yet
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("second_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, f"-t {str(threads)}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
             (
                 cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
                 if self._refindex is not None
@@ -352,9 +348,6 @@ class Pipeline(object):
             )
             logger.debug("minimap command: " + " ".join(cmd1))
             proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
-            proc2 = Popen(
-                ["samtools", "view", "-h", "-F 4"], stdin=proc1.stdout, stdout=sam_fh
-            )
             nreads = 0
             for l in proc1.stderr:
                 nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
@@ -363,9 +356,8 @@ class Pipeline(object):
                 logger.debug(
                     "  minimap log: " + l.decode().rstrip()
                 )  # output is in bytes
-            proc1.stdout.close()
             self._stats["runstats"].update({"total input reads secondmap": nreads})
-            return proc2.wait()
+            return proc1.wait()
 
     @check_stage_file(
         stage="intervals_fastq",
