@@ -32,8 +32,13 @@ or with the `--help` parameter to view help message. When run for the first
 time, pixi will resolve and install dependencies.
 
 ```console
-pixi run phyloblitz --help
+git clone git@github.com:kbseah/phyloblitz.git
+cd phyloblitz
+pixi shell # set up workspace and start pixi shell session
+phyloblitz --help
 ```
+
+Use `exit` or `Ctrl-D` to exit pixi shell session.
 
 Required inputs are a preprocessed SILVA reference database and the long read
 files in fastq(.gz) format.
@@ -105,12 +110,13 @@ v0.1.0 targets:
 
 Future steps:
 
+ - [x] Check if lr:hq mode is better for Q20 ONT reads than map:ont
+ - [ ] Does extracting flanking sequence context improve strain resolution?
+     - [ ] Filter out all-vs-all hits with overhangs
+     - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
- - [ ] Does extracting flanking sequence context improve strain resolution?
- - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Benchmarking against defined test datasets
- - [ ] Check if lr:hq mode is better for Q20 ONT reads than map:ont
  - [ ] MultiQC integration
  - [ ] Detailed documentation
 
