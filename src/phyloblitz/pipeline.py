@@ -14,7 +14,12 @@ from phyloblitz.report import (
     generate_report_md,
     generate_report_html,
 )
-from phyloblitz.utils import CIGAROPS, lists_common_prefix, parse_cigar_ops
+from phyloblitz.utils import (
+    CIGAROPS,
+    lists_common_prefix,
+    parse_cigar_ops,
+    filter_paf_overhang,
+)
 from subprocess import Popen, PIPE
 from tempfile import NamedTemporaryFile
 from collections import defaultdict, Counter
@@ -225,6 +230,7 @@ class Pipeline(object):
         "second_map": "_minimap_second.sam",
         "mapped_segments": "_mapped.fastq",
         "ava_map": "_ava.paf",
+        "ava_filter": "_ava_filter.paf",
         "ava_abc": "_ava.abc",
         "ava_mci": "_ava.mci",
         "ava_seqtab": "_ava_seq.tab",
@@ -460,17 +466,38 @@ class Pipeline(object):
                 logger.debug("  minimap log: " + l.decode().rstrip())
             return proc.wait()
 
+    @check_stage_file(
+        stage="ava_filter",
+        message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
+    )
+    def paf_file_filter_overhangs(self, max_overhang_frac=0.05):
+        logger.info(f"Max overhang fraction: {str(max_overhang_frac)}")
+        counter_all = 0
+        counter = 0
+        with open(self.pathto("ava_map"), "r") as fh_in:
+            with open(self.pathto("ava_filter"), "w") as fh_out:
+                for line in fh_in:
+                    counter_all += 1
+                    out = filter_paf_overhang(line, max_overhang_frac=max_overhang_frac)
+                    if out is not None:
+                        counter += 1
+                        fh_out.write(out)
+        logger.info(
+            f"Retained {str(counter)} out of {str(counter_all)} all-vs-all alignments"
+        )
+        return
+
     def paf_get_dvs(self):
         logger.info("Reading dvs data from ava mapping")
         dvs = defaultdict(list)
-        with open(self.pathto("ava_map"), "rt") as fh:
+        with open(self.pathto("ava_filter"), "rt") as fh:
             for line in fh:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
                 dv = re.findall(r"dv:f:([\d\.]+)", line)
                 assert (
                     len(dv) == 1
-                ), f"Problem in PAF file {self.pathto('ava_map')}: more than one dv tag in entry"
+                ), f"Problem in PAF file {self.pathto('ava_filter')}: more than one dv tag in entry"
                 dvs[query].append(float(dv[0]))
         self._stats.update({"dvs": dvs})
         # min dv for each read, to get dv distribution and median to
@@ -501,7 +528,7 @@ class Pipeline(object):
                 0.001, 2 * float(self._stats["runstats"]["ava min dvs median"])
             )
         fh_abc = open(self.pathto("ava_abc"), "w")
-        with open(self.pathto("ava_map"), "rt") as fh_paf:
+        with open(self.pathto("ava_filter"), "rt") as fh_paf:
             for line in fh_paf:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
@@ -822,11 +849,16 @@ class Pipeline(object):
             json.dump(self._stats, fh, indent=4)
         return
 
-    def write_cluster_alns(self):  # TODO WIP
+    def write_cluster_alns(self):
         """Dump cluster alignments for troubleshooting"""
         try:
             for c in self._stats["cluster cons parsed"]:
-                with open("test_cluster_" + str(c) + ".fasta", "w") as fh:
+                with open(
+                    os.path.join(
+                        self._outdir, self._prefix + "_aln_cluster_" + str(c) + ".fasta"
+                    ),
+                    "w",
+                ) as fh:
                     for hdr in self._stats["cluster cons parsed"][c]:
                         fh.write(">" + hdr + "\n")
                         fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")

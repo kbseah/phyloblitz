@@ -109,6 +109,11 @@ def init_args():
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--write_cluster_alns",
+        help="Write cluster alignments to files",
+        action="store_true",
+    )
 
     return parser.parse_args()
 
@@ -170,6 +175,7 @@ def main():
         twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
     )
     p.ava_map(mode=args.platform, threads=args.threads)
+    p.paf_file_filter_overhangs(max_overhang_frac=0.05)
     p.paf_get_dvs()
     p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 
@@ -190,7 +196,8 @@ def main():
 
     # Write reports
     p.write_report_json()
-    # p.write_cluster_alns()  # TODO for troubleshooting
+    if args.write_cluster_alns:
+        p.write_cluster_alns()
 
     if not args.noreport:
         p.write_report_histogram()

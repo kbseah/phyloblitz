@@ -45,3 +45,33 @@ def lists_common_prefix(lol):
         else:
             break
     return out
+
+
+def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
+    """Filter out PAF alignments with incompatible overhangs
+
+    If two aligned reads have overhangs that do not align, and the overhangs
+    are on the same side of the alignment, this means that the underlying
+    sequences have a conserved homologous region (e.g. a repeat or conserved
+    homolog), flanked by at least one non-homologous region.
+
+    :param line: Single line from PAF entry
+    :param max_overhang_frac: Max fraction of read length that same-side
+        overhang is allowed to be
+    :returns: Input `line` if alignment does not have overhangs on same side(s)
+        of alignment.
+    """
+    [qlen, qstart, qend, tlen, tstart, tend] = [
+        int(line.rstrip().split("\t")[i]) for i in [1, 2, 3, 6, 7, 8]
+    ]
+    s_q = qstart / qlen
+    s_t = tstart / tlen
+    t_q = (qlen - qend) / qlen
+    t_t = (tlen - tend) / tlen
+    if (s_q > max_overhang_frac and s_t > max_overhang_frac) or (
+        t_q > max_overhang_frac and t_t > max_overhang_frac
+    ):
+        # incompatible overlap
+        pass
+    else:
+        return line
