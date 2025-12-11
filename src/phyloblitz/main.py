@@ -39,9 +39,9 @@ def init_args():
     )
     parser.add_argument(
         "--platform",
-        help="Sequencing platform used, either `pb` or `ont`",
-        choices=["ont", "pb"],
-        default="ont",
+        help="Sequencing platform used, argument passed to minimap2 -x option",
+        choices=["map-ont", "map-pb", "lr:hq", "map-hifi"],
+        default="lr:hq",
     )
     parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
     parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
@@ -158,9 +158,7 @@ def main():
             logger.error(f"Output folder {args.outdir} already exists, resuming run")
 
     p = pipeline.Pipeline(args)
-    p.run_minimap(
-        threads=args.threads, mode="map-" + args.platform, sample=args.num_reads
-    )
+    p.run_minimap(threads=args.threads, mode=args.platform, sample=args.num_reads)
 
     if args.twopass:
         logger.info("[EXPERIMENTAL] Applying two-pass mode")
@@ -171,7 +169,7 @@ def main():
     p.extract_reads_for_ava(
         twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
     )
-    p.ava_map(mode="ava-" + args.platform, threads=args.threads)
+    p.ava_map(mode=args.platform, threads=args.threads)
     p.paf_get_dvs()
     p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 

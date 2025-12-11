@@ -429,22 +429,31 @@ class Pipeline(object):
         stage="ava_map",
         message="All-vs-all mapping of mapped reads with minimap2",
     )
-    def ava_map(self, mode="ava-ont", threads=12):
+    def ava_map(self, mode="map-ont", threads=12):
         """All-vs-all mapping with minimap2 to generate clusters for assembly
 
-        :param mode: Mapping preset mode, either `ava-ont` or `ava-pb`
+        :param mode: Mapping preset mode used for initial minimap2 mapping step
         :param threads: Number of threads for minimap2 to use
         """
+        presets = {
+            "map-ont": ["-x", "ava-ont"],
+            "map-pb": ["-x", "ava-pb"],
+            "lr:hq": ["-x", "lr:hq", "-Xw5", "-e0", "-m100", "-r2k"],
+            "map-hifi": ["-x", "map-hifi", "-Xw5", "-e0", "-m100"],
+        }
         with open(self.pathto("ava_map"), "w") as paf_fh:
-            cmd = [
-                "minimap2",
-                "-x",
-                mode,
-                "-t",
-                str(threads),
-                self.pathto("mapped_segments"),
-                self.pathto("mapped_segments"),
-            ]
+            cmd = (
+                [
+                    "minimap2",
+                ]
+                + presets[mode]
+                + [
+                    "-t",
+                    str(threads),
+                    self.pathto("mapped_segments"),
+                    self.pathto("mapped_segments"),
+                ]
+            )
             logger.debug("minimap command: " + " ".join(cmd))
             proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
             for l in proc.stderr:
