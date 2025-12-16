@@ -718,6 +718,9 @@ class Pipeline(object):
         self._stats["runstats"].update(
             {
                 "number of clusters": len(cluster2seq),
+                "number of clusters > 5 reads": len(
+                    [i for i in cluster2seq if len(cluster2seq[i]) > 5]
+                ),
                 "total reads in clusters": sum(
                     [len(cluster2seq[c]) for c in cluster2seq]
                 ),
