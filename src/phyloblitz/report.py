@@ -47,6 +47,8 @@ def dict2markdowntable(
     :param keys: Keys to include in table; if None, all keys will be used
     :param col1: Column header for first column
     :param col2: Column header for second column
+    :param order_by_value: Order rows by dict values
+    :param order_descending: Descending order if true
     :returns: Text table in markdown format
     :rtype: str
     """
@@ -73,7 +75,9 @@ def dict2markdowntable(
     return "\n".join(out)
 
 
-def dod2markdowntable(d, keys, col1="Name"):
+def dod2markdowntable(
+    d, keys, order_by_value=True, order_descending=True, order_by="numseq", col1="Name"
+):
     """Convert dict of dicts to a markdown table
 
     The first key will be cast as row names, second key as column names.
@@ -81,16 +85,26 @@ def dod2markdowntable(d, keys, col1="Name"):
     :param d: Dict of dicts
     :param keys: Keys to use as columns, must be keys of the second-level dicts
     :param col1: Column header to use for the first column
+    :param order_by_value: Order rows by dict values
+    :param order_descending: Descending order if true
+    :param order_by: Second-order key to use for ordering (i.e. which column)
     :returns: Text table in markdown format
     :rtype: str
     """
+    assert order_by in keys
     out = []
     out.append(f"| {col1} | " + " | ".join(keys) + " |")
     out.append("| :----: | " + " | ".join([":----:"] * len(keys)) + " |")
-    for c in d:
+    sign = -1 if order_descending else 1
+    dd = (
+        sorted(d.items(), key=lambda cv: sign * cv[1][order_by])
+        if order_by_value
+        else d
+    )
+    for c, v in dd:
         out.append(
             f"| {str(c)} | "
-            + " | ".join([str(d[c][k]) if k in d[c] else "-" for k in keys])
+            + " | ".join([str(v[k]) if k in v else "-" for k in keys])
             + " |"
         )
     return "\n".join(out)

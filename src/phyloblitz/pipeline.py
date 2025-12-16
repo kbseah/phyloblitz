@@ -605,6 +605,7 @@ class Pipeline(object):
         outfolder = os.path.dirname(os.path.dirname(self.pathto("isonclust3_cluster")))
         cmd = [
             "isONclust3",
+            "--no-fastq",
             "--fastq",
             self.pathto("mapped_segments"),
             "--mode",
