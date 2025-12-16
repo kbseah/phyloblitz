@@ -50,9 +50,9 @@ def init_args():
     )
     parser.add_argument(
         "--cluster_tool",
-        help="Tool for sequence clustering",
+        help="Tool(s) to use for sequence clustering",
         choices=["mcl", "isonclust3"],
-        default="mcl",
+        default="isonclust3",
     )
     parser.add_argument(
         "--twopass",
@@ -80,13 +80,13 @@ def init_args():
     )
     parser.add_argument(
         "--dv_max",
-        help="Maximum pairwise sequence divergence in all-vs-all mapping to retain for clustering",
+        help="Maximum pairwise sequence divergence in minimap2 all-vs-all mapping to retain for clustering (only used if `--cluster_tool mcl`)",
         default=0.03,
         type=float,
     )
     parser.add_argument(
         "--dv_max_auto",
-        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value)",
+        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value) (only used if `--cluster_tool mcl`)",
         default=False,
         action="store_true",
     )
