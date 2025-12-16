@@ -2,8 +2,8 @@
 
 **Rapid SSU rRNA marker gene screening of long read metagenomes.**
 
-Note: This tool is still under development. We appreciate any bug reports or
-feedback, please [create an issue on
+Note: This tool is still under development and the interface may change without
+warning. We appreciate any bug reports or feedback; please [create an issue on
 GitHub](https://github.com/kbseah/phyloblitz/issues/new). Please understand
 that, because of limited resources, we cannot guarantee a quick response.
 
@@ -27,9 +27,10 @@ references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 ## Usage
 
-Dependencies are managed with [pixi](https://pixi.sh/). Run without arguments
-or with the `--help` parameter to view help message. When run for the first
-time, pixi will resolve and install dependencies.
+Dependencies are managed with [pixi](https://pixi.sh/). When `pixi shell` is
+run for the first time in the folder containing the `pixi.toml` configuration
+file, pixi will resolve and install dependencies. Run `phyloblitz` without
+arguments or with the `--help` parameter to view help message.
 
 ```console
 git clone git@github.com:kbseah/phyloblitz.git
@@ -61,15 +62,16 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 
 ### Test datasets
 
-To try out `phyloblitz`, you can use published datasets of the [ZymoBIOMICS Gut
-Microbiome
+To try out `phyloblitz`, you can use published datasets that have sequenced the
+[ZymoBIOMICS Gut Microbiome
 Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard):
 
 * Nanopore GridION R9.4.1 flowcells, Kit 9 and Q20+ chemistry: SRR23926923
   ([Liu et al., 2022](https://doi.org/10.1186/s40168-022-01415-8))
 * PacBio Sequel II, Standard Input library: SRR13128014
 
-A subsample of ~100k reads is sufficient for a quick overview.
+A subsample of ~100k reads (`--num_reads 100000`) is sufficient for a quick
+overview.
 
 
 ## Pipeline overview
@@ -79,11 +81,7 @@ A subsample of ~100k reads is sufficient for a quick overview.
  * Extract aligned portion of mapped reads, use primary alignment only
      otherwise we get duplicate read segments with slightly differing
      boundaries
- * All-vs-all mapping of extracted read segments with minimap2
- * Filter out all-vs-all mappings where per-base sequence divergence reported
-     by minimap (`dv:` tag) is too low; this parameter should be adjusted,
-     depending on the expected read accuracy of the sequencing platform
- * Cluster sequences with mcl
+ * Sequence clustering, either with isONclust3 or minimap2 + mcl
  * Assemble consensus sequence per read cluster with spoa
  * Generate metrics per cluster for diagnostics: expect similar error rate per
      read vs. consensus, identify clusters with too few reads
@@ -108,17 +106,29 @@ v0.1.0 targets:
      - [x] Link SILVA record by accession
      - [x] Alignment identity (using Blast-like % id definition)
 
-Future steps:
+v0.2.0 targets:
 
  - [x] Check if lr:hq mode is better for Q20 ONT reads than map:ont
+ - [x] Option to cluster with isONclust3 instead of minimap2 ava
+ - [ ] Option to search final assembled cluster sequences with vsearch instead
+       of minimap2; better handling of divergent sequences: Example, the
+       Aestuariibacter sequence in SRR28830816
+ - [ ] Divergence of reads in each cluster from consensus to detect potential
+       chimeras
+ - [ ] Sequence diversity in reads flanking the SSU sequence per cluster to
+       identify meta-consensus sequences
+ - [ ] MultiQC integration
+ - [ ] Fix the CSS stylesheet
+ - [ ] Detailed documentation
+
+Future plans:
+
  - [ ] Does extracting flanking sequence context improve strain resolution?
      - [ ] Filter out all-vs-all hits with overhangs
      - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
- - [ ] Divergence of reads in each cluster from consensus to detect potential chimeras
  - [ ] Benchmarking against defined test datasets
- - [ ] MultiQC integration
- - [ ] Detailed documentation
+ - [ ] Multisample comparison and co-assembly
 
 
 ## Citations
@@ -126,13 +136,17 @@ Future steps:
 Please cite the following dependencies:
 
  * [`spoa`](https://github.com/rvaser/spoa)
+ * [`minimap2`](https://github.com/lh3/minimap2) Heng Li, Minimap2: pairwise
+     alignment for nucleotide sequences, Bioinformatics, 34(18):3094-3100,
+     2018.  https://doi.org/10.1093/bioinformatics/bty191
+ * [`isONclust3`](https://github.com/aljpetri/isONclust3) Alexander J Petri,
+     Kristoffer Sahlin, De novo clustering of large long-read transcriptome
+     datasets with isONclust3, Bioinformatics, 41(5):batf207, 2025.
+     https://doi.org/10.1093/bioinformatics/btaf207
  * [`mcl`](https://micans.org/mcl/) Stijn van Dongen, Graph Clustering Via a
      Discrete Uncoupling Process, SIAM Journal on Matrix Analysis and
      Applications, 30(1):121-141, 2008.
      http://link.aip.org/link/?SJMAEL/30/121/1
- * [`minimap2`](https://github.com/lh3/minimap2) Heng Li, Minimap2: pairwise
-     alignment for nucleotide sequences, Bioinformatics, 34(18):3094-3100,
-     2018.  https://doi.org/10.1093/bioinformatics/bty191
  * [`pyfastx`](https://pyfastx.readthedocs.io/)
  * [`samtools`](https://www.htslib.org/)
  * [`pysam`](https://github.com/pysam-developers/pysam)
