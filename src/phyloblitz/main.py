@@ -49,6 +49,12 @@ def init_args():
         "-t", "--threads", help="Number of parallel threads", default=12, type=int
     )
     parser.add_argument(
+        "--cluster_tool",
+        help="Tool for sequence clustering",
+        choices=["mcl", "isonclust3"],
+        default="mcl",
+    )
+    parser.add_argument(
         "--twopass",
         help="[EXPERIMENTAL] Extract read segments and map again to reference",
         default=False,
@@ -170,19 +176,26 @@ def main():
         p.twopass_extract_read_intervals(minlen=args.align_minlen)
         p.run_minimap_secondmap(threads=args.threads, mode="map-" + args.platform)
 
-    # All-vs-all mapping
+    # Extract reads for clustering
     p.extract_reads_for_ava(
         twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
     )
-    p.ava_map(mode=args.platform, threads=args.threads)
-    p.paf_file_filter_overhangs(max_overhang_frac=0.05)
-    p.paf_get_dvs()
-    p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
+    if args.cluster_tool == "mcl":
+        # All-vs-all mapping
+        p.ava_map(mode=args.platform, threads=args.threads)
+        p.paf_file_filter_overhangs(max_overhang_frac=0.05)
+        p.paf_get_dvs()
+        p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 
-    # Clustering
-    p.mcxload()
-    p.mcl_cluster()
-    p.assemble_clusters(threads=args.threads, keeptmp=args.keeptmp)
+        # Clustering
+        p.mcxload()
+        p.mcl_cluster()
+    elif args.cluster_tool == "isonclust3":
+        p.isonclust3_cluster()
+
+    p.assemble_clusters(
+        cluster_tool=args.cluster_tool, threads=args.threads, keeptmp=args.keeptmp
+    )
 
     # Taxonomy summary
     p.db_taxonomy()
@@ -200,7 +213,8 @@ def main():
         p.write_cluster_alns()
 
     if not args.noreport:
-        p.write_report_histogram()
+        if args.cluster_tool == "mcl":
+            p.write_report_histogram()
         p.write_report_markdown()
         p.write_report_html()
 

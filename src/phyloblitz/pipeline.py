@@ -124,7 +124,7 @@ def spoa_assemble_fasta(label_fastq):
     # ignoring stderr from spoa for now
     out = proc.communicate()[0]
     logger.info(f"Assembly complete for cluster {str(label)}")
-    return out
+    return label, out
 
 
 def parse_spoa_r2(fasta):
@@ -235,6 +235,7 @@ class Pipeline(object):
         "ava_mci": "_ava.mci",
         "ava_seqtab": "_ava_seq.tab",
         "mcl_cluster": "_mcl.out",
+        "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
         "cluster_asm": "_final.fasta",
         "cluster_tophits": "_final_tophits.paf",
         "report_json": "_report.json",
@@ -590,7 +591,34 @@ class Pipeline(object):
             logger.debug("  mcl log: " + l.decode().rstrip())
         return proc.wait()
 
-    def _cluster_seqs(self, mcl_out, reads, keeptmp):
+    @check_stage_file(
+        stage="isonclust3_cluster",
+        message="Clustering with isonclust3",
+    )
+    def isonclust3_cluster(self):
+        if self._platform in ["lr:hq", "map-ont"]:
+            isonclust3_mode = "ont"
+        elif self._platform in ["map-hifi", "map-pb"]:
+            isonclust3_mode = "pacbio"
+        # isonclust3 takes output folder path as argument, automatically
+        # creates `clustering` subfolder
+        outfolder = os.path.dirname(os.path.dirname(self.pathto("isonclust3_cluster")))
+        cmd = [
+            "isONclust3",
+            "--fastq",
+            self.pathto("mapped_segments"),
+            "--mode",
+            isonclust3_mode,
+            "--outfolder",
+            outfolder,
+        ]
+        logger.debug("isonclust3 command: " + " ".join(cmd))
+        proc = Popen(cmd, stderr=PIPE)
+        for l in proc.stderr:
+            logger.debug("  isonclust3 log: " + l.decode().rstrip())
+        return proc.wait()
+
+    def _cluster_seqs_from_mcl(self, mcl_out, reads, keeptmp):
         """Extract sequences from each MCL cluster to separate Fastq files for assembly
 
         :param mcl_out: Path MCL output file
@@ -628,16 +656,63 @@ class Pipeline(object):
             fastq_handles[i].close()
         return fastq_handles, cluster2seq
 
+    def _cluster_seqs_from_isonclust3(self, isonclust3_out, reads, keeptmp):
+        """Extract sequences from each isONclust3 cluster to separate Fastq files for assembly
+
+        The numbering of clusters by isONclust3 itself is not consistent
+        between the final_clusters.tsv file and the output fastq files; best to
+        extract the sequences ourselves.
+
+        :param isonclust3_out: Path isONclust3 output file
+        :param reads: Path to reads from extract_reads_for_ava step
+        :param keeptmp: Keep temporary files?
+        :returns: Dict of file handles to each Fastq file keyed by cluster ID
+        """
+        cluster_files = []
+        fastq_handles = {}
+        seq2cluster = {}
+        with open(isonclust3_out, "r") as fh:
+            for line in fh:
+                (clust, seqname) = line.rstrip().split("\t")
+                seq2cluster[seqname] = clust
+        cluster2seq = defaultdict(list)
+        for seqname in seq2cluster:
+            cluster2seq[seq2cluster[seqname]].append(seqname)
+        for cluster in cluster2seq:
+            logger.info(
+                f"Cluster {str(cluster)} comprises {str(len(cluster2seq[cluster]))} sequences"
+            )
+            fastq_handles[cluster] = NamedTemporaryFile(
+                suffix=".fastq",
+                mode="w",
+                delete=(not keeptmp),
+                delete_on_close=False,
+            )
+        for seqname, seq, qual in pyfastx.Fastx(reads):
+            if seqname in seq2cluster:
+                fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
+                fastq_handles[seq2cluster[seqname]].write(fastq_rec)
+        for i in fastq_handles:
+            fastq_handles[i].close()
+        return fastq_handles, cluster2seq
+
     @check_stage_file(
         stage="cluster_asm",
         message="Extract cluster sequences and assemble with SPOA",
     )
-    def assemble_clusters(self, threads=12, keeptmp=False):
-        fastq_handles, cluster2seq = self._cluster_seqs(
-            self.pathto("mcl_cluster"),
-            self.pathto("mapped_segments"),
-            keeptmp,
-        )
+    def assemble_clusters(self, cluster_tool="mcl", threads=12, keeptmp=False):
+        if cluster_tool == "mcl":
+            fastq_handles, cluster2seq = self._cluster_seqs_from_mcl(
+                self.pathto("mcl_cluster"),
+                self.pathto("mapped_segments"),
+                keeptmp,
+            )
+        elif cluster_tool == "isonclust3":
+            fastq_handles, cluster2seq = self._cluster_seqs_from_isonclust3(
+                self.pathto("isonclust3_cluster"),
+                self.pathto("mapped_segments"),
+                keeptmp,
+            )
         self._stats.update({"cluster2seq": cluster2seq})
         self._stats["runstats"].update(
             {
@@ -649,7 +724,7 @@ class Pipeline(object):
         )
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
-            cluster_cons = pool.map(
+            cluster_cons_tuples = pool.map(
                 spoa_assemble_fasta,
                 [(c, handle.name) for c, handle in fastq_handles.items()],
             )
@@ -657,9 +732,9 @@ class Pipeline(object):
         for i in fastq_handles.values():  # close NamedTemporaryFile handles
             i.close()
 
-        cluster_cons_parsed = {
-            i: parse_spoa_r2(cluster_cons[i]) for i in range(len(cluster_cons))
-        }
+        cluster_cons = dict(cluster_cons_tuples)
+
+        cluster_cons_parsed = {i: parse_spoa_r2(cluster_cons[i]) for i in cluster_cons}
         cluster_variant_counts = {
             i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
         }
