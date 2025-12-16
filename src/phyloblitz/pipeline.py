@@ -513,7 +513,7 @@ class Pipeline(object):
 
     @check_stage_file(
         stage="ava_abc",
-        message="Converting PAF ava alignment to ABC format for clustering",
+        message="Converting PAF ava alignment to ABC format for clustering; using minimap2's estimated sequence divergences",
     )
     def paf_abc(self, dv_max=0.03, dv_max_auto=False):
         """Convert PAF alignment to ABC format for MCL clustering
@@ -540,6 +540,51 @@ class Pipeline(object):
                         "\t".join([str(i) for i in [query, target, score]]) + "\n"
                     )
         self._stats["runstats"].update({"dv_max applied": dv_max})
+        return fh_abc.close()
+
+    def paf_get_pids(self):
+        logger.info("Getting PIDs from ava mapping")
+        pids = defaultdict(list)
+        with open(self.pathto("ava_filter"), "rt") as fh:
+            for line in fh:
+                spl = line.rstrip().split("\t")
+                query = spl[0]
+                pid = int(spl[9]) / int(spl[10])
+                pids[query].append(pid)
+        self._stats.update({"pids": pids})
+        max_pids = [max(pids[r]) for r in pids]
+        self._stats.update({"max_pids": max_pids})
+        self._stats["runstats"].update(
+            {
+                "ava max pids median": "{:.4f}".format(np.median(max_pids)),
+            }
+        )
+        return
+
+    @check_stage_file(
+        stage="ava_abc",
+        message="Converting PAF ava alignment to ABC format for clustering; using Blast-like pid",
+    )
+    def paf_abc_pids(self, pid_min=0.7, pid_min_auto=False):
+        """Convert PAF alignment to ABC format for MCL clustering
+
+        :param pid_min: Minimum proportion sequence ID to accept
+        :param pid_min_auto: Set pid_min automatically to ... TODO
+        """
+        if pid_min_auto:
+            pass  # TODO
+        fh_abc = open(self.pathto("ava_abc"), "w")
+        with open(self.pathto("ava_filter"), "rt") as fh_paf:
+            for line in fh_paf:
+                spl = line.rstrip().split("\t")
+                query = spl[0]
+                target = spl[5]
+                pid = int(spl[9]) / int(spl[10])
+                if pid > pid_min:
+                    fh_abc.write(
+                        "\t".join([str(i) for i in [query, target, pid]]) + "\n"
+                    )
+        self._stats["runstats"].update({"pid_min applied": pid_min})
         return fh_abc.close()
 
     @check_stage_file(

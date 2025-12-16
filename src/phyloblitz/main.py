@@ -85,6 +85,11 @@ def init_args():
         action="store_true",
     )
     parser.add_argument(
+        "--use_pid",
+        help="Use blast-like alignment identity instead of per-base sequence divergence",
+        action="store_true",
+    )
+    parser.add_argument(
         "--resume",
         help="Resume partially completed run based on expected filenames",
         default=False,
@@ -176,8 +181,12 @@ def main():
     )
     p.ava_map(mode=args.platform, threads=args.threads)
     p.paf_file_filter_overhangs(max_overhang_frac=0.05)
-    p.paf_get_dvs()
-    p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
+    if args.use_pid:
+        p.paf_get_pids()
+        p.paf_abc_pids(pid_min=0.9)  # TODO implement pid_min_auto, expose as CLI params
+    else:
+        p.paf_get_dvs()
+        p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 
     # Clustering
     p.mcxload()
