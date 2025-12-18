@@ -904,14 +904,14 @@ class Pipeline(object):
                 if out[c]["tophit taxonomy"].startswith(
                     "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast"
                 ):
-                    out[c]["higher taxonomy"] = "[Chloroplast]"
+                    out[c]["higher taxonomy"] = "[Eukaryotic organelle Chloroplast]"
                 elif out[c]["tophit taxonomy"].startswith(
                     "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria"
                 ):
-                    out[c]["higher taxonomy"] = "[Mitochondria]"
+                    out[c]["higher taxonomy"] = "[Eukaryotic organelle Mitochondria]"
                 else:
-                    out[c]["higher taxonomy"] = ";".join(
-                        self._acc2tax[out[c]["tname"]][0:3]
+                    out[c]["higher taxonomy"] = "; ".join(
+                        self._acc2tax[out[c]["tname"]][0:-1]
                     )
             except KeyError:
                 KeyError(f"Accession {out[c]['tname']} not found in database?")
