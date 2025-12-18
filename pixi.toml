@@ -18,6 +18,11 @@ backend = { name = "pixi-build-python", version = "==0.4.0" }
 
 [tasks]
 main = "main"
+test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
+download = "wget -q -O - 'https://zenodo.org/records/7892522/files/138.1.tar.gz?download=1' | tar -xzf - 138.1/SILVA_SSU.noLSU.masked.trimmed.NR96.fixed.fasta"
+run = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR96.fixed.fasta --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run --platform lr:hq --threads 12 --log runtest/run.log --resume --debug"
+clean = "rm -rf runtest/run runtest/run.log"
+pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
 
 [package.host-dependencies]
 hatchling = ">=1.16.1"
