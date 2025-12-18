@@ -142,7 +142,6 @@ Future plans:
 
 Please cite the following dependencies:
 
- * [`spoa`](https://github.com/rvaser/spoa)
  * [`minimap2`](https://github.com/lh3/minimap2) Heng Li, Minimap2: pairwise
      alignment for nucleotide sequences, Bioinformatics, 34(18):3094-3100,
      2018.  https://doi.org/10.1093/bioinformatics/bty191
@@ -154,9 +153,18 @@ Please cite the following dependencies:
      Discrete Uncoupling Process, SIAM Journal on Matrix Analysis and
      Applications, 30(1):121-141, 2008.
      http://link.aip.org/link/?SJMAEL/30/121/1
- * [`pyfastx`](https://pyfastx.readthedocs.io/)
- * [`samtools`](https://www.htslib.org/)
+ * [`pyfastx`](https://pyfastx.readthedocs.io/) Lianming Du, et al., Pyfastx: a
+     robust Python package for fast random access to sequences from plain and
+     gzipped FASTA/Q files, Briefings in Bioinformatics, 22(4):bbaa368, 2020.
+     https://doi.org/10.1093/bib/bbaa368
+ * [`samtools`](https://www.htslib.org/) Heng Li, Bob Handsaker, et al., The
+     Sequence Alignment/Map format and SAMtools, Bioinformatics,
+     25(16):2078-2079, 2009. https://doi.org/10.1093/bioinformatics/btp352
+     James K Bonfield, John Marshall, Petr Danecek, et al., HTSlib: C library
+     for reading/writing high-throughput sequencing data, GigaScience,
+     10(2):giab007, 2021. https://doi.org/10.1093/gigascience/giab007
  * [`pysam`](https://github.com/pysam-developers/pysam)
+ * [`spoa`](https://github.com/rvaser/spoa)
 
 Please cite the SILVA reference database if you use it:
 
