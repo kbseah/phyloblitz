@@ -5,13 +5,24 @@ name = "phyloblitz"
 platforms = ["linux-64"]
 version = "0.1.0"
 preview = ["pixi-build"]
+description = "Rapid SSU rRNA marker gene screening of long read metagenomes."
+license = "MIT"
+license-file = "LICENSE.txt"
+readme = "README.md"
+repository = "https://github.com/kbseah/phyloblitz"
 
 [dependencies]
 phyloblitz = { path = "." }
 
 [package]
 name = "phyloblitz"
-version = "0.1.0"
+version = { workspace = true }
+authors = { workspace = true }
+description = { workspace = true }
+license = { workspace = true }
+license-file = { workspace = true }
+readme = { workspace = true }
+repository = { workspace = true }
 
 [package.build]
 backend = { name = "pixi-build-python", version = "==0.4.0" }
