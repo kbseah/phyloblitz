@@ -6,3 +6,5 @@ __pycache__
 # test run folder
 /test_run
 test.log
+/138.1/
+/runtest/run*
