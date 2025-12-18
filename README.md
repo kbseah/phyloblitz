@@ -52,7 +52,9 @@ Download the database files from https://doi.org/10.5281/zenodo.7892522
 These have been formatted and indexed for use with
 [phyloFlash](https://hrgv.github.io/phyloFlash/). For `phyloblitz`, only the
 Fasta file with trimmed, dereplicated sequences is necessary:
-`SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta`.
+`SILVA_SSU.noLSU.masked.trimmed.NR96.fixed.fasta`.
+
+You can use `pixi run download` to execute the download command.
 
 If you build your own database, low complexity regions should be masked (e.g.
 with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
@@ -62,7 +64,12 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 
 ### Test datasets
 
-To try out `phyloblitz`, you can use published datasets that have sequenced the
+After downloading the database file with `pixi run download` (or manually to
+the subfolder `138.1/`) you can test `phyloblitz` on the test data (a sample of
+SSU rRNA-containing Nanopore reads from SRR17913200) with `pixi run run`. The
+output will be in `runtest/run`.
+
+Try out `phyloblitz` on other published datasets that have sequenced the
 [ZymoBIOMICS Gut Microbiome
 Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard):
 
@@ -70,8 +77,8 @@ Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-stand
   ([Liu et al., 2022](https://doi.org/10.1186/s40168-022-01415-8))
 * PacBio Sequel II, Standard Input library: SRR13128014
 
-A subsample of ~100k reads (`--num_reads 100000`) is sufficient for a quick
-overview.
+A subsample of ~100k reads (`--num_reads 100000`) from a metagenome dataset is
+sufficient for a quick overview.
 
 
 ## Pipeline overview
