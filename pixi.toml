@@ -23,9 +23,13 @@ download = "wget -q -O - 'https://zenodo.org/records/7892522/files/138.1.tar.gz?
 run = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run --platform lr:hq --threads 12 --log runtest/run.log --resume --debug"
 clean = "rm -rf runtest/run runtest/run.log"
 pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
+prun = [{task="test"}, {task="pclean"}, {task="run"}]
+rerun = [{task="test"}, {task="clean"}, {task="run"}]
 run_pb = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_pb --platform map-hifi --threads 12 --log runtest/run_pb.log --resume --debug"
 clean_pb = "rm -rf runtest/run_pb runtest/run_pb.log"
 pclean_pb = "find ./runtest/run_pb -type f ! -name pbz_minimap_initial.sam -delete"
+prun_pb = [{task="test"}, {task="pclean_pb"}, {task="run_pb"}]
+rerun_pb = [{task="test"}, {task="clean_pb"}, {task="run_pb"}]
 
 [package.host-dependencies]
 hatchling = ">=1.16.1"
