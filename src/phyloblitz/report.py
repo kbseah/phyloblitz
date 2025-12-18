@@ -221,7 +221,9 @@ Summary of assembled sequence clusters and their top hits in the reference
 database. Cluster sequences with few underlying reads and many
 mismatches/indels to the reference hits are lower quality because of
 insufficient coverage, and should not be used for phylogenetics or probe
-design.
+design. Clusters with a high number of underlying reads but low alignment
+identity to a reference sequence may represent novel taxa, but should be
+checked for sequence chimerism or misassembly.
 
 {dod2markdowntable(per_cluster_summarize(stats), cluster_table_fields, col1='Cluster ID')}
 
