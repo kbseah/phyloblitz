@@ -180,19 +180,19 @@ def main():
     p.extract_reads_for_ava(
         twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
     )
-    if args.cluster_tool == "mcl":
-        # All-vs-all mapping
-        p.ava_map(mode=args.platform, threads=args.threads)
-        p.paf_file_filter_overhangs(max_overhang_frac=0.05)
-        p.paf_get_dvs()
-        p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
 
-        # Clustering
+    # All-vs-all mapping
+    p.ava_map(mode=args.platform, threads=args.threads)
+    p.paf_file_filter_overhangs(max_overhang_frac=0.05)
+    p.paf_get_dvs()
+
+    # Clustering
+    if args.cluster_tool == "mcl":
+        p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
         p.mcxload()
         p.mcl_cluster()
     elif args.cluster_tool == "isonclust3":
         p.isonclust3_cluster()
-
     p.assemble_clusters(
         cluster_tool=args.cluster_tool, threads=args.threads, keeptmp=args.keeptmp
     )
@@ -213,8 +213,7 @@ def main():
         p.write_cluster_alns()
 
     if not args.noreport:
-        if args.cluster_tool == "mcl":
-            p.write_report_histogram()
+        p.write_report_histogram()
         p.write_report_markdown()
         p.write_report_html()
 

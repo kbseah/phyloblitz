@@ -146,7 +146,8 @@ def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
 
     fig, axs = plt.subplots(1, figsize=figsize)
     axs.hist(vals, bins="auto", density=True)
-    axs.axvline(vline, color="red")
+    if vline is not None:
+        axs.axvline(vline, color="red")
     axs.set_title(title)
     fig.tight_layout()
     fig.savefig(outfile)

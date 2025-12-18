@@ -951,9 +951,13 @@ class Pipeline(object):
     )
     def write_report_histogram(self):
         """Write histogram graphic required for report"""
+        if "dv_max_applied" in self._stats["runstats"]:
+            vline = (self._stats["runstats"]["dv_max applied"],)
+        else:
+            vline = None
         generate_histogram(
             vals=self._stats["min_dvs"],
-            vline=self._stats["runstats"]["dv_max applied"],
+            vline=vline,
             title="Histogram of ava min dvs",
             outfile=self.pathto("report_dvs_hist"),
             figsize=(3, 2),
