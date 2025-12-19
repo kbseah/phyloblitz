@@ -91,7 +91,7 @@ sufficient for a quick overview.
  * Sequence clustering, either with isONclust3 or minimap2 + mcl
  * Assemble consensus sequence per read cluster with spoa
  * Generate metrics per cluster for diagnostics: expect similar error rate per
-     read vs. consensus, identify clusters with too few reads
+     read vs. consensus, identify clusters with too few reads (TODO)
 
 
 ## TODO
@@ -124,9 +124,8 @@ v0.2.0 targets:
        chimeras
  - [ ] Sequence diversity in reads flanking the SSU sequence per cluster to
        identify meta-consensus sequences
- - [ ] MultiQC integration
- - [ ] Fix the CSS stylesheet
  - [ ] Detailed documentation
+ - [ ] Multisample comparison and co-assembly
 
 Future plans:
 
@@ -135,7 +134,8 @@ Future plans:
      - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Benchmarking against defined test datasets
- - [ ] Multisample comparison and co-assembly
+ - [ ] MultiQC integration
+ - [ ] Fix the CSS stylesheet
 
 
 ## Citations
