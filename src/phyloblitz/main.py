@@ -16,109 +16,129 @@ def init_args():
     parser = argparse.ArgumentParser(
         prog="phyloblitz",
         description="SSU rRNA profile from ONT or PacBio long reads",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
+
+    in_args = parser.add_argument_group("inputs")
+    in_args.add_argument(
         "-d",
         "--db",
         help="Path to preprocessed SILVA database fasta file",
         required=True,
     )
-    parser.add_argument(
+    in_args.add_argument(
         "--dbindex",
         help="Path to minimap2 index of database file (optional)",
         default=None,
     )
-    parser.add_argument(
+    in_args.add_argument(
         "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
     )
-    parser.add_argument(
+    in_args.add_argument(
         "--num_reads",
         help="Use subsample of N reads; default is to use all reads",
         default=None,
         type=int,
     )
-    parser.add_argument(
+    in_args.add_argument(
         "--platform",
         help="Sequencing platform used, argument passed to minimap2 -x option",
         choices=["map-ont", "map-pb", "lr:hq", "map-hifi"],
         default="lr:hq",
     )
-    parser.add_argument("-p", "--prefix", help="Output filename prefix", default="pbz")
-    parser.add_argument("-o", "--outdir", help="Output folder path", default="pbz_test")
-    parser.add_argument(
-        "-t", "--threads", help="Number of parallel threads", default=12, type=int
+
+    out_args = parser.add_argument_group("outputs")
+    out_args.add_argument(
+        "-p", "--prefix", help="Output filename prefix", default="pbz"
     )
-    parser.add_argument(
-        "--cluster_tool",
-        help="Tool(s) to use for sequence clustering",
-        choices=["mcl", "isonclust3"],
-        default="isonclust3",
+    out_args.add_argument(
+        "-o", "--outdir", help="Output folder path", default="pbz_test"
     )
-    parser.add_argument(
-        "--twopass",
-        help="[EXPERIMENTAL] Extract read segments and map again to reference",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--align_minlen",
-        help="Minimum length of aligned segment",
-        default=1200,
-        type=int,
-    )
-    parser.add_argument(
-        "--flanking",
-        help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
-        default=0,
-        type=int,
-    )
-    parser.add_argument(
-        "--summary_taxlevel",
-        help="Depth of taxonomy string for summary in report",
-        default=4,
-        type=int,
-    )
-    parser.add_argument(
-        "--dv_max",
-        help="Maximum pairwise sequence divergence in minimap2 all-vs-all mapping to retain for clustering (only used if `--cluster_tool mcl`)",
-        default=0.03,
-        type=float,
-    )
-    parser.add_argument(
-        "--dv_max_auto",
-        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value) (only used if `--cluster_tool mcl`)",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--resume",
-        help="Resume partially completed run based on expected filenames",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
+    out_args.add_argument(
         "--noreport",
         help="Do not generate report file",
         default=False,
         action="store_true",
     )
-    parser.add_argument(
+    out_args.add_argument(
         "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
     )
-    parser.add_argument(
+    out_args.add_argument(
         "--log",
         help="Write logging messages to this file",
     )
-    parser.add_argument(
+    out_args.add_argument(
+        "--write_cluster_alns",
+        help="Write cluster alignments to files",
+        action="store_true",
+    )
+
+    run_args = parser.add_argument_group("run options")
+    run_args.add_argument(
+        "-t", "--threads", help="Number of parallel threads", default=12, type=int
+    )
+    run_args.add_argument(
+        "--cluster_tool",
+        help="Tool(s) to use for sequence clustering",
+        choices=["mcl", "isonclust3"],
+        default="isonclust3",
+    )
+    run_args.add_argument(
+        "--align_minlen",
+        help="Minimum length of aligned segment",
+        default=1200,
+        type=int,
+    )
+    run_args.add_argument(
+        "--summary_taxlevel",
+        help="Depth of taxonomy string for summary in report",
+        default=4,
+        type=int,
+    )
+    run_args.add_argument(
+        "--resume",
+        help="Resume partially completed run based on expected filenames",
+        default=False,
+        action="store_true",
+    )
+    run_args.add_argument(
         "--debug",
         help="Display logging DEBUG level messages to console",
         default=False,
         action="store_true",
     )
-    parser.add_argument(
-        "--write_cluster_alns",
-        help="Write cluster alignments to files",
+
+    mcl_args = parser.add_argument_group(
+        "ava + mcl options", "Only used if `--cluster_tool mcl`"
+    )
+    mcl_args.add_argument(
+        "--dv_max",
+        help="Maximum pairwise sequence divergence in minimap2 all-vs-all mapping to retain for clustering",
+        default=0.03,
+        type=float,
+    )
+    mcl_args.add_argument(
+        "--dv_max_auto",
+        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value)",
+        default=False,
         action="store_true",
+    )
+
+    exp_args = parser.add_argument_group(
+        "experimental",
+        "Experimental options, may not function as expected or break without warning",
+    )
+    exp_args.add_argument(
+        "--twopass",
+        help="[EXPERIMENTAL] Extract read segments and map again to reference",
+        default=False,
+        action="store_true",
+    )
+    exp_args.add_argument(
+        "--flanking",
+        help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
+        default=0,
+        type=int,
     )
 
     return parser.parse_args()
