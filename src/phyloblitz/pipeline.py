@@ -208,19 +208,19 @@ class Pipeline(object):
 
     def __init__(self, args):
         """Constructor for Pipeline"""
-        self._ref = args.db  # Path to reference database Fasta file
-        self._refindex = (
-            args.dbindex
-        )  # Path to reference database Minimap2 index (optional)
-        self._reads = (
-            args.reads
-        )  # Path to reads to be processed in Fastq or Fastq.gz format
-        self._outdir = args.outdir  # Path to output folder
-        self._prefix = args.prefix  # Filename prefix for output files
-        self._platform = args.platform  # Sequencing mode, ont or pb
-        self._resume = args.resume
+        self._ref = args["db"]  # Path to reference database Fasta file
+        self._refindex = args[
+            "dbindex"
+        ]  # Path to reference database Minimap2 index (optional)
+        self._reads = args[
+            "reads"
+        ]  # Path to reads to be processed in Fastq or Fastq.gz format
+        self._outdir = args["outdir"]  # Path to output folder
+        self._prefix = args["prefix"]  # Filename prefix for output files
+        self._platform = args["platform"]  # Sequencing mode, ont or pb
+        self._resume = args["resume"]
         self._stats = {}
-        self._stats["args"] = vars(args)
+        self._stats["args"] = args
         self._stats["runstats"] = {}
         self._stats["starttime"] = str(datetime.now())
 

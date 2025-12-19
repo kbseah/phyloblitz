@@ -1,159 +1,265 @@
 #!/usr/bin/env python3
 
 import logging
-import argparse
 import json
 import sys
 import re
 
 import phyloblitz.pipeline as pipeline
+import rich_click as click
 
 from os import makedirs
 from datetime import datetime
+from phyloblitz.__about__ import __version__
 
 
-def init_args():
-    parser = argparse.ArgumentParser(
-        prog="phyloblitz",
-        description="SSU rRNA profile from ONT or PacBio long reads",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    in_args = parser.add_argument_group("inputs")
-    in_args.add_argument(
-        "-d",
-        "--db",
-        help="Path to preprocessed SILVA database fasta file",
-        required=True,
-    )
-    in_args.add_argument(
-        "--dbindex",
-        help="Path to minimap2 index of database file (optional)",
-        default=None,
-    )
-    in_args.add_argument(
-        "-r", "--reads", help="Fastq or Fastq.gz read file to screen", required=True
-    )
-    in_args.add_argument(
-        "--num_reads",
-        help="Use subsample of N reads; default is to use all reads",
-        default=None,
-        type=int,
-    )
-    in_args.add_argument(
-        "--platform",
-        help="Sequencing platform used, argument passed to minimap2 -x option",
-        choices=["map-ont", "map-pb", "lr:hq", "map-hifi"],
-        default="lr:hq",
-    )
-
-    out_args = parser.add_argument_group("outputs")
-    out_args.add_argument(
-        "-p", "--prefix", help="Output filename prefix", default="pbz"
-    )
-    out_args.add_argument(
-        "-o", "--outdir", help="Output folder path", default="pbz_test"
-    )
-    out_args.add_argument(
-        "--noreport",
-        help="Do not generate report file",
-        default=False,
-        action="store_true",
-    )
-    out_args.add_argument(
-        "--keeptmp", help="Do not delete temp files", default=False, action="store_true"
-    )
-    out_args.add_argument(
-        "--log",
-        help="Write logging messages to this file",
-    )
-    out_args.add_argument(
-        "--write_cluster_alns",
-        help="Write cluster alignments to files",
-        action="store_true",
-    )
-
-    run_args = parser.add_argument_group("run options")
-    run_args.add_argument(
-        "-t", "--threads", help="Number of parallel threads", default=12, type=int
-    )
-    run_args.add_argument(
-        "--cluster_tool",
-        help="Tool(s) to use for sequence clustering",
-        choices=["mcl", "isonclust3"],
-        default="isonclust3",
-    )
-    run_args.add_argument(
-        "--align_minlen",
-        help="Minimum length of aligned segment",
-        default=1200,
-        type=int,
-    )
-    run_args.add_argument(
-        "--summary_taxlevel",
-        help="Depth of taxonomy string for summary in report",
-        default=4,
-        type=int,
-    )
-    run_args.add_argument(
-        "--resume",
-        help="Resume partially completed run based on expected filenames",
-        default=False,
-        action="store_true",
-    )
-    run_args.add_argument(
-        "--debug",
-        help="Display logging DEBUG level messages to console",
-        default=False,
-        action="store_true",
-    )
-
-    mcl_args = parser.add_argument_group(
-        "ava + mcl options", "Only used if `--cluster_tool mcl`"
-    )
-    mcl_args.add_argument(
-        "--dv_max",
-        help="Maximum pairwise sequence divergence in minimap2 all-vs-all mapping to retain for clustering",
-        default=0.03,
-        type=float,
-    )
-    mcl_args.add_argument(
-        "--dv_max_auto",
-        help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value)",
-        default=False,
-        action="store_true",
-    )
-
-    exp_args = parser.add_argument_group(
-        "experimental",
-        "Experimental options, may not function as expected or break without warning",
-    )
-    exp_args.add_argument(
-        "--twopass",
-        help="[EXPERIMENTAL] Extract read segments and map again to reference",
-        default=False,
-        action="store_true",
-    )
-    exp_args.add_argument(
-        "--flanking",
-        help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
-        default=0,
-        type=int,
-    )
-
-    return parser.parse_args()
+click.rich_click.OPTION_GROUPS = {
+    "phyloblitz": [
+        {
+            "name": "Input",
+            "options": ["db", "dbindex", "reads", "num_reads", "platform"],
+        },
+        {
+            "name": "Output",
+            "options": [
+                "prefix",
+                "outdir",
+                "report",
+                "keeptmp",
+                "log",
+                "write_cluster_alns",
+            ],
+        },
+        {
+            "name": "Run parameters",
+            "options": [
+                "threads",
+                "cluster_tool",
+                "align_minlen",
+                "summary_taxlevel",
+                "resume",
+                "debug",
+            ],
+        },
+        {
+            "name": "ava + mcl options",
+            "options": ["dv_max", "dv_max_auto"],
+        },
+        {
+            "name": "Experimental",
+            "options": ["twopass", "flanking"],
+        },
+    ]
+}
 
 
-def main():
+@click.command()
+@click.option(
+    "--db",
+    "-d",
+    help="Path to preprocessed SILVA database fasta file",
+    type=click.Path(exists=True),
+    required=True,
+)
+@click.option(
+    "--dbindex",
+    help="Path to minimap2 index of database file (optional)",
+    type=click.Path(exists=True),
+    default=None,
+)
+@click.option(
+    "--reads",
+    "-r",
+    help="Fastq or Fastq.gz read file to screen",
+    type=click.Path(exists=True),
+    required=True,
+)
+@click.option(
+    "--num_reads",
+    help="Use subsample of N reads; default is to use all reads",
+    default=None,
+    type=int,
+)
+@click.option(
+    "--platform",
+    help="Sequencing platform used, argument passed to minimap2 -x option",
+    type=click.Choice(["map-ont", "map-pb", "lr:hq", "map-hifi"]),
+    default="lr:hq",
+    show_default=True,
+)
+@click.option(
+    "--prefix", "-p", help="Output filename prefix", default="pbz", show_default=True
+)
+@click.option(
+    "--outdir", "-o", help="Output folder path", default="pbz_test", show_default=True
+)
+@click.option(
+    "--report/--noreport",
+    help="Generate report file",
+    default=True,
+    is_flag=True,
+    show_default=True,
+)
+@click.option("--keeptmp", help="Do not delete temp files", default=False, is_flag=True)
+@click.option("--log", help="Write logging messages to this file")
+@click.option(
+    "--write_cluster_alns",
+    help="Write cluster alignments to files",
+    default=False,
+    is_flag=True,
+    show_default=True,
+)
+@click.option(
+    "--threads",
+    "-t",
+    help="Number of parallel threads",
+    default=12,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--cluster_tool",
+    help="Tool(s) to use for sequence clustering",
+    type=click.Choice(["mcl", "isonclust3"]),
+    default="isonclust3",
+    show_default=True,
+)
+@click.option(
+    "--align_minlen",
+    help="Minimum length of aligned segment",
+    default=1200,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--summary_taxlevel",
+    help="Depth of taxonomy string for summary in report",
+    default=4,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--resume",
+    help="Resume partially completed run based on expected filenames",
+    default=False,
+    is_flag=True,
+    show_default=True,
+)
+@click.option(
+    "--debug",
+    help="Display logging DEBUG level messages to console",
+    default=False,
+    is_flag=True,
+)
+@click.option(
+    "--dv_max",
+    help="Maximum pairwise sequence divergence in minimap2 all-vs-all mapping to retain for clustering",
+    default=0.03,
+    type=float,
+    show_default=True,
+)
+@click.option(
+    "--dv_max_auto",
+    help="Set dv_max parameter automatically at max(0.001, 2 * median of all-vs-all divergence value)",
+    default=False,
+    is_flag=True,
+    show_default=True,
+)
+@click.option(
+    "--twopass",
+    help="[EXPERIMENTAL] Extract read segments and map again to reference",
+    default=False,
+    is_flag=True,
+)
+@click.option(
+    "--flanking",
+    help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
+    default=0,
+    type=int,
+)
+@click.version_option(version=__version__)
+def main(
+    db,
+    dbindex,
+    reads,
+    num_reads,
+    platform,
+    prefix,
+    outdir,
+    report,
+    keeptmp,
+    log,
+    write_cluster_alns,
+    threads,
+    cluster_tool,
+    align_minlen,
+    summary_taxlevel,
+    resume,
+    debug,
+    dv_max,
+    dv_max_auto,
+    twopass,
+    flanking,
+):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    args = init_args()
+    # args = init_args()
+    args = dict(
+        zip(
+            [
+                "db",
+                "dbindex",
+                "reads",
+                "num_reads",
+                "platform",
+                "prefix",
+                "outdir",
+                "report",
+                "keeptmp",
+                "log",
+                "write_cluster_alns",
+                "threads",
+                "cluster_tool",
+                "align_minlen",
+                "summary_taxlevel",
+                "resume",
+                "debug",
+                "dv_max",
+                "dv_max_auto",
+                "twopass",
+                "flanking",
+            ],
+            [
+                db,
+                dbindex,
+                reads,
+                num_reads,
+                platform,
+                prefix,
+                outdir,
+                report,
+                keeptmp,
+                log,
+                write_cluster_alns,
+                threads,
+                cluster_tool,
+                align_minlen,
+                summary_taxlevel,
+                resume,
+                debug,
+                dv_max,
+                dv_max_auto,
+                twopass,
+                flanking,
+            ],
+        )
+    )
 
     console_handler = logging.StreamHandler(sys.stderr)
-    if args.debug:
+    if debug:
         console_handler.setLevel(logging.DEBUG)
     else:
         console_handler.setLevel(logging.INFO)
@@ -164,80 +270,78 @@ def main():
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    if args.log:
-        logfile_handler = logging.FileHandler(args.log)
+    if log:
+        logfile_handler = logging.FileHandler(log)
         logfile_handler.setFormatter(formatter)
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
     logger.debug("Arguments:")
-    for i in vars(args):
-        logger.debug(f" {i} : {str(vars(args)[i])}")
+    for i in args:
+        logger.debug(f" {i} : {str(args[i])}")
 
     logger.info("Starting phyloblitz run ... ")
 
-    logger.info(f"Creating output folder {args.outdir}")
+    logger.info(f"Creating output folder {outdir}")
     try:
-        makedirs(args.outdir, exist_ok=False)
+        makedirs(outdir, exist_ok=False)
     except FileExistsError:
-        if not args.resume:
+        if not resume:
             logger.error(
-                f"Output folder {args.outdir} already exists, and option --resume not used"
+                f"Output folder {outdir} already exists, and option --resume not used"
             )
             sys.exit(1)
         else:
-            logger.error(f"Output folder {args.outdir} already exists, resuming run")
+            logger.error(f"Output folder {outdir} already exists, resuming run")
 
     p = pipeline.Pipeline(args)
-    p.run_minimap(threads=args.threads, mode=args.platform, sample=args.num_reads)
+    p.run_minimap(threads=threads, mode=platform, sample=num_reads)
 
-    if args.twopass:
+    if twopass:
         logger.info("[EXPERIMENTAL] Applying two-pass mode")
-        p.twopass_extract_read_intervals(minlen=args.align_minlen)
-        p.run_minimap_secondmap(threads=args.threads, mode="map-" + args.platform)
+        p.twopass_extract_read_intervals(minlen=align_minlen)
+        p.run_minimap_secondmap(threads=threads, mode="map-" + platform)
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
-        twopass=args.twopass, align_minlen=args.align_minlen, flanking=args.flanking
+        twopass=twopass, align_minlen=align_minlen, flanking=flanking
     )
 
     # All-vs-all mapping
-    p.ava_map(mode=args.platform, threads=args.threads)
+    p.ava_map(mode=platform, threads=threads)
     p.paf_file_filter_overhangs(max_overhang_frac=0.05)
     p.paf_get_dvs()
 
     # Clustering
-    if args.cluster_tool == "mcl":
-        p.paf_abc(dv_max=args.dv_max, dv_max_auto=args.dv_max_auto)
+    if cluster_tool == "mcl":
+        p.paf_abc(dv_max=dv_max, dv_max_auto=dv_max_auto)
         p.mcxload()
         p.mcl_cluster()
-    elif args.cluster_tool == "isonclust3":
+    elif cluster_tool == "isonclust3":
         p.isonclust3_cluster()
-    p.assemble_clusters(
-        cluster_tool=args.cluster_tool, threads=args.threads, keeptmp=args.keeptmp
-    )
+    p.assemble_clusters(cluster_tool=cluster_tool, threads=threads, keeptmp=keeptmp)
 
     # Taxonomy summary
     p.db_taxonomy()
     p.summarize_initial_mapping_taxonomy(
-        twopass=args.twopass,
-        minlen=args.align_minlen,
-        taxlevel=args.summary_taxlevel,
+        twopass=twopass,
+        minlen=align_minlen,
+        taxlevel=summary_taxlevel,
     )
-    p.cluster_asm_tophits(threads=args.threads)
+    p.cluster_asm_tophits(threads=threads)
     p.summarize_tophit_paf()
 
     # Write reports
     p.write_report_json()
-    if args.write_cluster_alns:
+    if write_cluster_alns:
         p.write_cluster_alns()
 
-    if not args.noreport:
+    if report:
         p.write_report_histogram()
         p.write_report_markdown()
         p.write_report_html()
 
     logger.info("-------------- phyloblitz run complete --------------")
 
-    if args.log:
+    if log:
         logfile_handler.close()
