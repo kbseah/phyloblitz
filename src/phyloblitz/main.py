@@ -43,6 +43,7 @@ click.rich_click.OPTION_GROUPS = {
         },
         {
             "name": "ava + mcl options",
+            "help": "Only used if --cluster_tool mcl is specified",
             "options": ["dv_max", "dv_max_auto"],
         },
         {
@@ -53,7 +54,7 @@ click.rich_click.OPTION_GROUPS = {
 }
 
 
-@click.command()
+@click.command(help="Rapid SSU rRNA marker gene screening of long read metagenomes.")
 @click.option(
     "--db",
     "-d",
@@ -91,7 +92,12 @@ click.rich_click.OPTION_GROUPS = {
     "--prefix", "-p", help="Output filename prefix", default="pbz", show_default=True
 )
 @click.option(
-    "--outdir", "-o", help="Output folder path", default="pbz_test", show_default=True
+    "--outdir",
+    "-o",
+    help="Output folder path",
+    default="pbz_test",
+    show_default=True,
+    type=click.Path(),
 )
 @click.option(
     "--report/--noreport",
@@ -101,7 +107,7 @@ click.rich_click.OPTION_GROUPS = {
     show_default=True,
 )
 @click.option("--keeptmp", help="Do not delete temp files", default=False, is_flag=True)
-@click.option("--log", help="Write logging messages to this file")
+@click.option("--log", help="Write logging messages to this file", type=click.Path())
 @click.option(
     "--write_cluster_alns",
     help="Write cluster alignments to files",
