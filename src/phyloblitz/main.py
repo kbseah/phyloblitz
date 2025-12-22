@@ -11,6 +11,7 @@ import rich_click as click
 from os import makedirs
 from datetime import datetime
 from phyloblitz.__about__ import __version__
+from phyloblitz.utils import check_dependencies
 
 
 click.rich_click.OPTION_GROUPS = {
@@ -285,6 +286,11 @@ def main(
     logger.debug("Arguments:")
     for i in args:
         logger.debug(f" {i} : {str(args[i])}")
+
+    logger.debug("Dependencies:")
+    deps = check_dependencies()
+    for d in deps:
+        logger.debug(f"  {d} : {deps[d]}")
 
     logger.info("Starting phyloblitz run ... ")
 

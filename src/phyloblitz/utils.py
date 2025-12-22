@@ -5,6 +5,7 @@ import re
 import os.path
 
 from collections import defaultdict
+from subprocess import Popen, PIPE, STDOUT
 
 logger = logging.getLogger(__name__)
 
@@ -75,3 +76,27 @@ def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
         pass
     else:
         return line
+
+
+def check_dependencies():
+    vers = {}
+    from sys import version as python_version
+    from pysam import __version__ as pysam_version
+    from pyfastx import __version__ as pyfastx_version
+    from mistune import __version__ as mistune_version
+    from numpy import __version__ as numpy_version
+    from matplotlib import __version__ as matplotlib_version
+
+    vers["python"] = python_version
+    vers["pysam"] = pysam_version
+    vers["pyfastx"] = pyfastx_version
+    vers["mistune"] = mistune_version
+    vers["numpy"] = numpy_version
+    vers["matplotlib"] = matplotlib_version
+
+    for tool in ["minimap2", "spoa", "mcl", "isONclust3"]:
+        p = Popen([tool, "--version"], stdout=PIPE, stderr=STDOUT, text=True)
+        vers[tool] = (
+            p.communicate()[0].split("\n")[0].rstrip()
+        )  # mcl has multiline output
+    return vers
