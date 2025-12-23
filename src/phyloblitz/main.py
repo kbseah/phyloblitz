@@ -54,8 +54,13 @@ click.rich_click.OPTION_GROUPS = {
     ]
 }
 
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
-@click.command(help="Rapid SSU rRNA marker gene screening of long read metagenomes.")
+
+@click.command(
+    context_settings=CONTEXT_SETTINGS,
+    help="Rapid SSU rRNA marker gene screening of long read metagenomes.",
+)
 @click.option(
     "--db",
     "-d",
