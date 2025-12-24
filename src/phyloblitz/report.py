@@ -237,6 +237,7 @@ checked for sequence chimerism or misassembly.
 phyloblitz depends on the following tools; please cite them:
 [`minimap2`](https://github.com/lh3/minimap2) ([Li, 2018](https://doi.org/10.1093/bioinformatics/bty191)),
 [`isONclust3`](https://github.com/aljpetri/isONclust3) ([Petri & Sahlin, 2025](https://doi.org/10.1093/bioinformatics/btaf207)),
+[`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
 [`mcl`](https://micans.org/mcl/) ([van Dongen, 2008](http://link.aip.org/link/?SJMAEL/30/121/1)),
 [`pyfastx`](https://pyfastx.readthedocs.io/) ([Du, et al., 2020](https://doi.org/10.1093/bib/bbaa368)),
 [`samtools`](https://www.htslib.org/) ([Li, Handsaker, et al., 2009](https://doi.org/10.1093/bioinformatics/btp352); [Bonfield, Marshall, Danecek, et al., 2021](https://doi.org/10.1093/gigascience/giab007)),

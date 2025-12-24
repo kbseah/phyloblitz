@@ -149,6 +149,8 @@ Please cite the following dependencies:
      Kristoffer Sahlin, De novo clustering of large long-read transcriptome
      datasets with isONclust3, Bioinformatics, 41(5):batf207, 2025.
      https://doi.org/10.1093/bioinformatics/btaf207
+ * [`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
+     implementation of MCL in Python
  * [`mcl`](https://micans.org/mcl/) Stijn van Dongen, Graph Clustering Via a
      Discrete Uncoupling Process, SIAM Journal on Matrix Analysis and
      Applications, 30(1):121-141, 2008.
