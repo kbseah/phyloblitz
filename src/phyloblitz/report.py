@@ -14,6 +14,10 @@ from mistune import create_markdown, html
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
+# mute verbose debug messages from matplotlib and PngImagePlugin
+plt.set_loglevel(level="warning")
+pil_logger = logging.getLogger("PIL")
+pil_logger.setLevel(logging.INFO)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
