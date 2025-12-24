@@ -8,6 +8,7 @@ import os.path
 import json
 
 import numpy as np
+import pymarkovclustering as pymcl
 
 from phyloblitz.report import (
     generate_histogram,
@@ -242,8 +243,6 @@ class Pipeline(object):
         "mapped_segments": "_mapped.fastq",
         "ava_map": "_ava.paf",
         "ava_filter": "_ava_filter.paf",
-        "ava_abc": "_ava.abc",
-        "ava_mci": "_ava.mci",
         "ava_seqtab": "_ava_seq.tab",
         "mcl_cluster": "_mcl.out",
         "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
@@ -526,22 +525,23 @@ class Pipeline(object):
         return
 
     @check_stage_file(
-        stage="ava_abc",
-        message="Converting PAF ava alignment to ABC format for clustering",
+        stage="mcl_cluster",
+        message="Clustering with mcl",
     )
-    def paf_abc(self, dv_max=0.03, dv_max_auto=False):
-        """Convert PAF alignment to ABC format for MCL clustering
+    def pymcl_cluster(self, dv_max=0.03, dv_max_auto=False, inflation=2):
+        """Cluster with MCL implemented in pymarkovclustering
 
         :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
         :param dv_max_auto: Set dv_max to max(0.001, 2 * median all-vs-all
             sequence divergence); parameter `dv_max` will be ignored). The value
             0.001 is to account for cases where median divergence is zero.
+        :param inflation: Inflation parameter for MCL
         """
         if dv_max_auto:
             dv_max = max(
                 0.001, 2 * float(self._stats["runstats"]["ava min dvs median"])
             )
-        fh_abc = open(self.pathto("ava_abc"), "w")
+        edges = []
         with open(self.pathto("ava_filter"), "rt") as fh_paf:
             for line in fh_paf:
                 spl = line.rstrip().split("\t")
@@ -550,59 +550,16 @@ class Pipeline(object):
                 dv = re.findall(r"dv:f:([\d\.]+)", line)
                 if len(dv) == 1 and float(dv[0]) < dv_max:
                     score = 1 - float(dv[0])
-                    fh_abc.write(
-                        "\t".join([str(i) for i in [query, target, score]]) + "\n"
-                    )
+                    edges.append((query, target, score))
         self._stats["runstats"].update({"dv_max applied": dv_max})
-        return fh_abc.close()
-
-    @check_stage_file(
-        stage="ava_mci",  # and ava_seqtab
-        message="Preparing clustering files with mcxload",
-    )
-    def mcxload(self):
-        """Convert ABC file to cluster input files for MCL"""
-        cmd = [
-            "mcxload",
-            "-abc",
-            self.pathto("ava_abc"),
-            "--stream-mirror",
-            "-o",
-            self.pathto("ava_mci"),
-            "-write-tab",
-            self.pathto("ava_seqtab"),
-        ]
-        logger.debug("mcxload command: " + " ".join(cmd))
-        proc = Popen(cmd, stderr=PIPE)
-        for l in proc.stderr:
-            logger.debug("  mcxload log: " + l.decode().rstrip())
-        return proc.wait()
-
-    @check_stage_file(
-        stage="mcl_cluster",
-        message="Clustering with mcl",
-    )
-    def mcl_cluster(self, inflation=2):
-        """Clustering with MCL to get sequence clusters for assembly
-
-        :param inflation: Inflation parameter passed to mcl -I option
-        """
         logger.info(f"Inflation parameter {str(inflation)}")
-        cmd = [
-            "mcl",
-            self.pathto("ava_mci"),
-            "-I",
-            str(inflation),
-            "-use-tab",
-            self.pathto("ava_seqtab"),
-            "-o",
-            self.pathto("mcl_cluster"),
-        ]
-        logger.debug("mcl command: " + " ".join(cmd))
-        proc = Popen(cmd, stderr=PIPE)
-        for l in proc.stderr:
-            logger.debug("  mcl log: " + l.decode().rstrip())
-        return proc.wait()
+        matrix, labels = pymcl.edges_to_sparse_matrix(edges)
+        mcl_matrix = pymcl.mcl(matrix, inflation=inflation)
+        clusters = pymcl.extract_clusters(mcl_matrix, labels)
+        with open(self.pathto("mcl_cluster"), "w") as fh:
+            for c in clusters:
+                fh.write("\t".join(c) + "\n")
+        return
 
     @check_stage_file(
         stage="isonclust3_cluster",

@@ -14,6 +14,7 @@ repository = "https://github.com/kbseah/phyloblitz"
 [dependencies]
 phyloblitz = { path = "." }
 rich-click = ">=1.9.4,<2"
+pymarkovclustering = ">=0.1.1,<0.2"
 
 [package]
 name = "phyloblitz"
@@ -32,16 +33,31 @@ backend = { name = "pixi-build-python", version = "==0.4.0" }
 main = "main"
 test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
 download = "wget -q -O - 'https://zenodo.org/records/7892522/files/138.1.tar.gz?download=1' | tar -xzf - 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta"
+# isonclust3 ont
 run = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run --platform lr:hq --threads 12 --log runtest/run.log --resume --debug"
 clean = "rm -rf runtest/run runtest/run.log"
 pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
 prun = [{task="test"}, {task="pclean"}, {task="run"}]
 rerun = [{task="test"}, {task="clean"}, {task="run"}]
+# isonclust3 pb
 run_pb = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_pb --platform map-hifi --threads 12 --log runtest/run_pb.log --resume --debug"
 clean_pb = "rm -rf runtest/run_pb runtest/run_pb.log"
 pclean_pb = "find ./runtest/run_pb -type f ! -name pbz_minimap_initial.sam -delete"
 prun_pb = [{task="test"}, {task="pclean_pb"}, {task="run_pb"}]
 rerun_pb = [{task="test"}, {task="clean_pb"}, {task="run_pb"}]
+# mcl ont
+run_mcl = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run_mcl --cluster_tool mcl --platform lr:hq --threads 12 --log runtest/run_mcl.log --inflation 50 --resume --debug"
+clean_mcl = "rm -rf runtest/run_mcl runtest/run_mcl.log"
+pclean_mcl = "find ./runtest/run_mcl -type f ! -name pbz_minimap_initial.sam -delete"
+prun_mcl = [{task="test"}, {task="pclean_mcl"}, {task="run_mcl"}]
+rerun_mcl = [{task="test"}, {task="clean_mcl"}, {task="run_mcl"}]
+# mcl ont
+run_mcl_pb = "phyloblitz --db 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta --reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_mcl_pb --cluster_tool mcl --platform map-hifi --threads 12 --log runtest/run_mcl_pb.log --inflation 50 --resume --debug"
+clean_mcl_pb = "rm -rf runtest/run_mcl_pb runtest/run_mcl_pb.log"
+pclean_mcl_pb = "find ./runtest/run_mcl_pb -type f ! -name pbz_minimap_initial.sam -delete"
+prun_mcl_pb = [{task="test"}, {task="pclean_mcl_pb"}, {task="run_mcl_pb"}]
+rerun_mcl_pb = [{task="test"}, {task="clean_mcl_pb"}, {task="run_mcl_pb"}]
+
 
 [package.host-dependencies]
 hatchling = ">=1.16.1"
@@ -51,7 +67,6 @@ python = ">=3.10,<3.14"
 minimap2 = ">=2.30,<3"
 pysam = ">=0.23.3,<0.24"
 spoa = ">=4.1.5,<5"
-mcl = ">=22.282,<23"
 pyfastx = ">=2.2.0,<3"
 mistune = ">=3.1.4,<4"
 numpy = ">=2.3.5,<3"

@@ -45,7 +45,7 @@ click.rich_click.OPTION_GROUPS = {
         {
             "name": "ava + mcl options",
             "help": "Only used if --cluster_tool mcl is specified",
-            "options": ["dv_max", "dv_max_auto"],
+            "options": ["dv_max", "dv_max_auto", "inflation"],
         },
         {
             "name": "Experimental",
@@ -178,6 +178,9 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
 )
 @click.option(
+    "--inflation", help="Inflation parameter for MCL", default=2, show_default=True
+)
+@click.option(
     "--twopass",
     help="[EXPERIMENTAL] Extract read segments and map again to reference",
     default=False,
@@ -210,6 +213,7 @@ def main(
     debug,
     dv_max,
     dv_max_auto,
+    inflation,
     twopass,
     flanking,
 ):
@@ -241,6 +245,7 @@ def main(
                 "debug",
                 "dv_max",
                 "dv_max_auto",
+                "inflation",
                 "twopass",
                 "flanking",
             ],
@@ -264,6 +269,7 @@ def main(
                 debug,
                 dv_max,
                 dv_max_auto,
+                inflation,
                 twopass,
                 flanking,
             ],
@@ -331,9 +337,7 @@ def main(
 
     # Clustering
     if cluster_tool == "mcl":
-        p.paf_abc(dv_max=dv_max, dv_max_auto=dv_max_auto)
-        p.mcxload()
-        p.mcl_cluster()
+        p.pymcl_cluster(dv_max=dv_max, dv_max_auto=dv_max_auto, inflation=inflation)
     elif cluster_tool == "isonclust3":
         p.isonclust3_cluster()
     p.assemble_clusters(cluster_tool=cluster_tool, threads=threads, keeptmp=keeptmp)

@@ -86,6 +86,7 @@ def check_dependencies():
     from mistune import __version__ as mistune_version
     from numpy import __version__ as numpy_version
     from matplotlib import __version__ as matplotlib_version
+    from pymarkovclustering import __version__ as pymcl_version
 
     vers["python"] = python_version
     vers["pysam"] = pysam_version
@@ -93,8 +94,9 @@ def check_dependencies():
     vers["mistune"] = mistune_version
     vers["numpy"] = numpy_version
     vers["matplotlib"] = matplotlib_version
+    vers["pymarkovclustering"] = pymcl_version
 
-    for tool in ["minimap2", "spoa", "mcl", "isONclust3"]:
+    for tool in ["minimap2", "spoa", "isONclust3"]:
         p = Popen([tool, "--version"], stdout=PIPE, stderr=STDOUT, text=True)
         vers[tool] = (
             p.communicate()[0].split("\n")[0].rstrip()
