@@ -77,6 +77,10 @@ def merge_intervals(intervals: list):
 def sam_seq_generator(sam_file, minlen=1200, flanking=0):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping
 
+    This uses pysam.AlignedSegment.query_sequence; if the read is mapped to
+    reverse strand, the sequence and coordinates are already
+    reverse-complemented.
+
     :param sam_file: Path to SAM file
     :param minlen: Minimum query alignment length; adjust if targeting a
         different gene, e.g. LSU rRNA
@@ -94,12 +98,19 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
         if i.query_alignment_length >= minlen and i.query_alignment_sequence:
             # Primary mappings only to ensure only one mapping per input read
             if not i.is_secondary and not i.is_supplementary:
-                mystart = max(0, i.query_alignment_start - flanking)
-                myend = min(i.query_length, i.query_alignment_end + flanking)
+                mystart = max(0, i.query_alignment_start)
+                myend = min(i.query_length, i.query_alignment_end)
+                # mapped segment
                 name = ":".join([str(i) for i in [i.query_name, mystart, myend]])
                 seq = i.query_sequence[mystart:myend]
                 quals = i.query_qualities_str[mystart:myend]
-                yield (name, seq, quals)
+                # pre-flank
+                pre_start = max(0, i.query_alignment_start - flanking)
+                pre_seq = i.query_sequence[pre_start:mystart]
+                # post-flank
+                post_end = min(i.query_length, i.query_alignment_end + flanking)
+                post_seq = i.query_sequence[myend:post_end]
+                yield (name, seq, quals, pre_seq, post_seq)
 
 
 def spoa_assemble_fasta(label_fastq):
@@ -419,8 +430,9 @@ class Pipeline(object):
     def extract_reads_for_ava(self, twopass=False, align_minlen=1200, flanking=0):
         sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
         counter = 0
+        self._stats["flanking"] = {}
         with open(self.pathto("mapped_segments"), "w") as fq_fh:
-            for name, seq, quals in sam_seq_generator(
+            for name, seq, quals, pre_seq, post_seq in sam_seq_generator(
                 sam_file, minlen=align_minlen, flanking=flanking
             ):
                 counter += 1
@@ -428,6 +440,7 @@ class Pipeline(object):
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
+                self._stats["flanking"][name] = {"pre": pre_seq, "post": post_seq}
         self._stats["runstats"].update({"mapped pass filter": counter})
         logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
         return
