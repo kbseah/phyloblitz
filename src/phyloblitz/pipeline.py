@@ -602,13 +602,15 @@ class Pipeline(object):
             logger.debug("  isonclust3 log: " + l.decode().rstrip())
         return proc.wait()
 
-    def _cluster_seqs_from_mcl(self, mcl_out, reads, keeptmp):
+    def _cluster_seqs_from_mcl(self, mcl_out, reads, keeptmp, min_clust_size=5):
         """Extract sequences from each MCL cluster to separate Fastq files for assembly
 
         :param mcl_out: Path MCL output file
         :param reads: Path to reads from extract_reads_for_ava step
         :param keeptmp: Keep temporary files?
+        :param min_clust_size: Minimum cluster size to return Fastq file
         :returns: Dict of file handles to each Fastq file keyed by cluster ID
+        :returns: Dict of sequence IDs keyed by cluster ID
         """
         counter = 0
         cluster_files = []
@@ -622,15 +624,18 @@ class Pipeline(object):
                 )
                 for seq in seqs:
                     seq2cluster[seq] = counter  # assume each seq in only one cluster
-                fastq_handles[counter] = NamedTemporaryFile(
-                    suffix=".fastq",
-                    mode="w",
-                    delete=(not keeptmp),
-                    delete_on_close=False,
-                )
+                if len(seqs) >= min_clust_size:
+                    fastq_handles[counter] = NamedTemporaryFile(
+                        suffix=".fastq",
+                        mode="w",
+                        delete=(not keeptmp),
+                        delete_on_close=False,
+                    )
+                else:
+                    logger.debug(f"Cluster {str(counter)} below size cutoff")
                 counter += 1
         for name, seq, qual in pyfastx.Fastx(reads):
-            if name in seq2cluster:
+            if name in seq2cluster and seq2cluster[name] in fastq_handles:
                 fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
                 fastq_handles[seq2cluster[name]].write(fastq_rec)
         cluster2seq = defaultdict(list)
@@ -640,7 +645,9 @@ class Pipeline(object):
             fastq_handles[i].close()
         return fastq_handles, cluster2seq
 
-    def _cluster_seqs_from_isonclust3(self, isonclust3_out, reads, keeptmp):
+    def _cluster_seqs_from_isonclust3(
+        self, isonclust3_out, reads, keeptmp, min_clust_size=5
+    ):
         """Extract sequences from each isONclust3 cluster to separate Fastq files for assembly
 
         The numbering of clusters by isONclust3 itself is not consistent
@@ -650,7 +657,9 @@ class Pipeline(object):
         :param isonclust3_out: Path isONclust3 output file
         :param reads: Path to reads from extract_reads_for_ava step
         :param keeptmp: Keep temporary files?
+        :param min_clust_size: Minimum cluster size to return Fastq file
         :returns: Dict of file handles to each Fastq file keyed by cluster ID
+        :returns: Dict of sequence IDs keyed by cluster ID
         """
         cluster_files = []
         fastq_handles = {}
@@ -666,14 +675,17 @@ class Pipeline(object):
             logger.info(
                 f"Cluster {str(cluster)} comprises {str(len(cluster2seq[cluster]))} sequences"
             )
-            fastq_handles[cluster] = NamedTemporaryFile(
-                suffix=".fastq",
-                mode="w",
-                delete=(not keeptmp),
-                delete_on_close=False,
-            )
+            if len(cluster2seq[cluster]) >= min_clust_size:
+                fastq_handles[cluster] = NamedTemporaryFile(
+                    suffix=".fastq",
+                    mode="w",
+                    delete=(not keeptmp),
+                    delete_on_close=False,
+                )
+            else:
+                logger.debug(f"Cluster {str(cluster)} below size cutoff")
         for seqname, seq, qual in pyfastx.Fastx(reads):
-            if seqname in seq2cluster:
+            if seqname in seq2cluster and seq2cluster[seqname] in fastq_handles:
                 fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
                 fastq_handles[seq2cluster[seqname]].write(fastq_rec)
         for i in fastq_handles:
@@ -684,18 +696,22 @@ class Pipeline(object):
         stage="cluster_asm",
         message="Extract cluster sequences and assemble with SPOA",
     )
-    def assemble_clusters(self, cluster_tool="mcl", threads=12, keeptmp=False):
+    def assemble_clusters(
+        self, cluster_tool="isonclust3", threads=12, keeptmp=False, min_clust_size=5
+    ):
         if cluster_tool == "mcl":
             fastq_handles, cluster2seq = self._cluster_seqs_from_mcl(
                 self.pathto("mcl_cluster"),
                 self.pathto("mapped_segments"),
-                keeptmp,
+                keeptmp=keeptmp,
+                min_clust_size=min_clust_size,
             )
         elif cluster_tool == "isonclust3":
             fastq_handles, cluster2seq = self._cluster_seqs_from_isonclust3(
                 self.pathto("isonclust3_cluster"),
                 self.pathto("mapped_segments"),
-                keeptmp,
+                keeptmp=keeptmp,
+                min_clust_size=min_clust_size,
             )
         self._stats.update({"cluster2seq": cluster2seq})
         self._stats["runstats"].update(
@@ -709,7 +725,7 @@ class Pipeline(object):
                 ),
             }
         )
-        # TODO downsample if >200 sequences in cluster
+        # TODO downsample if >500 sequences in cluster
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(
@@ -830,7 +846,6 @@ class Pipeline(object):
         sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
         logger.info("Summarizing taxonomic composition of initial mapping")
         common_taxstrings = self._per_read_consensus_taxonomy(sam_file, minlen)
-        # TODO right-pad taxonomy strings if too short
         self._stats.update(
             {
                 "initial_taxonomy": Counter(

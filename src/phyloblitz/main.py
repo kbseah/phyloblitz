@@ -38,6 +38,7 @@ click.rich_click.OPTION_GROUPS = {
                 "cluster_tool",
                 "align_minlen",
                 "summary_taxlevel",
+                "min_clust_size",
                 "resume",
                 "debug",
             ],
@@ -151,6 +152,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
 )
 @click.option(
+    "--min_clust_size",
+    help="Minimum cluster size to assemble a consensus sequence",
+    default=5,
+    type=int,
+    show_default=True,
+)
+@click.option(
     "--resume",
     help="Resume partially completed run based on expected filenames",
     default=False,
@@ -209,6 +217,7 @@ def main(
     cluster_tool,
     align_minlen,
     summary_taxlevel,
+    min_clust_size,
     resume,
     debug,
     dv_max,
@@ -241,6 +250,7 @@ def main(
                 "cluster_tool",
                 "align_minlen",
                 "summary_taxlevel",
+                "min_clust_size",
                 "resume",
                 "debug",
                 "dv_max",
@@ -265,6 +275,7 @@ def main(
                 cluster_tool,
                 align_minlen,
                 summary_taxlevel,
+                min_clust_size,
                 resume,
                 debug,
                 dv_max,
@@ -340,7 +351,12 @@ def main(
         p.pymcl_cluster(dv_max=dv_max, dv_max_auto=dv_max_auto, inflation=inflation)
     elif cluster_tool == "isonclust3":
         p.isonclust3_cluster()
-    p.assemble_clusters(cluster_tool=cluster_tool, threads=threads, keeptmp=keeptmp)
+    p.assemble_clusters(
+        cluster_tool=cluster_tool,
+        threads=threads,
+        keeptmp=keeptmp,
+        min_clust_size=min_clust_size,
+    )
 
     # Cluster flanking sequences
     if flanking > 500:
