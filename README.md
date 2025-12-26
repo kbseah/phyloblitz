@@ -168,6 +168,7 @@ Please cite the following dependencies:
      10(2):giab007, 2021. https://doi.org/10.1093/gigascience/giab007
  * [`pysam`](https://github.com/pysam-developers/pysam)
  * [`spoa`](https://github.com/rvaser/spoa)
+ * `oxli`
 
 Please cite the SILVA reference database if you use it:
 
