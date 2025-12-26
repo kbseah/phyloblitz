@@ -361,6 +361,7 @@ def main(
     # Cluster flanking sequences
     if flanking > 500:
         p.cluster_flanking_isonclust3()
+        p.cluster_flanking_kmercount(k=11, minlen=500)
 
     # Taxonomy summary
     p.db_taxonomy()

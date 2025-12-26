@@ -15,6 +15,7 @@ repository = "https://github.com/kbseah/phyloblitz"
 phyloblitz = { path = "." }
 rich-click = ">=1.9.4,<2"
 pymarkovclustering = ">=0.1.1,<0.2"
+oxli = ">=0.3.0,<0.4"
 
 [package]
 name = "phyloblitz"

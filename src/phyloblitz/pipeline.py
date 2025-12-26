@@ -6,6 +6,7 @@ import pyfastx
 import logging
 import os.path
 import json
+import oxli
 
 import numpy as np
 import pymarkovclustering as pymcl
@@ -808,6 +809,27 @@ class Pipeline(object):
                         )
                         cluster_flanking_numclust[cluster] = int(num_clusters.group(1))
         self._stats["cluster flanking numclust"] = cluster_flanking_numclust
+        return
+
+    def cluster_flanking_kmercount(self, k=11, minlen=500):
+        """Count kmers from flanking sequences per cluster"""
+        logger.info("Counting k-mers from flanking sequences per cluster")
+        kmer_tables = {}
+        for cluster in self._stats["cluster2seq"]:
+            kmer_tables[cluster] = oxli.KmerCountTable(k)
+            for seqid in self._stats["cluster2seq"][cluster]:
+                if seqid in self._stats["flanking"]:
+                    if len(self._stats["flanking"][seqid]["pre"]) > minlen:
+                        kmer_tables[cluster].consume(
+                            self._stats["flanking"][seqid]["pre"]
+                        )
+                    if len(self._stats["flanking"][seqid]["post"]) > minlen:
+                        kmer_tables[cluster].consume(
+                            self._stats["flanking"][seqid]["post"]
+                        )
+        self._stats["flanking kmer histo"] = {
+            cluster: kmer_tables[cluster].histo() for cluster in kmer_tables
+        }
         return
 
     def db_taxonomy(self):
