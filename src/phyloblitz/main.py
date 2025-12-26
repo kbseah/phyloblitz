@@ -342,6 +342,10 @@ def main(
         p.isonclust3_cluster()
     p.assemble_clusters(cluster_tool=cluster_tool, threads=threads, keeptmp=keeptmp)
 
+    # Cluster flanking sequences
+    if flanking > 500:
+        p.cluster_flanking_isonclust3()
+
     # Taxonomy summary
     p.db_taxonomy()
     p.summarize_initial_mapping_taxonomy(

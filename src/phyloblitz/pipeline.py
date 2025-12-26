@@ -22,7 +22,7 @@ from phyloblitz.utils import (
     filter_paf_overhang,
 )
 from subprocess import Popen, PIPE
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from collections import defaultdict, Counter
 from functools import wraps
 from multiprocessing import Pool
@@ -108,10 +108,12 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
                 # pre-flank
                 pre_start = max(0, i.query_alignment_start - flanking)
                 pre_seq = i.query_sequence[pre_start:mystart]
+                pre_quals = i.query_qualities_str[pre_start:mystart]
                 # post-flank
                 post_end = min(i.query_length, i.query_alignment_end + flanking)
                 post_seq = i.query_sequence[myend:post_end]
-                yield (name, seq, quals, pre_seq, post_seq)
+                post_quals = i.query_qualities_str[myend:post_end]
+                yield (name, seq, quals, pre_seq, pre_quals, post_seq, post_quals)
 
 
 def spoa_assemble_fasta(label_fastq):
@@ -431,15 +433,26 @@ class Pipeline(object):
         counter = 0
         self._stats["flanking"] = {}
         with open(self.pathto("mapped_segments"), "w") as fq_fh:
-            for name, seq, quals, pre_seq, post_seq in sam_seq_generator(
-                sam_file, minlen=align_minlen, flanking=flanking
-            ):
+            for (
+                name,
+                seq,
+                quals,
+                pre_seq,
+                pre_quals,
+                post_seq,
+                post_quals,
+            ) in sam_seq_generator(sam_file, minlen=align_minlen, flanking=flanking):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")
                 fq_fh.write("+" + "\n")
                 fq_fh.write(quals + "\n")
-                self._stats["flanking"][name] = {"pre": pre_seq, "post": post_seq}
+                self._stats["flanking"][name] = {
+                    "pre": pre_seq,
+                    "pre_quals": pre_quals,
+                    "post": post_seq,
+                    "post_quals": post_quals,
+                }
         self._stats["runstats"].update({"mapped pass filter": counter})
         logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
         return
@@ -696,6 +709,7 @@ class Pipeline(object):
                 ),
             }
         )
+        # TODO downsample if >200 sequences in cluster
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(
@@ -731,6 +745,54 @@ class Pipeline(object):
                     + "\n"
                 )
             logger.info(f"Assembled sequences written to {self.pathto('cluster_asm')}")
+
+    def cluster_flanking_isonclust3(self):
+        """Cluster flanking sequences with isonclust3 and report number of groups"""
+        logger.info("Clustering flanking sequences with isonclust3")
+        if self._platform in ["lr:hq", "map-ont"]:
+            isonclust3_mode = "ont"
+        elif self._platform in ["map-hifi", "map-pb"]:
+            isonclust3_mode = "pacbio"
+        cluster_flanking_numclust = {}
+        # Iterate clusters and count number of clustered flanking seqs
+        for cluster in self._stats["cluster2seq"]:
+            with NamedTemporaryFile(suffix=".fastq", mode="w") as fq:
+                for seqid in self._stats["cluster2seq"][cluster]:
+                    seq = (
+                        self._stats["flanking"][seqid]["pre"]
+                        + "NNNNNNNNNN"
+                        + self._stats["flanking"][seqid]["post"]
+                    )
+                    quals = (
+                        self._stats["flanking"][seqid]["pre_quals"]
+                        + "@@@@@@@@@@"
+                        + self._stats["flanking"][seqid]["post_quals"]
+                    )
+                    fq.write("@" + seqid + "\n" + seq + "\n+\n" + quals + "\n")
+                with TemporaryDirectory() as tmpdir:
+                    cmd = [
+                        "isONclust3",
+                        "--no-fastq",
+                        "--fastq",
+                        fq.name,
+                        "--mode",
+                        isonclust3_mode,
+                        "--outfolder",
+                        tmpdir,
+                    ]
+                    logger.debug(f"isonclust3 command: {' '.join(cmd)}")
+                    proc = Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
+                    proc_stdout, proc_stderr = proc.communicate()
+                    num_clusters = re.search(
+                        r"(\d+) different clusters identified", proc_stdout
+                    )
+                    if num_clusters:
+                        logger.debug(
+                            f"Flanking sequences for target cluster {cluster} fall into {num_clusters.group(1)} clusters"
+                        )
+                        cluster_flanking_numclust[cluster] = int(num_clusters.group(1))
+        self._stats["cluster flanking numclust"] = cluster_flanking_numclust
+        return
 
     def db_taxonomy(self):
         """Get taxonomy string from SILVA headers in database Fasta file
