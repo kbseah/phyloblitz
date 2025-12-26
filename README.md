@@ -117,13 +117,14 @@ v0.2.0 targets:
 
  - [x] Check if lr:hq mode is better for Q20 ONT reads than map:ont
  - [x] Option to cluster with isONclust3 instead of minimap2 ava
+ - [x] Sequence diversity in reads flanking the SSU sequence per cluster to
+       identify meta-consensus sequences
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
        Aestuariibacter sequence in SRR28830816
  - [ ] Divergence of reads in each cluster from consensus to detect potential
        chimeras
- - [ ] Sequence diversity in reads flanking the SSU sequence per cluster to
-       identify meta-consensus sequences
+ - [ ] Diversity measure from taxonomy summary
  - [ ] Detailed documentation
  - [ ] Multisample comparison and co-assembly
 
