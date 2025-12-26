@@ -597,8 +597,8 @@ class Pipeline(object):
             outfolder,
         ]
         logger.debug("isonclust3 command: " + " ".join(cmd))
-        proc = Popen(cmd, stderr=PIPE)
-        for l in proc.stderr:
+        proc = Popen(cmd, stdout=PIPE)
+        for l in proc.stdout:
             logger.debug("  isonclust3 log: " + l.decode().rstrip())
         return proc.wait()
 
