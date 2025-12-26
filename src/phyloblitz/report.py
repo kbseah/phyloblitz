@@ -180,6 +180,8 @@ def generate_report_md(stats, histogram_file_path):
         "insertion",
         "deletion",
     ]
+    if "cluster flanking numclust" in stats:
+        cluster_table_fields.append("flanking seq clusters")
 
     raw = f"""# phyloblitz run report
 
@@ -278,4 +280,9 @@ def per_cluster_summarize(stats):
         out["cluster_" + str(c)]["numseq"] = len(stats["cluster2seq"][c])
     for c in stats["cluster_tophits"]:
         out[c].update(stats["cluster_tophits"][c])
+    if "cluster flanking numclust" in stats:
+        for c in stats["cluster flanking numclust"]:
+            out["cluster_" + str(c)]["flanking seq clusters"] = stats[
+                "cluster flanking numclust"
+            ][c]
     return out
