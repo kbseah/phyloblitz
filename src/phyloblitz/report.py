@@ -158,11 +158,12 @@ def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
     return
 
 
-def generate_report_md(stats, histogram_file_path):
+def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
     """Generate markdown report from stats collected during phyloblitz run
 
     :param stats: `stats` dict produced in phyloblitz.main.main
     :param histogram_file_path: Path to histogram image file, relative to report file path
+    :param kmercount_plot_path: Path to k-mer count plot file, relative to report file path
     :returns: Report in markdown format
     :rtype: str
     """
@@ -222,10 +223,10 @@ copy rRNA copy numbers.
 
 {dict2markdowntable(stats['initial_taxonomy'], order_by_value=True, col1='Taxon', col2='Read count')}
 
-## Assembled sequence clusters
+## Assembled marker sequence clusters
 
-Summary of assembled sequence clusters and their top hits in the reference
-database. Cluster sequences with few underlying reads and many
+Summary of assembled marker sequence clusters and their top hits in the
+reference database. Cluster sequences with few underlying reads and many
 mismatches/indels to the reference hits are lower quality because of
 insufficient coverage, and should not be used for phylogenetics or probe
 design. Clusters with a high number of underlying reads but low alignment
@@ -233,6 +234,14 @@ identity to a reference sequence may represent novel taxa, but should be
 checked for sequence chimerism or misassembly.
 
 {dod2markdowntable(per_cluster_summarize(stats), cluster_table_fields, col1='Cluster ID')}
+
+<figure>
+
+![]({kmercount_plot_path})
+
+<figcaption>K-mer multiplicity plots for flanking sequences of each marker sequence cluster.</figcaption>
+</figure>
+
 
 ---
 
@@ -260,7 +269,7 @@ HTML styling with [Simple.css](https://simplecss.org/)
     return format_md(raw)
 
 
-def generate_report_html(stats, histogram_file_path):
+def generate_report_html(stats, histogram_file_path, kmercount_plot_path):
     """Generate HTML report from stats collected during phyloblitz run
 
     Same parameters as `generate_report_md`
@@ -270,7 +279,8 @@ def generate_report_html(stats, histogram_file_path):
     """
 
     return HTML_TEMPLATE.replace(
-        "{{markdown_report}}", html(generate_report_md(stats, histogram_file_path))
+        "{{markdown_report}}",
+        html(generate_report_md(stats, histogram_file_path, kmercount_plot_path)),
     ).replace("{{title}}", "phyloblitz run report")
 
 

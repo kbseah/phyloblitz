@@ -197,7 +197,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option(
     "--flanking",
     help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
-    default=0,
+    default=1000,
     type=int,
 )
 @click.version_option(version=__version__)
@@ -359,9 +359,12 @@ def main(
     )
 
     # Cluster flanking sequences
-    if flanking > 500:
-        p.cluster_flanking_isonclust3()
-        p.cluster_flanking_kmercount(k=11, minlen=500)
+    if flanking < 500:
+        logger.info("Flanking sequence length must be >=500 bp; setting to 500 bp")
+        flanking = 500
+    p.cluster_flanking_isonclust3()
+    p.cluster_flanking_kmercount(k=11, minlen=500)
+    p.cluster_flanking_kmercount_plot(k=11, min_clust_size=min_clust_size)
 
     # Taxonomy summary
     p.db_taxonomy()

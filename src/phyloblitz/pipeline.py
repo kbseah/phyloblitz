@@ -10,6 +10,7 @@ import oxli
 
 import numpy as np
 import pymarkovclustering as pymcl
+import matplotlib.pyplot as plt
 
 from phyloblitz.report import (
     generate_histogram,
@@ -255,6 +256,7 @@ class Pipeline(object):
         "report_md": "_report.md",
         "report_html": "_report.html",
         "report_dvs_hist": "_report_dvs_hist.png",
+        "report_kmercount_plot": "_report_kmercount_plot.png",
     }
 
     def check_run_file(self, stage):
@@ -836,6 +838,39 @@ class Pipeline(object):
         }
         return
 
+    @check_stage_file(
+        stage="report_kmercount_plot",
+        message="Generate k-mer multiplicity plot for report",
+    )
+    def cluster_flanking_kmercount_plot(self, k=11, min_clust_size=5):
+        cluster_ids = {
+            i: len(self._stats["cluster2seq"][i])
+            for i in self._stats["cluster2seq"]
+            if len(self._stats["cluster2seq"][i]) > min_clust_size
+        }
+        histos = {
+            i: self._stats["flanking kmer histo"][i]
+            for i in self._stats["flanking kmer histo"]
+            if i in cluster_ids
+        }
+        max_kmer_cov = max([max([j[0] for j in histos[i]]) for i in histos])
+        fig_height = len(cluster_ids) * 0.6
+        fig, axs = plt.subplots(
+            len(histos),
+            sharex=True,
+            sharey=False,
+            figsize=(4, fig_height),
+            layout="constrained",
+        )
+        for idx, (cid, histo) in enumerate(histos.items()):
+            axs[idx].bar(
+                x=[i[0] for i in histo], height=[np.log1p(i[1]) for i in histo], width=1
+            )
+            axs[idx].set_title(cid, y=1.0, pad=-15, loc="right")
+            axs[idx].set_xlim(-2, max_kmer_cov + 2)
+        fig.savefig(self.pathto("report_kmercount_plot"))
+        return
+
     def db_taxonomy(self):
         """Get taxonomy string from SILVA headers in database Fasta file
 
@@ -1046,7 +1081,9 @@ class Pipeline(object):
         with open(self.pathto("report_md"), "w") as fh:
             fh.write(
                 generate_report_md(
-                    self._stats, self.pathto("report_dvs_hist", basename_only=True)
+                    self._stats,
+                    self.pathto("report_dvs_hist", basename_only=True),
+                    self.pathto("report_kmercount_plot", basename_only=True),
                 )
             )
         return
@@ -1060,7 +1097,9 @@ class Pipeline(object):
         with open(self.pathto("report_html"), "w") as fh:
             fh.write(
                 generate_report_html(
-                    self._stats, self.pathto("report_dvs_hist", basename_only=True)
+                    self._stats,
+                    self.pathto("report_dvs_hist", basename_only=True),
+                    self.pathto("report_kmercount_plot", basename_only=True),
                 )
             )
         return
