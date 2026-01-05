@@ -597,6 +597,8 @@ class Pipeline(object):
             "--outfolder",
             outfolder,
         ]
+        if isonclust3_mode == "ont":
+            cmd.append("--post-cluster")
         logger.debug("isonclust3 command: " + " ".join(cmd))
         proc = Popen(cmd, stdout=PIPE)
         for l in proc.stdout:
@@ -797,6 +799,8 @@ class Pipeline(object):
                         "--outfolder",
                         tmpdir,
                     ]
+                    if isonclust3_mode == "ont":
+                        cmd.append("--post-cluster")
                     logger.debug(f"isonclust3 command: {' '.join(cmd)}")
                     proc = Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
                     proc_stdout, proc_stderr = proc.communicate()
