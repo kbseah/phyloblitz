@@ -25,7 +25,7 @@ for Illumina reads in the software tool
 references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 
-## Usage
+## Installation and usage
 
 Dependencies are managed with [pixi](https://pixi.sh/). When `pixi shell` is
 run for the first time in the folder containing the `pixi.toml` configuration
@@ -119,6 +119,7 @@ v0.2.0 targets:
  - [x] Option to cluster with isONclust3 instead of minimap2 ava
  - [x] Sequence diversity in reads flanking the SSU sequence per cluster to
        identify meta-consensus sequences
+ - [x] Separately cluster flanking sequences as measure of diversity
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
        Aestuariibacter sequence in SRR28830816
@@ -127,6 +128,7 @@ v0.2.0 targets:
  - [ ] Diversity measure from taxonomy summary
  - [ ] Detailed documentation
  - [ ] Multisample comparison and co-assembly
+ - [ ] Consensus sequence length in table
 
 Future plans:
 
@@ -150,12 +152,12 @@ Please cite the following dependencies:
      Kristoffer Sahlin, De novo clustering of large long-read transcriptome
      datasets with isONclust3, Bioinformatics, 41(5):batf207, 2025.
      https://doi.org/10.1093/bioinformatics/btaf207
- * [`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
-     implementation of MCL in Python
  * [`mcl`](https://micans.org/mcl/) Stijn van Dongen, Graph Clustering Via a
      Discrete Uncoupling Process, SIAM Journal on Matrix Analysis and
      Applications, 30(1):121-141, 2008.
      http://link.aip.org/link/?SJMAEL/30/121/1
+ * [`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
+     implementation of MCL in Python
  * [`pyfastx`](https://pyfastx.readthedocs.io/) Lianming Du, et al., Pyfastx: a
      robust Python package for fast random access to sequences from plain and
      gzipped FASTA/Q files, Briefings in Bioinformatics, 22(4):bbaa368, 2020.
@@ -168,7 +170,7 @@ Please cite the following dependencies:
      10(2):giab007, 2021. https://doi.org/10.1093/gigascience/giab007
  * [`pysam`](https://github.com/pysam-developers/pysam)
  * [`spoa`](https://github.com/rvaser/spoa)
- * `oxli`
+ * [`oxli`](https://github.com/oxli-bio/oxli)
 
 Please cite the SILVA reference database if you use it:
 
