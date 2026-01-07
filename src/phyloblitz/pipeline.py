@@ -119,7 +119,7 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
 
 
 def spoa_assemble_fasta(label_fastq):
-    """Run SPOA assembly on a Fastq input file
+    """Run spoa assembly on a Fastq input file
 
     :param label_fastq: Tuple of input label (str) and path to Fastq file with
         reads to assemble
@@ -144,9 +144,9 @@ def spoa_assemble_fasta(label_fastq):
 
 
 def parse_spoa_r2(fasta):
-    """Parse SPOA gapped alignment + consensus in Fasta format (-r 2 output)
+    """Parse spoa gapped alignment + consensus in Fasta format (-r 2 output)
 
-    :param fasta: Assembly from SPOA as list of strings
+    :param fasta: Assembly from spoa as list of strings
     """
     seqs = {}
     prev_hdr = ""
@@ -699,7 +699,7 @@ class Pipeline(object):
 
     @check_stage_file(
         stage="cluster_asm",
-        message="Extract cluster sequences and assemble with SPOA",
+        message="Extract cluster sequences and assemble with spoa",
     )
     def assemble_clusters(
         self, cluster_tool="isonclust3", threads=12, keeptmp=False, min_clust_size=5
@@ -1050,7 +1050,7 @@ class Pipeline(object):
                         fh.write(">" + hdr + "\n")
                         fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")
         except KeyError:
-            raise Exception("Key `cluster cons parsed` not found, has SPOA been run?")
+            raise Exception("Key `cluster cons parsed` not found, has spoa been run?")
         return
 
     @check_stage_file(
