@@ -196,6 +196,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     default=1000,
     type=int,
 )
+@click.option(
+    "--parse_supplementary",
+    help="[EXPERIMENTAL] Parse supplementary alignments in minimap2 mapping",
+    default=False,
+    is_flag=True,
+)
 @click.version_option(version=__version__)
 def main(
     db,
@@ -221,6 +227,7 @@ def main(
     inflation,
     twopass,
     flanking,
+    parse_supplementary,
 ):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
@@ -254,6 +261,7 @@ def main(
                 "inflation",
                 "twopass",
                 "flanking",
+                "parse_supplementary",
             ],
             [
                 db,
@@ -279,6 +287,7 @@ def main(
                 inflation,
                 twopass,
                 flanking,
+                parse_supplementary,
             ],
             strict=False,
         )
@@ -335,7 +344,7 @@ def main(
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
-        twopass=twopass, align_minlen=align_minlen, flanking=flanking
+        twopass=twopass, align_minlen=align_minlen, parse_supplementary=parse_supplementary, flanking=flanking
     )
 
     # All-vs-all mapping

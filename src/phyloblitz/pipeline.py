@@ -78,16 +78,24 @@ def merge_intervals(intervals: list):
     return merged
 
 
-def sam_seq_generator(sam_file, minlen=1200, flanking=0):
+def sam_seq_generator(sam_file, minlen=1200, parse_supplementary=False, flanking=0):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping
 
     This uses pysam.AlignedSegment.query_sequence; if the read is mapped to
     reverse strand, the sequence and coordinates are already
     reverse-complemented.
 
+    Secondary alignments are always skipped, because they represent hits to
+    other reference sequences and hence not required for extracting read
+    segments. Supplementary alignments potentially represent other copies of
+    target gene on the same read, and should be extracted. The -Y flag in
+    minimap2 must be set so that supplementary alignments are softclipped, not
+    hardclipped, to allow correct extraction of the aligned segment.
+
     :param sam_file: Path to SAM file
     :param minlen: Minimum query alignment length; adjust if targeting a
         different gene, e.g. LSU rRNA
+    :param parse_supplementary: Parse supplementary alignments as well
     :param flanking: [EXPERIMENTAL] Additional flanking sequence to extract
     """
     logger.info(f"Filtering alignment for primary mappings with length >= {minlen!s}")
@@ -97,24 +105,28 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
         )
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
-        if i.query_alignment_length >= minlen and i.query_alignment_sequence:
-            # Primary mappings only to ensure only one mapping per input read
-            if not i.is_secondary and not i.is_supplementary:
-                mystart = max(0, i.query_alignment_start)
-                myend = min(i.query_length, i.query_alignment_end)
-                # mapped segment
-                name = ":".join([str(i) for i in [i.query_name, mystart, myend]])
-                seq = i.query_sequence[mystart:myend]
-                quals = i.query_qualities_str[mystart:myend]
-                # pre-flank
-                pre_start = max(0, i.query_alignment_start - flanking)
-                pre_seq = i.query_sequence[pre_start:mystart]
-                pre_quals = i.query_qualities_str[pre_start:mystart]
-                # post-flank
-                post_end = min(i.query_length, i.query_alignment_end + flanking)
-                post_seq = i.query_sequence[myend:post_end]
-                post_quals = i.query_qualities_str[myend:post_end]
-                yield (name, seq, quals, pre_seq, pre_quals, post_seq, post_quals)
+        if i.query_alignment_length < minlen or i.query_alignment_sequence is None:
+            continue
+        if i.is_secondary or (i.is_supplementary and not parse_supplementary):
+            continue
+        if i.is_supplementary and parse_supplementary:
+            # TODO: Track reads that have supplementary alignments
+            logger.debug(f"Parsing supplementary alignment for read {i.query_name}")
+        mystart = max(0, i.query_alignment_start)
+        myend = min(i.query_length, i.query_alignment_end)
+        # mapped segment
+        name = ":".join([str(i) for i in [i.query_name, mystart, myend]])
+        seq = i.query_sequence[mystart:myend]
+        quals = i.query_qualities_str[mystart:myend]
+        # pre-flank
+        pre_start = max(0, i.query_alignment_start - flanking)
+        pre_seq = i.query_sequence[pre_start:mystart]
+        pre_quals = i.query_qualities_str[pre_start:mystart]
+        # post-flank
+        post_end = min(i.query_length, i.query_alignment_end + flanking)
+        post_seq = i.query_sequence[myend:post_end]
+        post_quals = i.query_qualities_str[myend:post_end]
+        yield (name, seq, quals, pre_seq, pre_quals, post_seq, post_quals)
 
 
 def spoa_assemble_fasta(label_fastq):
@@ -343,7 +355,7 @@ class Pipeline:
 
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("initial_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {threads!s}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", "--secondary=no", "-Y", f"-t {threads!s}"]
             (
                 cmd1.extend([self._refindex, infile])
                 if self._refindex is not None
@@ -378,7 +390,7 @@ class Pipeline:
         """
         # Don't use mappy because it doesn't support all-vs-all yet
         with open(self.pathto("second_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {threads!s}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", "--secondary=no", "-Y", f"-t {threads!s}"]
             (
                 cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
                 if self._refindex is not None
@@ -426,7 +438,7 @@ class Pipeline:
         stage="mapped_segments",
         message="Extracting read segments for all-vs-all mapping",
     )
-    def extract_reads_for_ava(self, twopass=False, align_minlen=1200, flanking=0):
+    def extract_reads_for_ava(self, twopass=False, align_minlen=1200, parse_supplementary=False, flanking=0):
         sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
@@ -439,7 +451,7 @@ class Pipeline:
                 pre_quals,
                 post_seq,
                 post_quals,
-            ) in sam_seq_generator(sam_file, minlen=align_minlen, flanking=flanking):
+            ) in sam_seq_generator(sam_file, minlen=align_minlen, parse_supplementary=parse_supplementary, flanking=flanking):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")
