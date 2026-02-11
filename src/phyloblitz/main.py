@@ -331,7 +331,7 @@ def main(
     if twopass:
         logger.info("[EXPERIMENTAL] Applying two-pass mode")
         p.twopass_extract_read_intervals(minlen=align_minlen)
-        p.run_minimap_secondmap(threads=threads, mode="map-" + platform)
+        p.run_minimap_secondmap(threads=threads, mode=platform)
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
