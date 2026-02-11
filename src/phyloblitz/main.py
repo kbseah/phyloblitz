@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
 import logging
-import json
 import sys
-import re
 
 import phyloblitz.pipeline as pipeline
 import rich_click as click
 
 from os import makedirs
-from datetime import datetime
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies
 

@@ -7,6 +7,7 @@ import logging
 import os.path
 import json
 import oxli
+import sys
 
 import numpy as np
 import pymarkovclustering as pymcl
@@ -41,7 +42,7 @@ def get_firstpass_intervals(sam_file, minlen=1200):
     :returns: Lists of intervals with hits per read, keyed by read name
     :rtype: dict
     """
-    logger.info(f"Filtering initial alignment to get aligned regions to extract")
+    logger.info("Filtering initial alignment to get aligned regions to extract")
     regions = defaultdict(list)
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
@@ -390,7 +391,7 @@ class Pipeline(object):
                 else cmd1.extend([self._ref, self.pathto("intervals_fastq")])
             )
             logger.debug("minimap command: " + " ".join(cmd1))
-            proc1 = Popen(cmd1, stdout=PIPE, stderr=PIPE)
+            proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
             nreads = 0
             for l in proc1.stderr:
                 nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
@@ -618,7 +619,6 @@ class Pipeline(object):
         :returns: Dict of sequence IDs keyed by cluster ID
         """
         counter = 0
-        cluster_files = []
         fastq_handles = {}
         seq2cluster = {}
         with open(mcl_out, "r") as fh:
@@ -666,7 +666,6 @@ class Pipeline(object):
         :returns: Dict of file handles to each Fastq file keyed by cluster ID
         :returns: Dict of sequence IDs keyed by cluster ID
         """
-        cluster_files = []
         fastq_handles = {}
         seq2cluster = {}
         with open(isonclust3_out, "r") as fh:

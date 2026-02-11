@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
-import re
 import logging
-import pysam
 
-import numpy as np
 import matplotlib.pyplot as plt
 
 from phyloblitz.__about__ import __version__
-import phyloblitz.utils as utils
 from mistune.renderers.markdown import MarkdownRenderer
 from mistune import create_markdown, html
 from collections import defaultdict
@@ -70,7 +66,7 @@ def dict2markdowntable(
         keys = ordered_keys
     out = []
     out.append(f"| {col1} | {col2} |")
-    out.append(f"| :----- | :----- |")
+    out.append("| :----- | :----- |")
     for k in keys:
         try:
             out.append(f"| {str(k)} | {str(d[k])} |")
@@ -112,30 +108,6 @@ def dod2markdowntable(
             + " |"
         )
     return "\n".join(out)
-
-
-def generate_report_plots(stats, args):
-    """Generate plots for report file
-
-    :param stats: `stats` dict produced in phyloblitz.main.main
-    :param args: Command line arguments from ArgumentParser.parse_args()
-    """
-
-    if not utils.check_run_file(args, "report_dvs_hist"):
-        fig, axs = plt.subplots(1, figsize=(3, 2))
-        axs.hist(dvs, bins="auto", density=True)
-        axs.axvline(args.dv_max, color="red")
-        axs.set_title("Histogram of ava min dvs")
-        fig.tight_layout()
-        fig.savefig(utils.pathto(args, "report_dvs_hist"))
-
-        generate_histogram(
-            vals=self._stats["min_dvs"],
-            vline=self._stats["args"]["dv_max"],
-            title="Histogram of ava min dvs",
-            outfile=self.pathto("report_dvs_hist"),
-            figsize=(3, 2),
-        )
 
 
 def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
