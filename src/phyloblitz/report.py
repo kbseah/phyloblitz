@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import logging
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
+from mistune import create_markdown, html
+from mistune.renderers.markdown import MarkdownRenderer
 
 from phyloblitz.__about__ import __version__
-from mistune.renderers.markdown import MarkdownRenderer
-from mistune import create_markdown, html
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 # mute verbose debug messages from matplotlib and PngImagePlugin
@@ -69,7 +69,7 @@ def dict2markdowntable(
     out.append("| :----- | :----- |")
     for k in keys:
         try:
-            out.append(f"| {str(k)} | {str(d[k])} |")
+            out.append(f"| {k!s} | {d[k]!s} |")
         except KeyError:
             raise Exception(f"Key {k} not defined in dict")
     return "\n".join(out)
@@ -103,7 +103,7 @@ def dod2markdowntable(
     )
     for c, v in dd:
         out.append(
-            f"| {str(c)} | "
+            f"| {c!s} | "
             + " | ".join([str(v[k]) if k in v else "-" for k in keys])
             + " |"
         )
@@ -127,7 +127,6 @@ def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
     axs.set_title(title)
     fig.tight_layout()
     fig.savefig(outfile)
-    return
 
 
 def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
@@ -158,8 +157,8 @@ def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
 
     raw = f"""# phyloblitz run report
 
-* Run started: {str(stats["starttime"])}
-* Run ended: {str(stats["endtime"])}
+* Run started: {stats["starttime"]!s}
+* Run ended: {stats["endtime"]!s}
 * phyloblitz version: {__version__}
 
 phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
@@ -188,7 +187,7 @@ all-vs-all mapping of extracted rRNA sequences.</figcaption>
 
 For each read in the initial mapping, the consensus taxonomy of top hits in
 reference database was taken; these are summarized here at the requested taxon
-level {str(stats["args"]["summary_taxlevel"])}. This should not be interpreted
+level {stats["args"]["summary_taxlevel"]!s}. This should not be interpreted
 as a direct measure of abundance, because the number of copies of rRNA genes
 per genome is variable between species. Eukaryotes especially often have high
 copy rRNA copy numbers.

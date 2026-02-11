@@ -1,35 +1,35 @@
 #!/usr/bin/env python
 
-import pysam
-import re
-import pyfastx
+import json
 import logging
 import os.path
-import json
-import oxli
+import re
 import sys
+from collections import Counter, defaultdict
+from datetime import datetime
+from functools import wraps
+from multiprocessing import Pool
+from subprocess import PIPE, Popen
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
-import numpy as np
-import pymarkovclustering as pymcl
 import matplotlib.pyplot as plt
+import numpy as np
+import oxli
+import pyfastx
+import pymarkovclustering as pymcl
+import pysam
 
 from phyloblitz.report import (
     generate_histogram,
-    generate_report_md,
     generate_report_html,
+    generate_report_md,
 )
 from phyloblitz.utils import (
     CIGAROPS,
+    filter_paf_overhang,
     lists_common_prefix,
     parse_cigar_ops,
-    filter_paf_overhang,
 )
-from subprocess import Popen, PIPE
-from tempfile import NamedTemporaryFile, TemporaryDirectory
-from collections import defaultdict, Counter
-from functools import wraps
-from multiprocessing import Pool
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def get_firstpass_intervals(sam_file, minlen=1200):
                 qstart += i.cigartuples[0][1]
                 qend += i.cigartuples[0][1]
             regions[i.query_name].append((qstart, qend))
-    logger.debug(f"Reads processed {str(len(regions))}")
+    logger.debug(f"Reads processed {len(regions)!s}")
     # merge intervals for each read
     merged_intervals = {i: merge_intervals(regions[i]) for i in regions}
     return merged_intervals
@@ -90,12 +90,10 @@ def sam_seq_generator(sam_file, minlen=1200, flanking=0):
         different gene, e.g. LSU rRNA
     :param flanking: [EXPERIMENTAL] Additional flanking sequence to extract
     """
-    logger.info(
-        f"Filtering alignment for primary mappings with length >= {str(minlen)}"
-    )
+    logger.info(f"Filtering alignment for primary mappings with length >= {minlen!s}")
     if flanking > 0:
         logger.info(
-            f"Including flanking {str(flanking)} bp sequence when extracting reads"
+            f"Including flanking {flanking!s} bp sequence when extracting reads"
         )
     sam = pysam.AlignmentFile(sam_file, "r")
     for i in sam.fetch():
@@ -140,7 +138,7 @@ def spoa_assemble_fasta(label_fastq):
     # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
     # ignoring stderr from spoa for now
     out = proc.communicate()[0]
-    logger.info(f"Assembly complete for cluster {str(label)}")
+    logger.info(f"Assembly complete for cluster {label!s}")
     return label, out
 
 
@@ -220,7 +218,7 @@ def count_spoa_aln_persite_vars(seqs):  # TODO WIP
     return var
 
 
-class Pipeline(object):
+class Pipeline:
     """phyloblitz pipeline run object"""
 
     def __init__(self, args):
@@ -278,10 +276,7 @@ class Pipeline(object):
         try:
             if basename_only:
                 return os.path.basename(self._prefix + self.OUTFILE_SUFFIX[stage])
-            else:
-                return os.path.join(
-                    self._outdir, self._prefix + self.OUTFILE_SUFFIX[stage]
-                )
+            return os.path.join(self._outdir, self._prefix + self.OUTFILE_SUFFIX[stage])
         except KeyError:
             raise Exception(f"Unknown intermediate file {stage}")
 
@@ -296,11 +291,10 @@ class Pipeline(object):
                             f"Stage {stage} file output already present, skipping"
                         )
                         return
-                    else:
-                        logger.error(
-                            f"Stage {stage} file output already present and option --resume not used, exiting"
-                        )
-                        sys.exit()
+                    logger.error(
+                        f"Stage {stage} file output already present and option --resume not used, exiting"
+                    )
+                    sys.exit()
                 else:
                     logger.info(message)
                     return func(self, *args, **kwargs)
@@ -328,7 +322,7 @@ class Pipeline(object):
         # Don't use mappy because it doesn't support all-vs-all yet
         infile = self._reads
         if sample is not None:
-            logger.info(f"Taking sample of {str(sample)} reads")
+            logger.info(f"Taking sample of {sample!s} reads")
             temp_infile = NamedTemporaryFile()  # TODO keeptmp
             cmd = [
                 "pyfastx",
@@ -349,7 +343,7 @@ class Pipeline(object):
 
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("initial_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {threads!s}"]
             (
                 cmd1.extend([self._refindex, infile])
                 if self._refindex is not None
@@ -384,7 +378,7 @@ class Pipeline(object):
         """
         # Don't use mappy because it doesn't support all-vs-all yet
         with open(self.pathto("second_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {str(threads)}"]
+            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", f"-t {threads!s}"]
             (
                 cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
                 if self._refindex is not None
@@ -425,7 +419,7 @@ class Pipeline(object):
                         counter += 1
         self._stats["runstats"].update({"firstpass intervals extracted": counter})
         logger.info(
-            f"[EXPERIMENTAL] Twopass mode: Read intervals extracted: {str(counter)}"
+            f"[EXPERIMENTAL] Twopass mode: Read intervals extracted: {counter!s}"
         )
 
     @check_stage_file(
@@ -458,8 +452,7 @@ class Pipeline(object):
                     "post_quals": post_quals,
                 }
         self._stats["runstats"].update({"mapped pass filter": counter})
-        logger.info(f"Read segments extracted for all-vs-all mapping: {str(counter)}")
-        return
+        logger.info(f"Read segments extracted for all-vs-all mapping: {counter!s}")
 
     @check_stage_file(
         stage="ava_map",
@@ -501,26 +494,27 @@ class Pipeline(object):
         message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
     )
     def paf_file_filter_overhangs(self, max_overhang_frac=0.05):
-        logger.info(f"Max overhang fraction: {str(max_overhang_frac)}")
+        logger.info(f"Max overhang fraction: {max_overhang_frac!s}")
         counter_all = 0
         counter = 0
-        with open(self.pathto("ava_map"), "r") as fh_in:
-            with open(self.pathto("ava_filter"), "w") as fh_out:
-                for line in fh_in:
-                    counter_all += 1
-                    out = filter_paf_overhang(line, max_overhang_frac=max_overhang_frac)
-                    if out is not None:
-                        counter += 1
-                        fh_out.write(out)
+        with (
+            open(self.pathto("ava_map")) as fh_in,
+            open(self.pathto("ava_filter"), "w") as fh_out,
+        ):
+            for line in fh_in:
+                counter_all += 1
+                out = filter_paf_overhang(line, max_overhang_frac=max_overhang_frac)
+                if out is not None:
+                    counter += 1
+                    fh_out.write(out)
         logger.info(
-            f"Retained {str(counter)} out of {str(counter_all)} all-vs-all alignments"
+            f"Retained {counter!s} out of {counter_all!s} all-vs-all alignments"
         )
-        return
 
     def paf_get_dvs(self):
         logger.info("Reading dvs data from ava mapping")
         dvs = defaultdict(list)
-        with open(self.pathto("ava_filter"), "rt") as fh:
+        with open(self.pathto("ava_filter")) as fh:
             for line in fh:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
@@ -536,10 +530,9 @@ class Pipeline(object):
         self._stats.update({"min_dvs": min_dvs})
         self._stats["runstats"].update(
             {
-                "ava min dvs median": "{:.4f}".format(np.median(min_dvs)),
+                "ava min dvs median": f"{np.median(min_dvs):.4f}",
             }
         )
-        return
 
     @check_stage_file(
         stage="mcl_cluster",
@@ -559,7 +552,7 @@ class Pipeline(object):
                 0.001, 2 * float(self._stats["runstats"]["ava min dvs median"])
             )
         edges = []
-        with open(self.pathto("ava_filter"), "rt") as fh_paf:
+        with open(self.pathto("ava_filter")) as fh_paf:
             for line in fh_paf:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
@@ -569,14 +562,12 @@ class Pipeline(object):
                     score = 1 - float(dv[0])
                     edges.append((query, target, score))
         self._stats["runstats"].update({"dv_max applied": dv_max})
-        logger.info(f"Inflation parameter {str(inflation)}")
+        logger.info(f"Inflation parameter {inflation!s}")
         matrix, labels = pymcl.edges_to_sparse_matrix(edges)
         mcl_matrix = pymcl.mcl(matrix, inflation=inflation)
         clusters = pymcl.extract_clusters(mcl_matrix, labels)
         with open(self.pathto("mcl_cluster"), "w") as fh:
-            for c in clusters:
-                fh.write("\t".join(c) + "\n")
-        return
+            fh.writelines("\t".join(c) + "\n" for c in clusters)
 
     @check_stage_file(
         stage="isonclust3_cluster",
@@ -621,12 +612,10 @@ class Pipeline(object):
         counter = 0
         fastq_handles = {}
         seq2cluster = {}
-        with open(mcl_out, "r") as fh:
+        with open(mcl_out) as fh:
             for line in fh:
                 seqs = line.rstrip().split("\t")
-                logger.info(
-                    f"Cluster {str(counter)} comprises {str(len(seqs))} sequences"
-                )
+                logger.info(f"Cluster {counter!s} comprises {len(seqs)!s} sequences")
                 for seq in seqs:
                     seq2cluster[seq] = counter  # assume each seq in only one cluster
                 if len(seqs) >= min_clust_size:
@@ -637,7 +626,7 @@ class Pipeline(object):
                         delete_on_close=False,
                     )
                 else:
-                    logger.debug(f"Cluster {str(counter)} below size cutoff")
+                    logger.debug(f"Cluster {counter!s} below size cutoff")
                 counter += 1
         for name, seq, qual in pyfastx.Fastx(reads):
             if name in seq2cluster and seq2cluster[name] in fastq_handles:
@@ -668,7 +657,7 @@ class Pipeline(object):
         """
         fastq_handles = {}
         seq2cluster = {}
-        with open(isonclust3_out, "r") as fh:
+        with open(isonclust3_out) as fh:
             for line in fh:
                 (clust, seqname) = line.rstrip().split("\t")
                 seq2cluster[seqname] = clust
@@ -677,7 +666,7 @@ class Pipeline(object):
             cluster2seq[seq2cluster[seqname]].append(seqname)
         for cluster in cluster2seq:
             logger.info(
-                f"Cluster {str(cluster)} comprises {str(len(cluster2seq[cluster]))} sequences"
+                f"Cluster {cluster!s} comprises {len(cluster2seq[cluster])!s} sequences"
             )
             if len(cluster2seq[cluster]) >= min_clust_size:
                 fastq_handles[cluster] = NamedTemporaryFile(
@@ -687,7 +676,7 @@ class Pipeline(object):
                     delete_on_close=False,
                 )
             else:
-                logger.debug(f"Cluster {str(cluster)} below size cutoff")
+                logger.debug(f"Cluster {cluster!s} below size cutoff")
         for seqname, seq, qual in pyfastx.Fastx(reads):
             if seqname in seq2cluster and seq2cluster[seqname] in fastq_handles:
                 fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
@@ -758,12 +747,12 @@ class Pipeline(object):
             }
         )
         with open(self.pathto("cluster_asm"), "w") as fh:
-            for c in cluster_cons_parsed:
-                fh.write(
-                    f">cluster_{str(c)} Consensus\n"
-                    + cluster_cons_parsed[c]["Consensus"].replace("-", "")
-                    + "\n"
-                )
+            fh.writelines(
+                f">cluster_{c!s} Consensus\n"
+                + cluster_cons_parsed[c]["Consensus"].replace("-", "")
+                + "\n"
+                for c in cluster_cons_parsed
+            )
             logger.info(f"Assembled sequences written to {self.pathto('cluster_asm')}")
 
     def cluster_flanking_isonclust3(self):
@@ -814,7 +803,6 @@ class Pipeline(object):
                         )
                         cluster_flanking_numclust[cluster] = int(num_clusters.group(1))
         self._stats["cluster flanking numclust"] = cluster_flanking_numclust
-        return
 
     def cluster_flanking_kmercount(self, k=11, minlen=500):
         """Count kmers from flanking sequences per cluster"""
@@ -835,7 +823,6 @@ class Pipeline(object):
         self._stats["flanking kmer histo"] = {
             cluster: kmer_tables[cluster].histo() for cluster in kmer_tables
         }
-        return
 
     @check_stage_file(
         stage="report_kmercount_plot",
@@ -868,7 +855,6 @@ class Pipeline(object):
             axs[idx].set_title(cid, y=1.0, pad=-15, loc="right")
             axs[idx].set_xlim(-2, max_kmer_cov + 2)
         fig.savefig(self.pathto("report_kmercount_plot"))
-        return
 
     def db_taxonomy(self):
         """Get taxonomy string from SILVA headers in database Fasta file
@@ -878,14 +864,14 @@ class Pipeline(object):
         """
         logger.info("Reading taxonomy from SILVA database file")
         self._acc2tax = {}
-        with open(self._ref, "r") as fh:
+        with open(self._ref) as fh:
             for line in fh:
                 if line.startswith(">"):
                     spl = line.lstrip(">").rstrip().split(" ")
                     acc = spl[0]
                     taxstring = " ".join(spl[1:]).split(";")
                     self._acc2tax[acc] = taxstring
-        logger.debug(f" Accessions read: {str(len(self._acc2tax))}")
+        logger.debug(f" Accessions read: {len(self._acc2tax)!s}")
 
     def _per_read_consensus_taxonomy(self, sam_file, minlen=1200):
         """Summarize taxonomy from initial mapping with minimap2
@@ -913,7 +899,6 @@ class Pipeline(object):
                 )
             }
         )
-        return
 
     @check_stage_file(
         stage="cluster_tophits",
@@ -955,7 +940,7 @@ class Pipeline(object):
         """
         out = {}
 
-        with open(self.pathto("cluster_tophits"), "r") as fh:
+        with open(self.pathto("cluster_tophits")) as fh:
             for line in fh:
                 spl = line.rstrip().split("\t")
                 hits = dict(
@@ -974,6 +959,7 @@ class Pipeline(object):
                             "alnlen",
                         ],
                         spl[0:11],
+                        strict=False,
                     )
                 )
                 cigar = [i for i in spl if i.startswith("cg:Z:")][0]
@@ -1033,7 +1019,6 @@ class Pipeline(object):
         self._stats.update({"endtime": str(datetime.now())})
         with open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
-        return
 
     def write_cluster_alns(self):
         """Dump cluster alignments for troubleshooting"""
@@ -1050,7 +1035,6 @@ class Pipeline(object):
                         fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")
         except KeyError:
             raise Exception("Key `cluster cons parsed` not found, has spoa been run?")
-        return
 
     @check_stage_file(
         stage="report_dvs_hist",
@@ -1069,7 +1053,6 @@ class Pipeline(object):
             outfile=self.pathto("report_dvs_hist"),
             figsize=(3, 2),
         )
-        return
 
     @check_stage_file(
         stage="report_md",
@@ -1085,7 +1068,6 @@ class Pipeline(object):
                     self.pathto("report_kmercount_plot", basename_only=True),
                 )
             )
-        return
 
     @check_stage_file(
         stage="report_html",
@@ -1101,4 +1083,3 @@ class Pipeline(object):
                     self.pathto("report_kmercount_plot", basename_only=True),
                 )
             )
-        return

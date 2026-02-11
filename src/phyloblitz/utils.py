@@ -2,10 +2,8 @@
 
 import logging
 import re
-import os.path
-
 from collections import defaultdict
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import PIPE, STDOUT, Popen
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +79,13 @@ def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
 def check_dependencies():
     vers = {}
     from sys import version as python_version
-    from pysam import __version__ as pysam_version
-    from pyfastx import __version__ as pyfastx_version
+
+    from matplotlib import __version__ as matplotlib_version
     from mistune import __version__ as mistune_version
     from numpy import __version__ as numpy_version
-    from matplotlib import __version__ as matplotlib_version
+    from pyfastx import __version__ as pyfastx_version
     from pymarkovclustering import __version__ as pymcl_version
+    from pysam import __version__ as pysam_version
 
     vers["python"] = python_version
     vers["pysam"] = pysam_version

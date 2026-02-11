@@ -2,14 +2,13 @@
 
 import logging
 import sys
+from os import makedirs
 
-import phyloblitz.pipeline as pipeline
 import rich_click as click
 
-from os import makedirs
+from phyloblitz import pipeline
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies
-
 
 click.rich_click.OPTION_GROUPS = {
     "phyloblitz": [
@@ -281,6 +280,7 @@ def main(
                 twopass,
                 flanking,
             ],
+            strict=False,
         )
     )
 
@@ -304,7 +304,7 @@ def main(
 
     logger.debug("Arguments:")
     for i in args:
-        logger.debug(f" {i} : {str(args[i])}")
+        logger.debug(f" {i} : {args[i]!s}")
 
     logger.debug("Dependencies:")
     deps = check_dependencies()
