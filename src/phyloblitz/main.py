@@ -46,7 +46,7 @@ click.rich_click.OPTION_GROUPS = {
         },
         {
             "name": "Experimental",
-            "options": ["twopass", "flanking"],
+            "options": ["twopass", "flanking", "parse_supplementary"],
         },
     ]
 }
