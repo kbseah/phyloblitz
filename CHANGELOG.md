@@ -17,7 +17,7 @@
      - [x] Link SILVA record by accession
      - [x] Alignment identity (using Blast-like % id definition)
 
-## v0.2.0 targets
+## v0.2.0
 
  - [x] Check if lr:hq mode is better for Q20 ONT reads than map:ont
  - [x] Option to cluster with isONclust3 instead of minimap2 ava
@@ -27,17 +27,16 @@
  - [x] Consensus sequence length in table
  - [x] Reference database on Zenodo for SSU and LSU
  - [x] Account for multiple SSUs in one read; see supplementary alignments
+
+## Future plans
+
+ - [ ] Multisample comparison and co-assembly
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
        Aestuariibacter sequence in SRR28830816
  - [ ] Divergence of reads in each cluster from consensus to detect potential
        chimeras
- - [ ] Diversity measure from taxonomy summary
  - [ ] Detailed documentation
- - [ ] Multisample comparison and co-assembly
-
-## Future plans
-
  - [ ] Does extracting flanking sequence context improve strain resolution?
      - [ ] Filter out all-vs-all hits with overhangs
      - [ ] Investigate effect of dv cutoff values and clustering methods
