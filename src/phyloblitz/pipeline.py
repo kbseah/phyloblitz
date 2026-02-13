@@ -355,7 +355,15 @@ class Pipeline:
 
         logger.info("Mapping reads to reference database with minimap2")
         with open(self.pathto("initial_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", "--secondary=no", "-Y", f"-t {threads!s}"]
+            cmd1 = [
+                "minimap2",
+                "-ax",
+                mode,
+                "--sam-hit-only",
+                "--secondary=no",
+                "-Y",
+                f"-t {threads!s}",
+            ]
             (
                 cmd1.extend([self._refindex, infile])
                 if self._refindex is not None
@@ -390,7 +398,15 @@ class Pipeline:
         """
         # Don't use mappy because it doesn't support all-vs-all yet
         with open(self.pathto("second_map"), "w") as sam_fh:
-            cmd1 = ["minimap2", "-ax", mode, "--sam-hit-only", "--secondary=no", "-Y", f"-t {threads!s}"]
+            cmd1 = [
+                "minimap2",
+                "-ax",
+                mode,
+                "--sam-hit-only",
+                "--secondary=no",
+                "-Y",
+                f"-t {threads!s}",
+            ]
             (
                 cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
                 if self._refindex is not None
@@ -438,7 +454,9 @@ class Pipeline:
         stage="mapped_segments",
         message="Extracting read segments for all-vs-all mapping",
     )
-    def extract_reads_for_ava(self, twopass=False, align_minlen=1200, parse_supplementary=False, flanking=0):
+    def extract_reads_for_ava(
+        self, twopass=False, align_minlen=1200, parse_supplementary=False, flanking=0
+    ):
         sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
@@ -451,7 +469,12 @@ class Pipeline:
                 pre_quals,
                 post_seq,
                 post_quals,
-            ) in sam_seq_generator(sam_file, minlen=align_minlen, parse_supplementary=parse_supplementary, flanking=flanking):
+            ) in sam_seq_generator(
+                sam_file,
+                minlen=align_minlen,
+                parse_supplementary=parse_supplementary,
+                flanking=flanking,
+            ):
                 counter += 1
                 fq_fh.write("@" + name + "\n")
                 fq_fh.write(seq + "\n")

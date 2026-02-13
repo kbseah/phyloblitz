@@ -344,7 +344,10 @@ def main(
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
-        twopass=twopass, align_minlen=align_minlen, parse_supplementary=parse_supplementary, flanking=flanking
+        twopass=twopass,
+        align_minlen=align_minlen,
+        parse_supplementary=parse_supplementary,
+        flanking=flanking,
     )
 
     # All-vs-all mapping
