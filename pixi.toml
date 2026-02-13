@@ -33,8 +33,8 @@ backend = { name = "pixi-build-python", version = ">=0.4.0,<0.5.0" }
 [tasks]
 main = "main"
 test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
-# download = "wget -q -O - 'https://zenodo.org/records/7892522/files/138.1.tar.gz?download=1' | tar -xzf - 138.1/SILVA_SSU.noLSU.masked.trimmed.NR99.fixed.fasta"
-# 138.2/SILVA_SSURef_NR99.masked.trimmed.fasta
+download = """wget -q --output-document=138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+'https://zenodo.org/records/18627380/files/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta?download=1'"""
 # isonclust3 ont
 run = """phyloblitz --resume --debug --threads 12 --platform lr:hq \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
