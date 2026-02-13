@@ -24,6 +24,9 @@
  - [x] Sequence diversity in reads flanking the SSU sequence per cluster to
        identify meta-consensus sequences
  - [x] Separately cluster flanking sequences as measure of diversity
+ - [x] Consensus sequence length in table
+ - [x] Reference database on Zenodo for SSU and LSU
+ - [x] Account for multiple SSUs in one read; see supplementary alignments
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
        Aestuariibacter sequence in SRR28830816
@@ -32,9 +35,6 @@
  - [ ] Diversity measure from taxonomy summary
  - [ ] Detailed documentation
  - [ ] Multisample comparison and co-assembly
- - [ ] Consensus sequence length in table
- - [x] Reference database on Zenodo for SSU and LSU
- - [x] Account for multiple SSUs in one read; see supplementary alignments
 
 ## Future plans
 
