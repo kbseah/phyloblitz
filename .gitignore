@@ -7,5 +7,6 @@ __pycache__
 /test_run
 test.log
 /138.1/
+/138.2/
 /runtest/run*
 *.swp
