@@ -2,6 +2,11 @@
 
 **Rapid SSU rRNA marker gene screening of long read metagenomes.**
 
+![GitHub Tag](https://img.shields.io/github/v/tag/kbseah/phyloblitz)
+![GitHub License](https://img.shields.io/github/license/kbseah/phyloblitz)
+![Conda Version](https://img.shields.io/conda/vn/bioconda/phyloblitz)
+
+
 Note: This tool is still under development and the interface may change without
 warning. We appreciate any bug reports or feedback; please [create an issue on
 GitHub](https://github.com/kbseah/phyloblitz/issues/new). Please understand
@@ -25,7 +30,10 @@ for Illumina reads in the software tool
 references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 
-## Installation and usage
+## Installation
+
+
+### Development version
 
 Dependencies are managed with [pixi](https://pixi.sh/). When `pixi shell` is
 run for the first time in the folder containing the `pixi.toml` configuration
@@ -42,10 +50,19 @@ phyloblitz --help
 Use `exit` or `Ctrl-D` to exit pixi shell session.
 
 Required inputs are a preprocessed SILVA reference database and the long read
-files in fastq(.gz) format.
+files in fastq(.gz) format. After navigating to the phyloblitz folder, fetch
+the (SSU rRNA) database file from Zenodo on the command line with:
+
+```console
+pixi run download
+```
+
+After downloading the database file to the subfolder `138.2/` you can test
+`phyloblitz` on the test data (a sample of SSU rRNA-containing Nanopore reads
+from SRR17913200) with `pixi run run`. The output will be in `runtest/run`.
 
 
-## Reference database
+### Reference database
 
 Download the database files from https://doi.org/10.5281/zenodo.18627380
 
@@ -54,9 +71,7 @@ trimming of contaminant sequences and masking of low-complexity repeats to
 avoid excessive false-positive matches. Use the appropriate file for either SSU
 or LSU rRNA genes. Refer to the [database processing
 pipeline](https://github.com/kbseah/phyloblitz-db) for the actual commands
-used.
-
-You can use `pixi run download` to execute the download command.
+used to prepare the database.
 
 If you build your own database, low complexity regions should be masked (e.g.
 with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
@@ -64,14 +79,18 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 2021](https://doi.org/10.1128/mSystems.00920-20)) for details.
 
 
+## Usage
+
+Refer to the help message for details on the phyloblitz run parameters:
+
+```console
+phyloblitz --help
+```
+
+
 ### Test datasets
 
-After downloading the database file with `pixi run download` (or manually to
-the subfolder `138.2/`) you can test `phyloblitz` on the test data (a sample of
-SSU rRNA-containing Nanopore reads from SRR17913200) with `pixi run run`. The
-output will be in `runtest/run`.
-
-Try out `phyloblitz` on other published datasets that have sequenced the
+Try out `phyloblitz` on published datasets that have sequenced the
 [ZymoBIOMICS Gut Microbiome
 Standard](https://www.zymoresearch.com/products/zymobiomics-gut-microbiome-standard):
 
