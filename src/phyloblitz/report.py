@@ -218,6 +218,9 @@ checked for sequence chimerism or misassembly.
 
 ---
 
+<details>
+<summary>Citations ...</summary>
+
 phyloblitz depends on the following tools; please cite them:
 [`minimap2`](https://github.com/lh3/minimap2) ([Li, 2018](https://doi.org/10.1093/bioinformatics/bty191)),
 [`isONclust3`](https://github.com/aljpetri/isONclust3) ([Petri & Sahlin, 2025](https://doi.org/10.1093/bioinformatics/btaf207)),
@@ -234,6 +237,8 @@ you use it.
 
 If you use `phyloblitz` in published research, please cite the GitHub
 repository URL and software version.
+
+</details>
 
 HTML styling with [Simple.css](https://simplecss.org/)
 """
