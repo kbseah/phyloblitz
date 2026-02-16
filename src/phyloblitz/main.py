@@ -35,6 +35,7 @@ click.rich_click.OPTION_GROUPS = {
                 "align_minlen",
                 "summary_taxlevel",
                 "min_clust_size",
+                "flanking",
                 "resume",
                 "debug",
             ],
@@ -46,7 +47,7 @@ click.rich_click.OPTION_GROUPS = {
         },
         {
             "name": "Experimental",
-            "options": ["twopass", "flanking", "parse_supplementary"],
+            "options": ["twopass", "parse_supplementary"],
         },
     ]
 }
@@ -155,6 +156,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
 )
 @click.option(
+    "--flanking",
+    help="Sequence flanking the mapped hits on query reads to extract",
+    default=1000,
+    type=int,
+    show_default=True,
+)
+@click.option(
     "--resume",
     help="Resume partially completed run based on expected filenames",
     default=False,
@@ -189,12 +197,6 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="[EXPERIMENTAL] Extract read segments and map again to reference",
     default=False,
     is_flag=True,
-)
-@click.option(
-    "--flanking",
-    help="[EXPERIMENTAL] Sequence flanking the mapped hits on query reads to extract",
-    default=1000,
-    type=int,
 )
 @click.option(
     "--parse_supplementary",
