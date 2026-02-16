@@ -28,6 +28,11 @@
  - [x] Reference database on Zenodo for SSU and LSU
  - [x] Account for multiple SSUs in one read; see supplementary alignments
 
+
+## v0.3.0 targets
+
+ - [ ] Deprecate two-pass mode
+
 ## Future plans
 
  - [ ] Multisample comparison and co-assembly
