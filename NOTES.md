@@ -116,6 +116,8 @@ only applied to prokaryotes and dsDNA viruses. Produces taxonomy summary but
 the actual marker sequences themselves are not directly accessible.
 
 MetaMaps https://github.com/DiltheyLab/MetaMaps
+uses MashMap to approximately map long reads to reference DB then estimates
+sequence composition with an EM-based method.
 
 MetaPhlAn https://github.com/biobakery/MetaPhlAn for shotgun metagenomes,
 appears to be limited to short reads
