@@ -1,23 +1,6 @@
 ## Pipeline design notes
 
 
-### One or two-pass mappings
-
-Mapper reports primary alignments on the assumption that each read should map
-to a single reference sequence. However, a single read may span more than one
-copy of the SSU rRNA gene if there are multiples of them in the genome; in
-terminology of the SAM specification it would be considered a 'chimeric
-alignment'. These would be reported by minimap2 as supplementary alignments
-(whereas hits to multiple references would be scored as secondary alignments).
-
-What we should do is a first-pass alignment, identify all regions with hits,
-take overlaps and extract those segments, then map them again to get the
-mapping stats.
-
-I'm not sure exactly what's going on with the mapping intervals and why the
-two-pass procedure doesn't yield more coverage. Should investigate further.
-
-
 ### Generating read clusters for assembly
 
 I was hoping that miniasm would generate unitigs directly from minimap2 ava
@@ -70,20 +53,21 @@ between prokaryotes, eukaryotes, organelles, and has exceptions.
 phyloblitz uses minimap2, set to skip reporting of secondary alignments, but to
 report supplementary alignments with soft clipping instead of hard clipping.
 
-For a conventional use case, where metagenomic reads (query) are mapped to a
-reference genome (subject), secondary mappings represent alternative positions
-in the genome that a read may map to, e.g., paralogs or repeat sequences.
-Supplementary mappings represent parts of the read that may map to locations in
-the reference that are discontinuous with the primary mapping.
+In conventional read mapping, metagenomic reads (query) are mapped to a
+reference genome (subject), so secondary mappings represent alternative
+positions in the genome that a read may map to, e.g., paralogs or repeat
+sequences. Supplementary mappings represent parts of the read that may map to
+locations in the reference that are discontinuous with the primary mapping; the
+SAM specification refers to them as 'chimeric alignments'.
 
-In the context of phyloblitz, with long reads (query) mapped to reference
-marker gene database (subject) where the subjects are on average shorter than
-the queries, secondary mappings represent alternative reference sequences that
-a read may map to (e.g. close relatives), whereas supplementary mappings
-represent multiple paralogs or copies of the marker gene on the same read. With
-long reads in the ~kbp range, it is possible that a single read may span two
-copies of the SSU rRNA gene (~1.8 kbp) especially in eukaryotes, where rRNA
-operons are often present as tandem repeat arrays.
+In the context of phyloblitz, long reads (query) are mapped to reference marker
+gene database (subject) where the subjects are on average shorter than the
+queries, so secondary mappings represent alternative reference sequences that a
+read may map to (e.g. close relatives), while supplementary mappings represent
+multiple paralogs or copies of the marker gene on the same read. With long
+reads in the ~kbp range, it is possible that a single read may span two copies
+of the SSU rRNA gene (~1.8 kbp) especially in eukaryotes, where rRNA operons
+are often present as tandem repeat arrays.
 
 TODO: Skip supplementary mappings that are also secondary to other
 supplementary mappings, i.e. they overlap with another supplementary mapping.
@@ -135,6 +119,14 @@ MetaMaps https://github.com/DiltheyLab/MetaMaps
 
 MetaPhlAn https://github.com/biobakery/MetaPhlAn for shotgun metagenomes,
 appears to be limited to short reads
+
+K-mer hashing tools, such as sendsketch.sh from BBtools (see its [user
+guide](https://bbmap.org/docs/guides/BBSketchGuide.md)): Much quicker lookup
+compared to conventional read mapping, powerful tools for searching large
+sequence collections. However results are usually reported as a summary of
+references matched, reads with matches are not reported. Most sketch databases
+are for whole genomes (although JGI does have a sketch server built from SILVA
+database).
 
 For working with amplicon libraries:
 
