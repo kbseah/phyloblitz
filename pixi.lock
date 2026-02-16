@@ -912,7 +912,7 @@ packages:
   timestamp: 1769093650580
 - conda: .
   name: phyloblitz
-  version: 0.1.0
+  version: 0.2.0
   build: pyh4616a5c_0
   subdir: noarch
   variants:
