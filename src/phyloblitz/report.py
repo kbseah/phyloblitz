@@ -140,7 +140,7 @@ def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
     """
     cluster_table_fields = [
         "numseq",
-        "numseg",
+        "numreads",
         "qlen",
         "tophit",
         "higher taxonomy",
@@ -265,9 +265,9 @@ def generate_report_html(stats, histogram_file_path, kmercount_plot_path):
 def per_cluster_summarize(stats):
     out = defaultdict(lambda: defaultdict(dict))
     for c in stats["cluster2seq"]:
-        # unique sequences from which mapped segments are derived
-        seqs = {":".join(i.split(":")[0:-2]) for i in stats["cluster2seq"][c]}
-        out["cluster_" + str(c)]["numseg"] = len(seqs)
+        # unique reads from which mapped segments are derived
+        reads = {":".join(i.split(":")[0:-2]) for i in stats["cluster2seq"][c]}
+        out["cluster_" + str(c)]["numreads"] = len(reads)
         out["cluster_" + str(c)]["numseq"] = len(stats["cluster2seq"][c])
     for c in stats["cluster_tophits"]:
         out[c].update(stats["cluster_tophits"][c])
