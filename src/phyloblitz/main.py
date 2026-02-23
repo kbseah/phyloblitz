@@ -11,7 +11,8 @@ from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies
 
 click.rich_click.OPTION_GROUPS = {
-    "phyloblitz": [
+    "phyloblitz download": [],
+    "phyloblitz run": [
         {
             "name": "Input",
             "options": ["db", "dbindex", "reads", "num_reads", "platform"],
@@ -49,15 +50,33 @@ click.rich_click.OPTION_GROUPS = {
             "name": "Experimental",
             "options": ["parse_supplementary"],
         },
-    ]
+    ],
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
-@click.command(
+@click.group(
     context_settings=CONTEXT_SETTINGS,
-    help="Rapid SSU rRNA marker gene screening of long read metagenomes.",
+    help="Rapid rRNA marker gene screening of long read metagenomes.",
+)
+@click.version_option(version=__version__)
+def main():
+    """Top level command"""
+    pass
+
+
+@main.command(
+    context_settings=CONTEXT_SETTINGS,
+    help="Download reference databases.",
+)
+def download():
+    print("Placeholder text")
+
+
+@main.command(
+    context_settings=CONTEXT_SETTINGS,
+    help="Run phyloblitz pipeline",
 )
 @click.option(
     "--db",
@@ -198,8 +217,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     default=False,
     is_flag=True,
 )
-@click.version_option(version=__version__)
-def main(
+def run(
     db,
     dbindex,
     reads,
