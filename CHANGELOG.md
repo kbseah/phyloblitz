@@ -32,6 +32,11 @@
 ## v0.3.0 targets
 
  - [ ] Deprecate two-pass mode
+ - [ ] Avoid duplicate segments extracted from overlapping supplementary
+       alignments
+ - [ ] Subcommands for run and database download
+ - [ ] Fix the CSS stylesheet
+
 
 ## Future plans
 
@@ -48,5 +53,4 @@
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Benchmarking against defined test datasets
  - [ ] MultiQC integration
- - [ ] Fix the CSS stylesheet
  - [ ] Extract the ITS too?
