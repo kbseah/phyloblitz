@@ -73,6 +73,41 @@ TODO: Skip supplementary mappings that are also secondary to other
 supplementary mappings, i.e. they overlap with another supplementary mapping.
 
 
+## Estimation of sequence accuracy
+
+There are a few ways to report sequence accuracy. Values are usually reported
+in the Phred-scale (Q-scores) but the underlying definitions can differ. Oxford
+Nanopore typically reports single-read accuracy with the BLAST-identity
+definition by alignment against a reference sequence. Base-callers like Guppy
+report base-quality scores which diverge from empirical qualities at higher
+values of Q. See [this blog
+post](https://epi2me.nanoporetech.com/quality-scores/) for details.
+
+In a metagenome sequencing library, sequences originate from a mixture of
+species. Not all of them will be represented by a matching reference sequence
+in the database, so we cannot use the divergence from reference of aligned
+reads to estimate the sequencing error directly.
+
+However, if the species diversity in the metagenome is low to moderate relative
+to the sequencing depth, we can assume that each marker sequence has at least
+two-fold coverage. If we align the extracted marker sequences all-vs-all, we
+expect that the best-matching hit of a given sequence should originate from
+another copy of the same underlying genome.
+
+Consider an underlying sequence $S$, and the observed sequences $s$ and $t$
+derived from $S$. For a given base $i$, the probability that it is correct
+$q = Pr(s_i = S_i) = Pr(t_i = S_i)$, which we assume to be identical for all $i$.
+
+The probability that two observed sequences differ at a given base $i$ is
+approximately 
+$Pr(s_i \neq t_i) \approx 1 - Pr(s_i = S_i) \times Pr(t_i = S_i) = 1 - q^2$,
+assuming that $Pr(s_i = t_i | s_i \neq S_i \intersect t_i \neq S_i) \approx 0$.
+
+We estimate $Pr(s_i \new t_i)$ with the per-base divergence of the
+best-matching hits $d$.
+
+Estimated read quality is therefore $\hat{q} = \sqrt{1 - d}$.
+
 ## Notes
 
 phyloblitz is essentially running nanopore amplicon pipeline, but first mapping
