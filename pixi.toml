@@ -30,49 +30,6 @@ repository = { workspace = true }
 [package.build]
 backend = { name = "pixi-build-python", version = ">=0.4.0,<0.5.0" }
 
-[tasks]
-main = "main"
-test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
-download = """wget -q --output-document=138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
-'https://zenodo.org/records/18627380/files/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta?download=1'"""
-# isonclust3 ont
-run = """phyloblitz --resume --debug --threads 12 --platform lr:hq \
---db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
---reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run \
---parse_supplementary --flanking 1000 --log runtest/run.log"""
-clean = "rm -rf runtest/run runtest/run.log"
-pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
-prun = [{task="test"}, {task="pclean"}, {task="run"}]
-rerun = [{task="test"}, {task="clean"}, {task="run"}]
-# isonclust3 pb
-run_pb = """phyloblitz --resume --debug --threads 12 --platform map-hifi \
---db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
---reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_pb \
---parse_supplementary --flanking 1000 --log runtest/run_pb.log"""
-clean_pb = "rm -rf runtest/run_pb runtest/run_pb.log"
-pclean_pb = "find ./runtest/run_pb -type f ! -name pbz_minimap_initial.sam -delete"
-prun_pb = [{task="test"}, {task="pclean_pb"}, {task="run_pb"}]
-rerun_pb = [{task="test"}, {task="clean_pb"}, {task="run_pb"}]
-# mcl ont
-run_mcl = """phyloblitz --resume --debug --threads 12 --platform lr:hq \
---db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
---reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run_mcl \
---parse_supplementary --flanking 1000 --log runtest/run_mcl.log --cluster_tool mcl --inflation 50"""
-clean_mcl = "rm -rf runtest/run_mcl runtest/run_mcl.log"
-pclean_mcl = "find ./runtest/run_mcl -type f ! -name pbz_minimap_initial.sam -delete"
-prun_mcl = [{task="test"}, {task="pclean_mcl"}, {task="run_mcl"}]
-rerun_mcl = [{task="test"}, {task="clean_mcl"}, {task="run_mcl"}]
-# mcl ont
-run_mcl_pb = """phyloblitz --resume --debug --threads 12 --platform map-hifi \
---db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
---reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_mcl_pb \
---parse_supplementary --flanking 1000 --log runtest/run_mcl_pb.log --cluster_tool mcl --inflation 50"""
-clean_mcl_pb = "rm -rf runtest/run_mcl_pb runtest/run_mcl_pb.log"
-pclean_mcl_pb = "find ./runtest/run_mcl_pb -type f ! -name pbz_minimap_initial.sam -delete"
-prun_mcl_pb = [{task="test"}, {task="pclean_mcl_pb"}, {task="run_mcl_pb"}]
-rerun_mcl_pb = [{task="test"}, {task="clean_mcl_pb"}, {task="run_mcl_pb"}]
-
-
 [package.host-dependencies]
 hatchling = ">=1.16.1"
 editables = ">=0.5"
@@ -87,3 +44,47 @@ mistune = ">=3.1.4,<4"
 numpy = ">=2.3.5,<3"
 matplotlib-base = ">=3.10.8,<4"
 isonclust3 = ">=0.3.0,<0.4"
+
+[tasks]
+main = "main"
+## Unit tests ------------------------------------------------------------------
+test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
+## Download reference databases ------------------------------------------------
+download = """wget -q --output-document=138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+'https://zenodo.org/records/18627380/files/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta?download=1'"""
+## isonclust3 ont --------------------------------------------------------------
+run = """phyloblitz --resume --debug --threads 12 --platform lr:hq \
+--db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+--reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run \
+--parse_supplementary --flanking 1000 --log runtest/run.log"""
+clean = "rm -rf runtest/run runtest/run.log"
+pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
+prun = [{task="test"}, {task="pclean"}, {task="run"}]
+rerun = [{task="test"}, {task="clean"}, {task="run"}]
+## isonclust3 pb ---------------------------------------------------------------
+run_pb = """phyloblitz --resume --debug --threads 12 --platform map-hifi \
+--db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+--reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_pb \
+--parse_supplementary --flanking 1000 --log runtest/run_pb.log"""
+clean_pb = "rm -rf runtest/run_pb runtest/run_pb.log"
+pclean_pb = "find ./runtest/run_pb -type f ! -name pbz_minimap_initial.sam -delete"
+prun_pb = [{task="test"}, {task="pclean_pb"}, {task="run_pb"}]
+rerun_pb = [{task="test"}, {task="clean_pb"}, {task="run_pb"}]
+## mcl ont ---------------------------------------------------------------------
+run_mcl = """phyloblitz --resume --debug --threads 12 --platform lr:hq \
+--db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+--reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run_mcl \
+--parse_supplementary --flanking 1000 --log runtest/run_mcl.log --cluster_tool mcl --inflation 50"""
+clean_mcl = "rm -rf runtest/run_mcl runtest/run_mcl.log"
+pclean_mcl = "find ./runtest/run_mcl -type f ! -name pbz_minimap_initial.sam -delete"
+prun_mcl = [{task="test"}, {task="pclean_mcl"}, {task="run_mcl"}]
+rerun_mcl = [{task="test"}, {task="clean_mcl"}, {task="run_mcl"}]
+## mcl ont ---------------------------------------------------------------------
+run_mcl_pb = """phyloblitz --resume --debug --threads 12 --platform map-hifi \
+--db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
+--reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_mcl_pb \
+--parse_supplementary --flanking 1000 --log runtest/run_mcl_pb.log --cluster_tool mcl --inflation 50"""
+clean_mcl_pb = "rm -rf runtest/run_mcl_pb runtest/run_mcl_pb.log"
+pclean_mcl_pb = "find ./runtest/run_mcl_pb -type f ! -name pbz_minimap_initial.sam -delete"
+prun_mcl_pb = [{task="test"}, {task="pclean_mcl_pb"}, {task="run_mcl_pb"}]
+rerun_mcl_pb = [{task="test"}, {task="clean_mcl_pb"}, {task="run_mcl_pb"}]
