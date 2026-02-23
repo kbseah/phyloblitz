@@ -31,10 +31,11 @@
 
 ## v0.3.0 targets
 
- - [ ] Deprecate two-pass mode
+ - [x] Deprecate two-pass mode
+ - [x] Subcommands for run and database download
  - [ ] Avoid duplicate segments extracted from overlapping supplementary
        alignments
- - [ ] Subcommands for run and database download
+ - [ ] Database download from Zenodo with checksums
  - [ ] Fix the CSS stylesheet
 
 

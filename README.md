@@ -32,13 +32,94 @@ references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 ## Installation
 
+phyloblitz is distributed via [Bioconda](https://bioconda.github.io/). Read
+[this explainer](https://conda.org/blog/2024-08-14-conda-ecosystem-explained/)
+if you are new to the Conda ecosystem. I recommend either installing
+Conda/Mamba with [Miniforge](https://conda-forge.org/download/) or using
+[pixi](https://pixi.prefix.dev/latest/).
+
+
+### Install with Conda/Mamba
+
+Set up your Conda/Mamba configuration as recommended for Bioconda, if you have
+not already done so:
+
+```console
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+```
+
+Install phyloblitz to a new environment (here named `phyloblitz_env`):
+
+```console
+conda create -n phyloblitz_env phyloblitz
+```
+
+Activate environment and view help message:
+
+```console
+conda activate phyloblitz_env
+phyloblitz --help
+```
+
+
+### Install with Pixi
+
+Configure [pixi](https://pixi.prefix.dev/latest/) to use Bioconda channel in
+addition to conda-forge:
+
+```console
+pixi config set default-channels '["conda-forge", "bioconda"]'
+```
+
+Create a new pixi workspace in a folder named `phyloblitz_workspace` and
+install phyloblitz there:
+
+```console
+mkdir phyloblitz_workspace
+cd phyloblitz_workspace
+pixi init
+pixi add phyloblitz
+```
+
+Start a pixi shell session and view help message:
+
+```console
+pixi shell
+phyloblitz --help
+```
+
+Use Ctrl-D or `exit` to exit the pixi shell session.
+
+
+### Install as a container from BioContainers
+
+Bioconda packages are automatically containerized and uploaded to the
+[BioContainers](https://biocontainers.pro/tools/phyloblitz) registry, so you
+could simply pull the container with either [Docker](https://www.docker.com/),
+[Singularity](https://sylabs.io/docs/), or [Apptainer](https://apptainer.org/)
+(my preference for HPC environments):
+
+```console
+docker pull quay.io/biocontainers/phyloblitz:0.2.0--pyhdfd78af_0
+```
+
+```console
+singularity pull phyloblitz.sif docker://quay.io/biocontainers/phyloblitz:0.2.0--pyhdfd78af_0
+```
+
 
 ### Development version
 
-Dependencies are managed with [pixi](https://pixi.sh/). When `pixi shell` is
-run for the first time in the folder containing the `pixi.toml` configuration
-file, pixi will resolve and install dependencies. Run `phyloblitz` without
-arguments or with the `--help` parameter to view help message.
+**Note: Currently not accepting pull requests. Please create an issue if you
+want to contribute.**
+
+Build and run time dependencies are managed with [pixi](https://pixi.sh/). When
+`pixi shell` is run for the first time in the folder containing the `pixi.toml`
+configuration file, pixi will resolve and install dependencies. Run
+`phyloblitz` without arguments or with the `--help` parameter to view help
+message.
 
 ```console
 git clone git@github.com:kbseah/phyloblitz.git
@@ -106,11 +187,11 @@ sufficient for a quick overview.
 
  * Map reads to SILVA with minimap2 and retain only mapped reads
  * Summarize taxonomy across mapped reads, using consensus taxonomy of each read
- * Extract aligned portion of mapped reads, use primary alignment only
-     otherwise we get duplicate read segments with slightly differing
-     boundaries
- * Sequence clustering, either with isONclust3 or minimap2 + mcl
- * Assemble consensus sequence per read cluster with spoa
+ * Extract aligned portion of mapped reads, including supplementary alignments
+   to account for multiple marker genes in one read. Also extract flanking
+   sequence context to identify potential strain diversity.
+ * Cluster extracted segments, either with isONclust3 or minimap2 + mcl
+ * Assemble a consensus sequence per read cluster with spoa
  * Generate metrics per cluster for diagnostics: expect similar error rate per
      read vs. consensus, identify clusters with too few reads (TODO)
 
