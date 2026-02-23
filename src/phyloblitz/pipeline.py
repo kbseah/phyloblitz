@@ -254,7 +254,6 @@ class Pipeline:
     OUTFILE_SUFFIX = {
         "initial_map": "_minimap_initial.sam",
         "intervals_fastq": "_intervals.fastq",
-        "second_map": "_minimap_second.sam",
         "mapped_segments": "_mapped.fastq",
         "ava_map": "_ava.paf",
         "ava_filter": "_ava_filter.paf",
@@ -384,10 +383,10 @@ class Pipeline:
 
     @check_stage_file(
         stage="second_map",
-        message="[EXPERIMENTAL] Twopass mode: Second mapping of extracted intervals for taxonomic summary",
+        message="[DEPRECATED] Twopass mode: Second mapping of extracted intervals for taxonomic summary",
     )
     def run_minimap_secondmap(self, threads=12, mode="map-ont"):
-        """Map reads to reference database with minimap2
+        """DEPRECATED Map reads to reference database with minimap2
 
         Only report reads that are mapped.
 
@@ -427,9 +426,10 @@ class Pipeline:
 
     @check_stage_file(
         stage="intervals_fastq",
-        message="[EXPERIMENTAL] Twopass mode: Extract aligned intervals on reads",
+        message="[DEPRECATED] Twopass mode: Extract aligned intervals on reads",
     )
     def twopass_extract_read_intervals(self, minlen=1200):
+        """DEPRECATED"""
         merged_intervals = get_firstpass_intervals(
             self.pathto("initial_map"), minlen=minlen
         )
@@ -455,9 +455,9 @@ class Pipeline:
         message="Extracting read segments for all-vs-all mapping",
     )
     def extract_reads_for_ava(
-        self, twopass=False, align_minlen=1200, parse_supplementary=False, flanking=0
+        self, align_minlen=1200, parse_supplementary=False, flanking=0
     ):
-        sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
+        sam_file = self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
         with open(self.pathto("mapped_segments"), "w") as fq_fh:
@@ -923,8 +923,8 @@ class Pipeline:
         }
         return common_taxstrings
 
-    def summarize_initial_mapping_taxonomy(self, twopass, minlen, taxlevel=4):
-        sam_file = self.pathto("second_map") if twopass else self.pathto("initial_map")
+    def summarize_initial_mapping_taxonomy(self, minlen, taxlevel=4):
+        sam_file = self.pathto("initial_map")
         logger.info("Summarizing taxonomic composition of initial mapping")
         common_taxstrings = self._per_read_consensus_taxonomy(sam_file, minlen)
         self._stats.update(

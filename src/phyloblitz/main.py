@@ -47,7 +47,7 @@ click.rich_click.OPTION_GROUPS = {
         },
         {
             "name": "Experimental",
-            "options": ["twopass", "parse_supplementary"],
+            "options": ["parse_supplementary"],
         },
     ]
 }
@@ -193,12 +193,6 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     "--inflation", help="Inflation parameter for MCL", default=2, show_default=True
 )
 @click.option(
-    "--twopass",
-    help="[EXPERIMENTAL] Extract read segments and map again to reference",
-    default=False,
-    is_flag=True,
-)
-@click.option(
     "--parse_supplementary",
     help="[EXPERIMENTAL] Parse supplementary alignments in minimap2 mapping",
     default=False,
@@ -227,7 +221,6 @@ def main(
     dv_max,
     dv_max_auto,
     inflation,
-    twopass,
     flanking,
     parse_supplementary,
 ):
@@ -261,7 +254,6 @@ def main(
                 "dv_max",
                 "dv_max_auto",
                 "inflation",
-                "twopass",
                 "flanking",
                 "parse_supplementary",
             ],
@@ -287,7 +279,6 @@ def main(
                 dv_max,
                 dv_max_auto,
                 inflation,
-                twopass,
                 flanking,
                 parse_supplementary,
             ],
@@ -339,14 +330,8 @@ def main(
     p = pipeline.Pipeline(args)
     p.run_minimap(threads=threads, mode=platform, sample=num_reads)
 
-    if twopass:
-        logger.info("[EXPERIMENTAL] Applying two-pass mode")
-        p.twopass_extract_read_intervals(minlen=align_minlen)
-        p.run_minimap_secondmap(threads=threads, mode=platform)
-
     # Extract reads for clustering
     p.extract_reads_for_ava(
-        twopass=twopass,
         align_minlen=align_minlen,
         parse_supplementary=parse_supplementary,
         flanking=flanking,
@@ -380,7 +365,6 @@ def main(
     # Taxonomy summary
     p.db_taxonomy()
     p.summarize_initial_mapping_taxonomy(
-        twopass=twopass,
         minlen=align_minlen,
         taxlevel=summary_taxlevel,
     )
