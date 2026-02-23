@@ -6,7 +6,7 @@ from os import makedirs
 
 import rich_click as click
 
-from phyloblitz import pipeline
+from phyloblitz import pipeline, downloads
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies
 
@@ -70,8 +70,62 @@ def main():
     context_settings=CONTEXT_SETTINGS,
     help="Download reference databases.",
 )
-def download():
-    print("Placeholder text")
+@click.option(
+    "--list_versions",
+    "-l",
+    help="List available database versions",
+    default=False,
+    is_flag=True,
+)
+@click.option(
+    "--which_db",
+    help="Which database to download",
+    type=click.Choice(["SSU", "LSU"]),
+    default="SSU",
+    show_default=True,
+)
+@click.option(
+    "--db_version",
+    help="Version of database to download, use --list to see available versions; if not specified, will download latest version",
+    default="latest",
+    show_default=True,
+)
+@click.option(
+    "--debug",
+    help="Display logging DEBUG level messages to console",
+    default=False,
+    is_flag=True,
+)
+def download(list_versions, which_db, db_version, debug):
+    logging.basicConfig(level=logging.DEBUG)
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()  # avoid duplicate handlers
+    logger = logging.getLogger(__name__)  # Logger for this module
+
+    console_handler = logging.StreamHandler(sys.stderr)
+    if debug:
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        console_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    if list_versions:
+        versions = downloads.list_versions()
+        for v in versions:
+            print(
+                f"Version: {v}, DOI: {versions[v]['doi']}, Created: {versions[v]['created']}"
+            )
+            for f in versions[v]["files"]:
+                print(
+                    f"  Marker: {f['marker']}, Filename: {f['filename']}, Size: {f['size']} bytes, Checksum: {f['checksum']}"
+                )
+    else:
+        print("Placeholder text")
 
 
 @main.command(
