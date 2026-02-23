@@ -107,9 +107,9 @@ How about iterative fishing assembler?
 From metagenomes:
 
 PenguiN assembler https://github.com/soedinglab/plass designed as a
-strain-resolved de novo metagenomic assembler for viruses and microbial 16S
-rRNA; limited to short reads (for now), closest to the phyloFlash targeted
-marker assembly approach
+strain-resolved de novo metagenomic assembler for protein-coding sequences, as
+well as viruses and microbial 16S rRNA; limited to short reads (for now),
+closest to the phyloFlash targeted marker assembly approach
 
 SingleM https://wwood.github.io/singlem/ uses protein coding markers, so far
 only applied to prokaryotes and dsDNA viruses. Produces taxonomy summary but
@@ -140,13 +140,17 @@ Emu https://github.com/treangenlab/emu for long reads, implementing EM
 algorithm for read classification, only outputs a summary table, may
 over-classify
 
-phyloblitz statement of novelty: works with long reads, lightweight database
-and fast execution, works with eukaryotes and organelles, better with divergent
-lineages because SSU is more conserved (flip side is that it is less sensitive
-to strain differences), still can give usable results with noisy data. With
-full-length assembled consensus, user can perform more detailed phylogenetic
-analysis, not just stop at taxonomy summary. Also useful for lower-coverage
-components of the metagenome.
+phyloblitz statement of novelty:
+ * Works with long reads
+ * Lightweight database and fast execution
+ * Works with eukaryotes and organelles, better with divergent lineages because
+   rRNA genes are more conserved than protein-coding sequences (flip side is
+   that it is less sensitive to strain differences), still can give usable
+   results with noisy data.
+ * Underlying reads and full-length assembled consensus are returned, so user
+   can perform more detailed phylogenetic analysis, not just stop at a taxonomy
+   summary.
+ * Also useful for lower-coverage components of the metagenome.
 
 Intended users: Working with low- to moderate-diversity metagenomes, aim to do
 QC to determine metagenome composition before de novo assembly and binning,
