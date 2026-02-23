@@ -2,9 +2,9 @@
 
 **Rapid SSU rRNA marker gene screening of long read metagenomes.**
 
-![GitHub Tag](https://img.shields.io/github/v/tag/kbseah/phyloblitz)
-![GitHub License](https://img.shields.io/github/license/kbseah/phyloblitz)
-![Conda Version](https://img.shields.io/conda/vn/bioconda/phyloblitz)
+[![GitHub Tag](https://img.shields.io/github/v/tag/kbseah/phyloblitz)](https://github.com/kbseah/phyloblitz/tags)
+[![GitHub License](https://img.shields.io/github/license/kbseah/phyloblitz)](https://github.com/kbseah/phyloblitz?tab=MIT-1-ov-file)
+[![Conda Version](https://img.shields.io/conda/vn/bioconda/phyloblitz)](https://anaconda.org/channels/bioconda/packages/phyloblitz/overview)
 
 
 Note: This tool is still under development and the interface may change without
