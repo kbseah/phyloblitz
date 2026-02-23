@@ -101,9 +101,9 @@ $q = Pr(s_i = S_i) = Pr(t_i = S_i)$, which we assume to be identical for all $i$
 The probability that two observed sequences differ at a given base $i$ is
 approximately 
 $Pr(s_i \neq t_i) \approx 1 - Pr(s_i = S_i) \times Pr(t_i = S_i) = 1 - q^2$,
-assuming that $Pr(s_i = t_i | s_i \neq S_i \intersect t_i \neq S_i) \approx 0$.
+assuming that $Pr(s_i = t_i | s_i \neq S_i \cap t_i \neq S_i) \approx 0$.
 
-We estimate $Pr(s_i \new t_i)$ with the per-base divergence of the
+We estimate $Pr(s_i \neq t_i)$ with the per-base divergence of the
 best-matching hits $d$.
 
 Estimated read quality is therefore $\hat{q} = \sqrt{1 - d}$.
