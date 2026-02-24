@@ -2,7 +2,6 @@
 
 import logging
 import sys
-from os import makedirs
 
 import rich_click as click
 
@@ -170,12 +169,23 @@ def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, deb
         logger.error(str(e))
         sys.exit(1)
 
-    if filepath is not None:
-        logger.info(f"Database file downloaded to {filepath}")
-    elif dryrun:
+    if dryrun:
         logger.info("Dry run complete, no file downloaded")
     else:
-        logger.error("Database file download failed")
+        logger.info(f"Database file downloaded to {filepath}")
+
+    try:
+        checksum_ok = downloads.check_md5sum_file(versions, which_db, db_version, filepath)
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+    if checksum_ok:
+        logger.info("MD5 checksum OK")
+        logger.info("------------ phyloblitz download complete ------------")
+        sys.exit(0)
+    else:
+        logger.error("MD5 checksum does not match expected value!")
+        sys.exit(1)
 
 
 @main.command(
