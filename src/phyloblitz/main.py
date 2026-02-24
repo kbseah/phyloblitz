@@ -118,20 +118,25 @@ def main():
     default=False,
     is_flag=True,
 )
-# TODO: Log file
-# TODO: Turn off progress bar
-def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug):
+@click.option("--log", help="Write logging messages to this file", type=click.Path())
+def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
     loglevel = logging.DEBUG if debug else logging.INFO
+    root_logger.addHandler(RichHandler(level=loglevel))
+
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    root_logger.addHandler(RichHandler(level=loglevel))
+    if log:
+        logfile_handler = logging.FileHandler(log)
+        logfile_handler.setFormatter(formatter)
+        logfile_handler.setLevel(logging.DEBUG)
+        root_logger.addHandler(logfile_handler)
 
     versions, latest = downloads.list_versions()
     logger.debug(f"Latest version is {latest!s}")
@@ -181,10 +186,12 @@ def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, deb
     if checksum_ok:
         logger.info("MD5 checksum OK")
         logger.info("------------ phyloblitz download complete ------------")
-        sys.exit(0)
     else:
         logger.error("MD5 checksum does not match expected value!")
         sys.exit(1)
+
+    if log:
+        logfile_handler.close()
 
 
 @main.command(
