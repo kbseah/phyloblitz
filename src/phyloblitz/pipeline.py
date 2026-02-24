@@ -59,7 +59,7 @@ def get_firstpass_intervals(sam_file, minlen=1200):
     return {i: merge_intervals(regions[i]) for i in regions}
 
 
-def merge_intervals(intervals: list):
+def merge_intervals(intervals: list) -> list:
     """Merge overlapping numerical intervals.
 
     :param intervals: List of tuples of (start, end) coordinates
@@ -125,22 +125,17 @@ def sam_seq_generator(sam_file, minlen=1200, no_supplementary=False, flanking=0)
         yield (name, seq, quals, pre_seq, pre_quals, post_seq, post_quals)
 
 
-def spoa_assemble_fasta(label_fastq):
+def spoa_assemble_fasta(label_fastq:tuple) -> tuple(str, str):
     """Run spoa assembly on a Fastq input file.
 
     :param label_fastq: Tuple of input label (str) and path to Fastq file with
         reads to assemble
-    :returns: Alignment of consensus and input sequences in Fasta format
-        (stdout from spoa -r 2)
-    :rtype: str
+    :returns: Tuple of input label and alignment of consensus and input
+        sequences in Fasta format (stdout from spoa -r 2)
+    :rtype: tuple
     """
     label, fastq = label_fastq
-    cmd = [
-        "spoa",
-        "-r",
-        "2",
-        fastq,
-    ]
+    cmd = [ "spoa", "-r", "2", fastq ]
     logger.debug("spoa command: %s", " ".join(cmd))
     proc = Popen(cmd, stdout=PIPE, text=True)
     # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
@@ -150,10 +145,13 @@ def spoa_assemble_fasta(label_fastq):
     return label, out
 
 
-def parse_spoa_r2(fasta):
+def parse_spoa_r2(fasta:str) -> dict:
     """Parse spoa gapped alignment + consensus in Fasta format (-r 2 output).
 
     :param fasta: Assembly from spoa as list of strings
+    :returns: dict of sequences (multiple lines concatenated) keyed by headers.
+        The conensus sequence assembled by spoa must have key "Consensus".
+    :rtype: dict
     """
     seqs = {}
     prev_hdr = ""
@@ -174,7 +172,7 @@ def parse_spoa_r2(fasta):
     return seqs
 
 
-def count_spoa_aln_vars(seqs):
+def count_spoa_aln_vars(seqs:dict) -> dict:
     """Count mismatches and gaps vs consensus for each sequence in a cluster.
 
     :param seqs: Dict of sequences parsed by parse_spoa_r2; the consensus
@@ -208,7 +206,7 @@ def count_spoa_aln_vars(seqs):
     return var
 
 
-def count_spoa_aln_persite_vars(seqs):  # TODO WIP
+def count_spoa_aln_persite_vars(seqs:dict) -> dict:  # TODO WIP
     """Count mismatches/gaps per alignment position for clustered sequences vs consensus.
 
     If mismatches/gaps between sequences and the consensus are solely due to
@@ -216,11 +214,14 @@ def count_spoa_aln_persite_vars(seqs):  # TODO WIP
     underlying reads, we expect fraction of variants per site to be roughly the
     sequencing error. If for example two sequences are misclustered, then we
     should see a secondary peak of ~50% variant coverage.
+
+    :param seqs: Dict of sequences parsed by parse_spoa_r2; the consensus
+        sequence must have key "Consensus"
     """
     var = {}
     for i in range(len(seqs["Consensus"])):
         column = [seqs[hdr][i] for hdr in seqs if hdr != "Consensus"]
-        values, counts = np.unique(column, return_counts=True)
+        _values, counts = np.unique(column, return_counts=True)
         counts_norm = counts / counts.sum()
         var[i] = -(counts_norm * np.log(counts_norm) / np.log(2)).sum()
     return var
@@ -229,8 +230,8 @@ def count_spoa_aln_persite_vars(seqs):  # TODO WIP
 class Pipeline:
     """phyloblitz pipeline run object."""
 
-    def __init__(self, args):
-        """Constructor for Pipeline."""
+    def __init__(self, args:dict) -> None:
+        """Construct Pipeline object."""
         self._ref = args["db"]  # Path to reference database Fasta file
         # Path to reference database Minimap2 index (optional)
         self._refindex = args["dbindex"]
@@ -263,15 +264,16 @@ class Pipeline:
         "report_kmercount_plot": "_report_kmercount_plot.png",
     }
 
-    def check_run_file(self, stage):
+    def check_run_file(self, stage:str) -> bool:
         """Check if intermediate output file has been created.
 
         :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
         :returns: True if file already exists at expected path
+        :rtype: bool
         """
         return os.path.isfile(self.pathto(stage))
 
-    def pathto(self, stage, basename_only=False):
+    def pathto(self, stage:str, basename_only:bool=False):
         """Combine output directory prefix and filenames to intermediate file path.
 
         :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
@@ -285,7 +287,17 @@ class Pipeline:
         except KeyError as e:
             raise Exception(f"Unknown intermediate file {stage}") from e
 
-    def check_stage_file(stage, message):
+    def check_stage_file(stage:str, message:str):
+        """Check whether outputs for each stage of Pipeline already exist.
+
+        Output files are checked by their expected filenames. If the expected
+        outputs already exist, the stage is skipped entirely. Use this function
+        as a decorator for individual stage methods. Enables resuming the
+        pipeline from partial output.
+
+        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+        :param message: Logging message to emit on starting each stage
+        """
         # TODO specify more than one output file; check required input files
         def check_stage_decorator(func):
             @wraps(func)
@@ -445,8 +457,20 @@ class Pipeline:
         message="Extracting read segments for all-vs-all mapping",
     )
     def extract_reads_for_ava(
-        self, align_minlen=1200, no_supplementary=False, flanking=0
-    ):
+        self, align_minlen:int=1200, no_supplementary:bool=False, flanking:int=0
+    ) -> None:
+        """Extract read segments aligning to markers for all-vs-all mapping.
+
+        Segments aligning to marker database are extracted in Fastq format to a
+        new file, for the next clustering steps. Flanking sequences are also
+        extracted, not to the Fastq file but to a separate dictionary in the
+        Pipeline object, so they do not influence the marker clustering and
+        assembly.
+
+        :param align_minlen: Minimum alignment length in bp
+        :param no_supplementary: Ignore supplementary alignments if True
+        :param flanking: Length of flanking sequence to extract, in bp
+        """
         sam_file = self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
@@ -483,8 +507,12 @@ class Pipeline:
         stage="ava_map",
         message="All-vs-all mapping of mapped reads with minimap2",
     )
-    def ava_map(self, mode="map-ont", threads=12):
+    def ava_map(self, mode:str="map-ont", threads:int=12):
         """All-vs-all mapping with minimap2 to generate clusters for assembly.
+
+        Minimap2 presets for Nanopore and PacBio CLR are applied. For Nanopore
+        Q20+ and PacBio HiFi/CCS reads, the "ava" presets were modified to
+        reflect their lower sequence error.
 
         :param mode: Mapping preset mode used for initial minimap2 mapping step
         :param threads: Number of threads for minimap2 to use
@@ -519,6 +547,19 @@ class Pipeline:
         message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
     )
     def paf_file_filter_overhangs(self, max_overhang_frac=0.05):
+        """Remove all-vs-all alignments with incompatible overhangs.
+
+        All-vs-all alignments of extracted marker read segments will be
+        clustered and used to assemble consensus marker sequences. However the
+        alignments are not always end-to-end, but may have soft-clipped
+        overhangs, when two sequences share a conserved middle portion but are
+        divergent elsewhere. This leads to over-clustering, so such alignments
+        with incompatible overhangs must be filtered out. Filtered alignments
+        are written to a new file.
+
+        :param max_overhang_frac: Max fraction of read length that same-side
+            overhang is allowed to be, passed to filter_paf_overhang()
+        """
         logger.info("Max overhang fraction: %f", max_overhang_frac)
         counter_all = 0
         counter = 0
@@ -534,7 +575,15 @@ class Pipeline:
                     fh_out.write(out)
         logger.info("Retained %d out of %d all-vs-all alignments", counter, counter_all)
 
-    def paf_get_dvs(self):
+    def paf_get_dvs(self) -> None:
+        """Read and summarize the per-base divergence scores from PAF alignments.
+
+        Minimap2 reports per-base divergence for each PAF alignment in the dv:
+        tag. We analyze the distribution of dv values from all-vs-all mappings
+        as a reference-free measure of sequence error, and also use it to set
+        the cutoffs for clustering with the mcl method. Updates the _stats in
+        the Pipeline object.
+        """
         logger.info("Reading dvs data from ava mapping")
         dvs = defaultdict(list)
         with open(self.pathto("ava_filter")) as fh:
@@ -561,8 +610,15 @@ class Pipeline:
         stage="mcl_cluster",
         message="Clustering with mcl",
     )
-    def pymcl_cluster(self, dv_max=0.03, dv_max_auto=False, inflation=2):
-        """Cluster with MCL implemented in pymarkovclustering.
+    def pymcl_cluster(self, dv_max:float=0.03, dv_max_auto:bool=False, inflation:float=2) -> None:
+        """Cluster marker read segments with MCL algorithm.
+
+        Cluster read segments with the MCL algorithm, using one minus the
+        sequence divergences from the (filtered) all-vs-all alignments as the
+        edge score. The threshold divergence value can be hardcoded, or
+        adjusted to the observed distribution, to account for different
+        sequencing errors across libraries and platforms. The default inflation
+        parameter was empirically chosen.
 
         :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
         :param dv_max_auto: Set dv_max to max(0.001, 2 * median all-vs-all
@@ -598,6 +654,14 @@ class Pipeline:
         message="Clustering with isonclust3",
     )
     def isonclust3_cluster(self):
+        """Cluster marker read segments with isONclust3.
+
+        isONclust3 was originally designed for long-read transcriptome
+        datasets, and uses minimizers with iterative cluster merging. The
+        default preset for Nanopore, "ont", is applied here for both legacy and
+        Q20+ Nanopore reads, while the "pacbio" preset is used for both PacBio
+        CLR and HiFi.
+        """
         if self._platform in ["lr:hq", "map-ont"]:
             isonclust3_mode = "ont"
         elif self._platform in ["map-hifi", "map-pb"]:
@@ -623,7 +687,7 @@ class Pipeline:
             logger.debug("  isonclust3 log: %s", l.decode().rstrip())
         return proc.wait()
 
-    def _cluster_seqs_from_mcl(self, mcl_out, reads, keeptmp, min_clust_size=5):
+    def _cluster_seqs_from_mcl(self, mcl_out, reads, keeptmp, min_clust_size=5) -> tuple:
         """Extract sequences from each MCL cluster to separate Fastq files for assembly.
 
         :param mcl_out: Path MCL output file
@@ -665,14 +729,14 @@ class Pipeline:
 
     def _cluster_seqs_from_isonclust3(
         self, isonclust3_out, reads, keeptmp, min_clust_size=5
-    ):
+    ) -> tuple:
         """Extract sequences from each isONclust3 cluster to separate Fastq files for assembly.
 
         The numbering of clusters by isONclust3 itself is not consistent
         between the final_clusters.tsv file and the output fastq files; best to
         extract the sequences ourselves.
 
-        :param isonclust3_out: Path isONclust3 output file
+        :param isonclust3_out: Path to isONclust3 output file
         :param reads: Path to reads from extract_reads_for_ava step
         :param keeptmp: Keep temporary files?
         :param min_clust_size: Minimum cluster size to return Fastq file
@@ -714,8 +778,20 @@ class Pipeline:
         message="Extract cluster sequences and assemble with spoa",
     )
     def assemble_clusters(
-        self, cluster_tool="isonclust3", threads=12, keeptmp=False, min_clust_size=5
-    ):
+        self, cluster_tool:str="isonclust3", threads:int=12, keeptmp:bool=False, min_clust_size:int=5
+    ) -> None:
+        """Extract cluster sequences and assemble with spoa
+
+        Extract read segments for each cluster to separate Fastq files and
+        assemble consensus sequence for each with Spoa. Assembly step is
+        embarrassingly parallelized.
+
+        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3"
+        :param threads: Number of parallel assembly jobs to run
+        :param keeptmp: If True, do not delete Fastq files with extracted reads
+        :param min_clust_size: Only assemble clusters containing at least this
+            number of reads.
+        """
         if cluster_tool == "mcl":
             fastq_handles, cluster2seq = self._cluster_seqs_from_mcl(
                 self.pathto("mcl_cluster"),
@@ -740,7 +816,7 @@ class Pipeline:
                 "total reads in clusters": sum(
                     [len(cluster2seq[c]) for c in cluster2seq]
                 ),
-            }
+            },
         )
         # TODO downsample if >500 sequences in cluster
         logger.info("Assemble consensus from clustered sequences with spoa")
@@ -768,7 +844,7 @@ class Pipeline:
                 "cluster variant counts": cluster_variant_counts,
                 "cluster persite variant counts": cluster_persite_variant_counts,  # TODO WIP
                 "cluster cons parsed": cluster_cons_parsed,
-            }
+            },
         )
         with open(self.pathto("cluster_asm"), "w") as fh:
             fh.writelines(
@@ -779,8 +855,16 @@ class Pipeline:
             )
             logger.info("Assembled sequences written to %s", self.pathto("cluster_asm"))
 
-    def cluster_flanking_isonclust3(self):
-        """Cluster flanking sequences with isonclust3 and report number of groups."""
+    def cluster_flanking_isonclust3(self) -> None:
+        """Cluster flanking sequences with isonclust3 and report number of groups.
+
+        rRNA marker genes are more conserved than most genes and intergenic
+        sequences. Different strains of the same species may therefore have
+        similar or even identical marker sequence, and end up represented in
+        the same cluster. As a measure of the potential diversity in each
+        cluster, sequence flanking the conserved markers is also extracted and
+        clustered, and the resulting number of clusters is reported.
+        """
         logger.info("Clustering flanking sequences with isonclust3")
         if self._platform in ["lr:hq", "map-ont"]:
             isonclust3_mode = "ont"
@@ -831,8 +915,16 @@ class Pipeline:
                         cluster_flanking_numclust[cluster] = int(num_clusters.group(1))
         self._stats["cluster flanking numclust"] = cluster_flanking_numclust
 
-    def cluster_flanking_kmercount(self, k=11, minlen=500):
-        """Count kmers from flanking sequences per cluster."""
+    def cluster_flanking_kmercount(self, k:int=11, minlen:int=500) -> None:
+        """Count kmers from flanking sequences per cluster.
+
+        As an alternative to clustering flanking sequences, report the k-mer
+        multiplicity to be visualized with cluster_flanking_kmercount_plot().
+        Counts are stored in the _stats slot of the Pipeline object.
+
+        :param k: K-mer length, in bp
+        :param minlen: Only count k-mers for flanking sequence at least this length
+        """
         logger.info("Counting k-mers from flanking sequences per cluster")
         kmer_tables = {}
         for cluster in self._stats["cluster2seq"]:
@@ -856,6 +948,18 @@ class Pipeline:
         message="Generate k-mer multiplicity plot for report",
     )
     def cluster_flanking_kmercount_plot(self, k=11, min_clust_size=5):
+        """Plot k-mer multiplicity of flanking sequences for report.
+
+        The k-mer multiplicity plot gives a visual impression of the sequence
+        error and sequence depth for each cluster, and together with other
+        metrics can help in judging whether there is adequate coverage for
+        assembling the genome(s) represented by a cluster, in addition to the
+        potential strain diversity.
+
+        :param k: K-mer length, in bp
+        :param min_clust_size: Only report for clusters containing at least this
+            number of reads.
+        """
         cluster_ids = {
             i: len(self._stats["cluster2seq"][i])
             for i in self._stats["cluster2seq"]
@@ -885,11 +989,11 @@ class Pipeline:
             axs[idx].set_xlim(-2, max_kmer_cov + 2)
         fig.savefig(self.pathto("report_kmercount_plot"))
 
-    def db_taxonomy(self):
+    def db_taxonomy(self) -> None:
         """Get taxonomy string from SILVA headers in database Fasta file.
 
-        :returns: Dict of taxonomy strings keyed by SILVA accession
-        :rtype: dict
+        Parse SILVA-style headers to get dict of taxonomy strings keyed by
+        accession; stored in the _acc2tax slot of Pipeline object.
         """
         logger.info("Reading taxonomy from SILVA database file")
         self._acc2tax = {}
@@ -902,10 +1006,15 @@ class Pipeline:
                     self._acc2tax[acc] = taxstring
         logger.debug(" Accessions read: %d", len(self._acc2tax))
 
-    def _per_read_consensus_taxonomy(self, sam_file, minlen=1200):
-        """Summarize taxonomy from initial mapping with minimap2.
+    def _per_read_consensus_taxonomy(self, sam_file:str, minlen:int=1200) -> dict:
+        """Consensus taxonomy of a single read from initial mapping with minimap2.
 
         :param sam_file: Path to SAM file of initial mapping
+        :param minlen: Only consider alignments where query_alignment_length is
+            this value and above.
+        :returns: dict with consensus taxonomy (produced by
+            lists_common_prefix()) keyed by accession.
+        :rtype: dict
         """
         all_taxstrings = defaultdict(list)
         sam = pysam.AlignmentFile(sam_file, "r")
@@ -914,7 +1023,14 @@ class Pipeline:
                 all_taxstrings[i.query_name].append(self._acc2tax[i.reference_name])
         return {acc: lists_common_prefix(all_taxstrings[acc]) for acc in all_taxstrings}
 
-    def summarize_initial_mapping_taxonomy(self, minlen, taxlevel=4):
+    def summarize_initial_mapping_taxonomy(self, minlen:int, taxlevel:int=4) -> None:
+        """Summarize taxonomy at a specified taxonomy level from initial mapping.
+
+        :param minlen: Only consider alignments where query_alignment_length is
+            this value and above.
+        :param taxlevel: Taxon level to generate summary (1-based, where 1
+            represents the highest taxon level).
+        """
         sam_file = self.pathto("initial_map")
         logger.info("Summarizing taxonomic composition of initial mapping")
         common_taxstrings = self._per_read_consensus_taxonomy(sam_file, minlen)
@@ -958,11 +1074,11 @@ class Pipeline:
             logger.debug("  minimap log: %s", l.decode().rstrip())
         return proc.wait()
 
-    def summarize_tophit_paf(self):
+    def summarize_tophit_paf(self) -> None:
         """Summarize top hits of assembled seqs mapped to SILVA database by minimap2.
 
-        :returns: Dict of summary stats for each hit, keyed by query sequence name
-        :rtype: dict
+        Update _self slot with a dict of summary stats for each hit, keyed by
+        query sequence name. 
         """
         out = {}
 
@@ -1032,8 +1148,8 @@ class Pipeline:
                     out[c]["higher taxonomy"] = "; ".join(
                         self._acc2tax[out[c]["tname"]][0:-1],
                     )
-            except KeyError:
-                KeyError(f"Accession {out[c]['tname']} not found in database?")
+            except KeyError as e:
+                raise KeyError(f"Accession {out[c]['tname']} not found in database?") from e
         self._stats.update({"cluster_tophits": out})
 
     @check_stage_file(
