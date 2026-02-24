@@ -35,6 +35,7 @@ click.rich_click.OPTION_GROUPS = {
                 "summary_taxlevel",
                 "min_clust_size",
                 "flanking",
+                "no_supplementary",
                 "resume",
                 "debug",
             ],
@@ -43,10 +44,6 @@ click.rich_click.OPTION_GROUPS = {
             "name": "ava + mcl options",
             "help": "Only used if --cluster_tool mcl is specified",
             "options": ["dv_max", "dv_max_auto", "inflation"],
-        },
-        {
-            "name": "Experimental",
-            "options": ["parse_supplementary"],
         },
     ],
 }
@@ -335,8 +332,8 @@ def download(
     "--inflation", help="Inflation parameter for MCL", default=2, show_default=True
 )
 @click.option(
-    "--parse_supplementary",
-    help="[EXPERIMENTAL] Parse supplementary alignments in minimap2 mapping",
+    "--no_supplementary",
+    help="Ignore supplementary alignments, only parse one marker sequence per read",
     default=False,
     is_flag=True,
 )
@@ -363,7 +360,7 @@ def run(
     dv_max_auto,
     inflation,
     flanking,
-    parse_supplementary,
+    no_supplementary,
 ):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
@@ -395,7 +392,7 @@ def run(
                 "dv_max_auto",
                 "inflation",
                 "flanking",
-                "parse_supplementary",
+                "no_supplementary",
             ],
             [
                 db,
@@ -420,7 +417,7 @@ def run(
                 dv_max_auto,
                 inflation,
                 flanking,
-                parse_supplementary,
+                no_supplementary,
             ],
             strict=False,
         ),
@@ -464,7 +461,7 @@ def run(
     # Extract reads for clustering
     p.extract_reads_for_ava(
         align_minlen=align_minlen,
-        parse_supplementary=parse_supplementary,
+        no_supplementary=no_supplementary,
         flanking=flanking,
     )
 

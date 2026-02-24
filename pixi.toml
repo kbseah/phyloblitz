@@ -59,7 +59,7 @@ download_dry = """phyloblitz download --db_version 138.2 --which_db SSU --outdir
 run = """phyloblitz run --resume --debug --threads 12 --platform lr:hq \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
 --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run \
---parse_supplementary --flanking 1000 --log runtest/run.log"""
+--flanking 1000 --log runtest/run.log"""
 clean = "rm -rf runtest/run runtest/run.log"
 pclean = "find ./runtest/run -type f ! -name pbz_minimap_initial.sam -delete"
 prun = [{task="test"}, {task="pclean"}, {task="run"}]
@@ -68,7 +68,7 @@ rerun = [{task="test"}, {task="clean"}, {task="run"}]
 run_pb = """phyloblitz run --resume --debug --threads 12 --platform map-hifi \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
 --reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_pb \
---parse_supplementary --flanking 1000 --log runtest/run_pb.log"""
+--flanking 1000 --log runtest/run_pb.log"""
 clean_pb = "rm -rf runtest/run_pb runtest/run_pb.log"
 pclean_pb = "find ./runtest/run_pb -type f ! -name pbz_minimap_initial.sam -delete"
 prun_pb = [{task="test"}, {task="pclean_pb"}, {task="run_pb"}]
@@ -77,7 +77,7 @@ rerun_pb = [{task="test"}, {task="clean_pb"}, {task="run_pb"}]
 run_mcl = """phyloblitz run --resume --debug --threads 12 --platform lr:hq \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
 --reads runtest/data/SRR17913200.ssu_sample.fastq.gz --outdir runtest/run_mcl \
---parse_supplementary --flanking 1000 --log runtest/run_mcl.log --cluster_tool mcl --inflation 50"""
+--flanking 1000 --log runtest/run_mcl.log --cluster_tool mcl --inflation 50"""
 clean_mcl = "rm -rf runtest/run_mcl runtest/run_mcl.log"
 pclean_mcl = "find ./runtest/run_mcl -type f ! -name pbz_minimap_initial.sam -delete"
 prun_mcl = [{task="test"}, {task="pclean_mcl"}, {task="run_mcl"}]
@@ -86,7 +86,7 @@ rerun_mcl = [{task="test"}, {task="clean_mcl"}, {task="run_mcl"}]
 run_mcl_pb = """phyloblitz run --resume --debug --threads 12 --platform map-hifi \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
 --reads runtest/data/SRR13128014.ssu_sample.fastq.gz --outdir runtest/run_mcl_pb \
---parse_supplementary --flanking 1000 --log runtest/run_mcl_pb.log --cluster_tool mcl --inflation 50"""
+--flanking 1000 --log runtest/run_mcl_pb.log --cluster_tool mcl --inflation 50"""
 clean_mcl_pb = "rm -rf runtest/run_mcl_pb runtest/run_mcl_pb.log"
 pclean_mcl_pb = "find ./runtest/run_mcl_pb -type f ! -name pbz_minimap_initial.sam -delete"
 prun_mcl_pb = [{task="test"}, {task="pclean_mcl_pb"}, {task="run_mcl_pb"}]

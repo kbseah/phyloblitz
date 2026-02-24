@@ -76,7 +76,7 @@ def merge_intervals(intervals: list):
     return merged
 
 
-def sam_seq_generator(sam_file, minlen=1200, parse_supplementary=False, flanking=0):
+def sam_seq_generator(sam_file, minlen=1200, no_supplementary=False, flanking=0):
     """Filter SAM alignment to get primary mappings for all-vs-all mapping.
 
     This uses pysam.AlignedSegment.query_sequence; if the read is mapped to
@@ -93,8 +93,8 @@ def sam_seq_generator(sam_file, minlen=1200, parse_supplementary=False, flanking
     :param sam_file: Path to SAM file
     :param minlen: Minimum query alignment length; adjust if targeting a
         different gene, e.g. LSU rRNA
-    :param parse_supplementary: Parse supplementary alignments as well
-    :param flanking: [EXPERIMENTAL] Additional flanking sequence to extract
+    :param no_supplementary: Ignore supplementary alignments
+    :param flanking: Additional flanking sequence to extract
     """
     logger.info("Filtering alignment for primary mappings with length >= %d", minlen)
     if flanking > 0:
@@ -103,9 +103,9 @@ def sam_seq_generator(sam_file, minlen=1200, parse_supplementary=False, flanking
     for i in sam.fetch():
         if i.query_alignment_length < minlen or i.query_alignment_sequence is None:
             continue
-        if i.is_secondary or (i.is_supplementary and not parse_supplementary):
+        if i.is_secondary or (i.is_supplementary and no_supplementary):
             continue
-        if i.is_supplementary and parse_supplementary:
+        if i.is_supplementary and not no_supplementary:
             # TODO: Track reads that have supplementary alignments
             logger.debug("Parsing supplementary alignment for read %s", i.query_name)
         mystart = max(0, i.query_alignment_start)
@@ -447,7 +447,7 @@ class Pipeline:
         message="Extracting read segments for all-vs-all mapping",
     )
     def extract_reads_for_ava(
-        self, align_minlen=1200, parse_supplementary=False, flanking=0
+        self, align_minlen=1200, no_supplementary=False, flanking=0
     ):
         sam_file = self.pathto("initial_map")
         counter = 0
@@ -464,7 +464,7 @@ class Pipeline:
             ) in sam_seq_generator(
                 sam_file,
                 minlen=align_minlen,
-                parse_supplementary=parse_supplementary,
+                no_supplementary=no_supplementary,
                 flanking=flanking,
             ):
                 counter += 1
