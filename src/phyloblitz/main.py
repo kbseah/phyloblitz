@@ -64,6 +64,7 @@ def main() -> None:
 @main.command(
     context_settings=CONTEXT_SETTINGS,
     help="Download reference databases.",
+    no_args_is_help=True,
 )
 @click.option(
     "--list_versions",
@@ -193,6 +194,7 @@ def download(
 @main.command(
     context_settings=CONTEXT_SETTINGS,
     help="Run phyloblitz pipeline.",
+    no_args_is_help=True,
 )
 @click.option(
     "--db",

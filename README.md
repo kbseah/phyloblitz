@@ -44,7 +44,7 @@ Conda/Mamba with [Miniforge](https://conda-forge.org/download/) or using
 Set up your Conda/Mamba configuration as recommended for Bioconda, if you have
 not already done so:
 
-```console
+```bash
 conda config --add channels bioconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
@@ -52,13 +52,13 @@ conda config --set channel_priority strict
 
 Install phyloblitz to a new environment (here named `phyloblitz_env`):
 
-```console
+```bash
 conda create -n phyloblitz_env phyloblitz
 ```
 
 Activate environment and view help message:
 
-```console
+```bash
 conda activate phyloblitz_env
 phyloblitz --help
 ```
@@ -69,14 +69,14 @@ phyloblitz --help
 Configure [pixi](https://pixi.prefix.dev/latest/) to use Bioconda channel in
 addition to conda-forge:
 
-```console
+```bash
 pixi config set default-channels '["conda-forge", "bioconda"]'
 ```
 
 Create a new pixi workspace in a folder named `phyloblitz_workspace` and
 install phyloblitz there:
 
-```console
+```bash
 mkdir phyloblitz_workspace
 cd phyloblitz_workspace
 pixi init
@@ -85,7 +85,7 @@ pixi add phyloblitz
 
 Start a pixi shell session and view help message:
 
-```console
+```bash
 pixi shell
 phyloblitz --help
 ```
@@ -101,11 +101,11 @@ could simply pull the container with either [Docker](https://www.docker.com/),
 [Singularity](https://sylabs.io/docs/), or [Apptainer](https://apptainer.org/)
 (my preference for HPC environments):
 
-```console
+```bash
 docker pull quay.io/biocontainers/phyloblitz:0.2.0--pyhdfd78af_0
 ```
 
-```console
+```bash
 singularity pull phyloblitz.sif docker://quay.io/biocontainers/phyloblitz:0.2.0--pyhdfd78af_0
 ```
 
@@ -121,7 +121,7 @@ configuration file, pixi will resolve and install dependencies. Run
 `phyloblitz` without arguments or with the `--help` parameter to view help
 message.
 
-```console
+```bash
 git clone git@github.com:kbseah/phyloblitz.git
 cd phyloblitz
 pixi shell # set up workspace and start pixi shell session
@@ -134,7 +134,7 @@ Required inputs are a preprocessed SILVA reference database and the long read
 files in fastq(.gz) format. After navigating to the phyloblitz folder, fetch
 the (SSU rRNA) database file from Zenodo on the command line with:
 
-```console
+```bash
 pixi run download
 ```
 
@@ -164,7 +164,7 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 
 Refer to the help message for details on the phyloblitz run parameters:
 
-```console
+```bash
 phyloblitz --help
 ```
 
