@@ -24,9 +24,6 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = [
-  "pysam>=0.23.3",
-]
 
 [project.urls]
 Documentation = "https://github.com/kbseah/phyloblitz#readme"
