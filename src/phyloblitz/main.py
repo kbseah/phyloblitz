@@ -73,7 +73,7 @@ def main():
 @click.option(
     "--list_versions",
     "-l",
-    help="List available database versions",
+    help="List available database versions and exit",
     default=False,
     is_flag=True,
 )
@@ -124,13 +124,14 @@ def download(list_versions, which_db, db_version, debug):
                 print(
                     f"  Marker: {f['marker']}, Filename: {f['filename']}, Size: {f['size']} bytes, Checksum: {f['checksum']}"
                 )
+        sys.exit(0)
     else:
         print("Placeholder text")
 
 
 @main.command(
     context_settings=CONTEXT_SETTINGS,
-    help="Run phyloblitz pipeline",
+    help="Run phyloblitz pipeline.",
 )
 @click.option(
     "--db",
