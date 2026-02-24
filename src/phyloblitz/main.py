@@ -52,6 +52,7 @@ click.rich_click.OPTION_GROUPS = {
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+MIN_FLANKING = 500
 
 
 @click.group(
@@ -59,8 +60,8 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Rapid rRNA marker gene screening of long read metagenomes.",
 )
 @click.version_option(version=__version__)
-def main():
-    """Top level command"""
+def main() -> None:
+    """Top level command."""
 
 
 @main.command(
@@ -117,7 +118,7 @@ def main():
 @click.option("--log", help="Write logging messages to this file", type=click.Path())
 def download(
     list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log
-):
+) -> None:
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
@@ -137,7 +138,7 @@ def download(
         root_logger.addHandler(logfile_handler)
 
     versions, latest = downloads.list_versions()
-    logger.debug(f"Latest version is {latest!s}")
+    logger.debug("Latest version is %s", latest)
     if list_versions:
         for v in versions:
             report = f"Version: {v}, DOI: {versions[v]['doi']}, Created: {versions[v]['created']}"
@@ -151,10 +152,10 @@ def download(
                 )
         sys.exit(0)
     if db_version == "latest":
-        logger.info(f"Using latest version {latest!s} of database")
+        logger.info("Using latest version %s of database", str(latest))
         db_version = str(latest)
 
-    logger.info(f"Creating output folder {outdir}")
+    logger.info("Creating output folder %s", outdir)
     try:
         check_outdir(outdir, resume=True)
     except Exception as e:
@@ -172,7 +173,7 @@ def download(
     if dryrun:
         logger.info("Dry run complete, no file downloaded")
     else:
-        logger.info(f"Database file downloaded to {filepath}")
+        logger.info("Database file downloaded to %s", filepath)
 
     try:
         checksum_ok = downloads.check_md5sum_file(
@@ -230,7 +231,11 @@ def download(
     show_default=True,
 )
 @click.option(
-    "--prefix", "-p", help="Output filename prefix", default="pbz", show_default=True
+    "--prefix",
+    "-p",
+    help="Output filename prefix",
+    default="pbz",
+    show_default=True,
 )
 @click.option(
     "--outdir",
@@ -365,7 +370,6 @@ def run(
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    # args = init_args()
     args = dict(
         zip(
             [
@@ -419,7 +423,7 @@ def run(
                 parse_supplementary,
             ],
             strict=False,
-        )
+        ),
     )
 
     loglevel = logging.DEBUG if debug else logging.INFO
@@ -437,16 +441,16 @@ def run(
 
     logger.debug("Arguments:")
     for i in args:
-        logger.debug(f" {i} : {args[i]!s}")
+        logger.debug(" %s : %s", str(i), str(args[i]))
 
     logger.debug("Dependencies:")
     deps = check_dependencies()
     for d in deps:
-        logger.debug(f"  {d} : {deps[d]}")
+        logger.debug("  %s : %s", d, deps[d])
 
     logger.info("Starting phyloblitz run ... ")
 
-    logger.info(f"Creating output folder {outdir}")
+    logger.info("Creating output folder %s", outdir)
     try:
         check_outdir(outdir, resume=resume)
     # catch any exceptions and log them, then exit with error code 1
@@ -482,9 +486,9 @@ def run(
     )
 
     # Cluster flanking sequences
-    if flanking < 500:
+    if flanking < MIN_FLANKING:
         logger.info("Flanking sequence length must be >=500 bp; setting to 500 bp")
-        flanking = 500
+        flanking = MIN_FLANKING
     p.cluster_flanking_isonclust3()
     p.cluster_flanking_kmercount(k=11, minlen=500)
     p.cluster_flanking_kmercount_plot(k=11, min_clust_size=min_clust_size)

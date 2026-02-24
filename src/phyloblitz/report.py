@@ -58,10 +58,7 @@ def dict2markdowntable(
         )
     else:
         ordered_keys = list(d.keys())
-    if keys is not None:
-        keys = [i for i in ordered_keys if i in keys]
-    else:
-        keys = ordered_keys
+    keys = ordered_keys if keys is None else [i for i in ordered_keys if i in keys]
     out = []
     out.append(f"| {col1} | {col2} |")
     out.append("| :----- | :----- |")
@@ -76,7 +73,7 @@ def dict2markdowntable(
 def dod2markdowntable(
     d, keys, order_by_value=True, order_descending=True, order_by="numseq", col1="Name"
 ):
-    """Convert dict of dicts to a markdown table
+    """Convert dict of dicts to a markdown table.
 
     The first key will be cast as row names, second key as column names.
 
@@ -103,13 +100,13 @@ def dod2markdowntable(
         out.append(
             f"| {c!s} | "
             + " | ".join([str(v[k]) if k in v else "-" for k in keys])
-            + " |"
+            + " |",
         )
     return "\n".join(out)
 
 
 def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
-    """Generate plots for report file
+    """Generate plots for report file.
 
     :param vals: Iterable of values to generate histogram for
     :param vline: x-value to draw vertical red line
@@ -128,11 +125,13 @@ def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
 
 
 def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
-    """Generate markdown report from stats collected during phyloblitz run
+    """Generate markdown report from stats collected during phyloblitz run.
 
     :param stats: `stats` dict produced in phyloblitz.main.main
-    :param histogram_file_path: Path to histogram image file, relative to report file path
-    :param kmercount_plot_path: Path to k-mer count plot file, relative to report file path
+    :param histogram_file_path: Path to histogram image file, relative to
+        report file path
+    :param kmercount_plot_path: Path to k-mer count plot file, relative to
+        report file path
     :returns: Report in markdown format
     :rtype: str
     """
@@ -246,14 +245,13 @@ HTML styling with [Simple.css](https://simplecss.org/)
 
 
 def generate_report_html(stats, histogram_file_path, kmercount_plot_path):
-    """Generate HTML report from stats collected during phyloblitz run
+    """Generate HTML report from stats collected during phyloblitz run.
 
     Same parameters as `generate_report_md`
 
     :returns: Report in HTML format
     :rtype: str
     """
-
     return HTML_TEMPLATE.replace(
         "{{markdown_report}}",
         html(generate_report_md(stats, histogram_file_path, kmercount_plot_path)),

@@ -8,7 +8,7 @@ class TestReportFunctions(unittest.TestCase):
     def test_parse_spoa_r2(self):
         f = """>S1\nAATAC\n>S2\nAAATC\n>Consensus\nAAAAC"""
         self.assertEqual(
-            parse_spoa_r2(f), {"S1": "AATAC", "S2": "AAATC", "Consensus": "AAAAC"}
+            parse_spoa_r2(f), {"S1": "AATAC", "S2": "AAATC", "Consensus": "AAAAC"},
         )
 
     def test_count_spoa_aln_vars(self):

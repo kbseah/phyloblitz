@@ -4,6 +4,13 @@ from collections import defaultdict
 from os import W_OK, access, makedirs
 from os.path import exists, isdir
 from subprocess import PIPE, STDOUT, Popen
+from sys import version as python_version
+from matplotlib import __version__ as matplotlib_version
+from mistune import __version__ as mistune_version
+from numpy import __version__ as numpy_version
+from pyfastx import __version__ as pyfastx_version
+from pymarkovclustering import __version__ as pymcl_version
+from pysam import __version__ as pysam_version
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +28,7 @@ CIGAROPS = {
 
 
 def parse_cigar_ops(cigar):
-    """Summarize operations in a CIGAR string"""
+    """Summarize operations in a CIGAR string."""
     summary = defaultdict(int)
     cigar = re.findall(r"(\d+)(\D)", cigar)
     for num, op in cigar:
@@ -30,7 +37,7 @@ def parse_cigar_ops(cigar):
 
 
 def lists_common_prefix(lol):
-    """Get common prefix in a list of lists
+    """Get common prefix in a list of lists.
 
     :param lol: list of lists of strings
     :returns: list of the common prefix
@@ -38,7 +45,7 @@ def lists_common_prefix(lol):
     """
     out = []
     for j in range(min([len(l) for l in lol])):
-        s = set([i[j] for i in lol])
+        s = {i[j] for i in lol}
         if len(s) == 1:
             out.append(s.pop())
         else:
@@ -47,7 +54,7 @@ def lists_common_prefix(lol):
 
 
 def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
-    """Filter out PAF alignments with incompatible overhangs
+    """Filter out PAF alignments with incompatible overhangs.
 
     If two aligned reads have overhangs that do not align, and the overhangs
     are on the same side of the alignment, this means that the underlying
@@ -76,30 +83,41 @@ def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
         return line
 
 
-def check_dependencies():
-    vers = {}
-    from sys import version as python_version
+def check_dependencies() -> dict:
+    """Check if depdendencies present and get versions.
 
-    from matplotlib import __version__ as matplotlib_version
-    from mistune import __version__ as mistune_version
-    from numpy import __version__ as numpy_version
-    from pyfastx import __version__ as pyfastx_version
-    from pymarkovclustering import __version__ as pymcl_version
-    from pysam import __version__ as pysam_version
+    Report dependency versions in log files for reproducibility and to
+    encourage users to cite them.
 
-    vers["python"] = python_version
-    vers["pysam"] = pysam_version
-    vers["pyfastx"] = pyfastx_version
-    vers["mistune"] = mistune_version
-    vers["numpy"] = numpy_version
-    vers["matplotlib"] = matplotlib_version
-    vers["pymarkovclustering"] = pymcl_version
-
+    :return: dict of dependency versions keyed by name
+    :rtype: dict
+    """
+    vers = dict(
+        zip(
+            [
+                "python",
+                "pysam",
+                "pyfastx",
+                "mistune",
+                "numpy",
+                "matplotlib",
+                "pymarkovclustering",
+            ],
+            [
+                python_version,
+                pysam_version,
+                pyfastx_version,
+                mistune_version,
+                numpy_version,
+                matplotlib_version,
+                pymcl_version,
+            ],
+        ),
+    )
     for tool in ["minimap2", "spoa", "isONclust3"]:
         p = Popen([tool, "--version"], stdout=PIPE, stderr=STDOUT, text=True)
-        vers[tool] = (
-            p.communicate()[0].split("\n")[0].rstrip()
-        )  # mcl has multiline output
+        # Split in case version message is multiline, e.g. mcl
+        vers[tool] = p.communicate()[0].split("\n")[0].rstrip()
     return vers
 
 
@@ -116,17 +134,16 @@ def check_outdir(outdir, resume=True):
     """
     if not exists(outdir):
         makedirs(outdir, exist_ok=False)
-        logger.debug("Created output directory: {outdir!s}")
+        logger.debug("Created output directory: %s", outdir)
     elif not isdir(outdir):
-        raise NotADirectoryError(
-            f"Output path {outdir!s} exists but is not a directory."
-        )
+        msg = f"Output path {outdir!s} exists but is not a directory."
+        raise NotADirectoryError(msg)
     # outdir exists but is not writable
     elif not access(outdir, W_OK):
-        raise PermissionError(f"Output directory {outdir!s} is not writable.")
+        msg = f"Output directory {outdir!s} is not writable."
+        raise PermissionError(msg)
     elif resume:
-        logger.info(f"Output directory {outdir!s} already exists, resuming.")
+        logger.info("Output directory %s already exists, resuming.", outdir)
     else:
-        raise FileExistsError(
-            f"Output directory {outdir!s} already exists, but resume is False."
-        )
+        msg = f"Output directory {outdir!s} already exists, but resume is False."
+        raise FileExistsError(msg)
