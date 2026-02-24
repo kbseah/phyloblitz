@@ -4,6 +4,8 @@ import logging
 import re
 from collections import defaultdict
 from subprocess import PIPE, STDOUT, Popen
+from os import makedirs, access, W_OK
+from os.path import exists, isdir
 
 logger = logging.getLogger(__name__)
 
@@ -101,3 +103,34 @@ def check_dependencies():
             p.communicate()[0].split("\n")[0].rstrip()
         )  # mcl has multiline output
     return vers
+
+
+def check_outdir(outdir, resume=True):
+    """Check if output directory exists, and create it if it doesn't
+
+    Raise exceptions if output path exists but is not a directory, or if it is
+    not writable. If output directory already exists and resume is False, raise
+    an exception. Otherwise create output directory recursively if it doesn't
+    exist, or simply carry on if it exists and resume is True.
+
+    :param outdir: Path to output directory
+    :param resume: If True, allow existing output directory to be used for resuming
+    """
+    if not exists(outdir):
+        makedirs(outdir, exist_ok=False)
+        logger.debug("Created output directory: {outdir!s}")
+    elif not isdir(outdir):
+        raise NotADirectoryError(
+            f"Output path {outdir!s} exists but is not a directory."
+        )
+    # outdir exists but is not writable
+    elif not access(outdir, W_OK):
+        raise PermissionError(f"Output directory {outdir!s} is not writable.")
+    elif resume:
+        logger.info(f"Output directory {outdir!s} already exists, resuming.")
+    else:
+        raise FileExistsError(
+            f"Output directory {outdir!s} already exists, but resume is False."
+        )
+
+    return
