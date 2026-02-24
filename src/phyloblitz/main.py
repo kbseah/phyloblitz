@@ -8,7 +8,7 @@ import rich_click as click
 
 from phyloblitz import pipeline, downloads
 from phyloblitz.__about__ import __version__
-from phyloblitz.utils import check_dependencies
+from phyloblitz.utils import check_dependencies, check_outdir
 
 click.rich_click.OPTION_GROUPS = {
     "phyloblitz download": [],
@@ -91,12 +91,33 @@ def main():
     show_default=True,
 )
 @click.option(
+    "--outdir",
+    "-o",
+    help="Output folder path",
+    default="pbz_db",
+    show_default=True,
+    type=click.Path(),
+)
+@click.option(
+    "--dryrun",
+    "-n",
+    help="Only print download URL without downloading the file",
+    default=False,
+    is_flag=True,
+)
+@click.option(
+    "--overwrite",
+    help="Overwrite existing file if it exists",
+    default=False,
+    is_flag=True,
+)
+@click.option(
     "--debug",
     help="Display logging DEBUG level messages to console",
     default=False,
     is_flag=True,
 )
-def download(list_versions, which_db, db_version, debug):
+def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
@@ -114,19 +135,45 @@ def download(list_versions, which_db, db_version, debug):
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
+    versions, latest = downloads.list_versions()
+    logger.debug(f"Latest version is {latest!s}")
     if list_versions:
-        versions = downloads.list_versions()
         for v in versions:
-            print(
-                f"Version: {v}, DOI: {versions[v]['doi']}, Created: {versions[v]['created']}"
-            )
+            report = f"Version: {v}, DOI: {versions[v]['doi']}, Created: {versions[v]['created']}"
+            if v == str(latest):
+                print("* " + report)
+            else:
+                print("  " + report)
             for f in versions[v]["files"]:
                 print(
-                    f"  Marker: {f['marker']}, Filename: {f['filename']}, Size: {f['size']} bytes, Checksum: {f['checksum']}"
+                    f"    Marker: {f['marker']}, Filename: {f['filename']}, Size: {f['size']} bytes, Checksum: {f['checksum']}"
                 )
         sys.exit(0)
+    if db_version == "latest":
+        logger.info(f"Using latest version {latest!s} of database")
+        db_version = str(latest)
+
+    logger.info(f"Creating output folder {outdir}")
+    try:
+        check_outdir(outdir, resume=True)
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+
+    try:
+        filepath = downloads.get_file(
+            versions, which_db, db_version, outdir, dryrun, overwrite
+        )
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+
+    if filepath is not None:
+        logger.info(f"Database file downloaded to {filepath}")
+    elif dryrun:
+        logger.info("Dry run complete, no file downloaded")
     else:
-        print("Placeholder text")
+        logger.error("Database file download failed")
 
 
 @main.command(
@@ -390,15 +437,11 @@ def run(
 
     logger.info(f"Creating output folder {outdir}")
     try:
-        makedirs(outdir, exist_ok=False)
-    except FileExistsError:
-        if not resume:
-            logger.error(
-                f"Output folder {outdir} already exists, and option --resume not used"
-            )
-            sys.exit(1)
-        else:
-            logger.error(f"Output folder {outdir} already exists, resuming run")
+        check_outdir(outdir, resume=resume)
+    # catch any exceptions and log them, then exit with error code 1
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     p = pipeline.Pipeline(args)
     p.run_minimap(threads=threads, mode=platform, sample=num_reads)
