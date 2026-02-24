@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import logging
 import sys
 
@@ -117,7 +115,9 @@ def main():
     is_flag=True,
 )
 @click.option("--log", help="Write logging messages to this file", type=click.Path())
-def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log):
+def download(
+    list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log
+):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers

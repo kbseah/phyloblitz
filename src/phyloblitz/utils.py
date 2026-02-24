@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import logging
 import re
 from collections import defaultdict
@@ -132,4 +130,3 @@ def check_outdir(outdir, resume=True):
         raise FileExistsError(
             f"Output directory {outdir!s} already exists, but resume is False."
         )
-

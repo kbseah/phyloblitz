@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import unittest
 
 from phyloblitz.utils import filter_paf_overhang, lists_common_prefix
