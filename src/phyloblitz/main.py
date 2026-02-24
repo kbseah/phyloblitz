@@ -146,9 +146,9 @@ def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, deb
                 print("* " + report)
             else:
                 print("  " + report)
-            for f in versions[v]["files"]:
+            for marker in versions[v]["files"]:
                 print(
-                    f"    Marker: {f['marker']}, Filename: {f['filename']}, Size: {f['size']} bytes, Checksum: {f['checksum']}"
+                    f"    Marker: {marker}, Filename: {versions[v]['files'][marker]['filename']}, Size: {versions[v]['files'][marker]['size']} bytes, Checksum: {versions[v]['files'][marker]['checksum']}"
                 )
         sys.exit(0)
     if db_version == "latest":
