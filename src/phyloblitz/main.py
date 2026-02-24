@@ -4,12 +4,11 @@ import logging
 import sys
 
 import rich_click as click
+from rich.logging import RichHandler
 
-from phyloblitz import pipeline, downloads
+from phyloblitz import downloads, pipeline
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies, check_outdir
-
-from rich.logging import RichHandler
 
 click.rich_click.OPTION_GROUPS = {
     "phyloblitz download": [],
@@ -64,7 +63,6 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.version_option(version=__version__)
 def main():
     """Top level command"""
-    pass
 
 
 @main.command(

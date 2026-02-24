@@ -1,7 +1,8 @@
 import hashlib
 import logging
-import requests
 import os.path
+
+import requests
 from packaging.version import Version
 from tqdm import tqdm
 
@@ -44,9 +45,8 @@ def list_versions():
                     "download_url": file["links"]["self"],
                 }
         return versions, max([Version(v) for v in versions])
-    else:
-        logger.error(f"Failed to fetch versions: {response.status_code}")
-        return [], None
+    logger.error(f"Failed to fetch versions: {response.status_code}")
+    return [], None
 
 
 def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite=False):
@@ -87,24 +87,22 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
     if response.status_code == 200:
         total_size = int(response.headers.get("Content-Length", 0))
         logger.debug(f"Expected total file size: {total_size!s} bytes")
-        with open(outpath, "wb") as f:
-            with tqdm(
-                total=total_size,
-                unit="B",
-                bar_format="{l_bar}{bar:20}{r_bar}",
-                colour="green",
-                unit_scale=True,
-                desc=versions[db_version]["files"][which_db]["filename"],
-            ) as pbar:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                    pbar.update(len(chunk))
+        with open(outpath, "wb") as f, tqdm(
+            total=total_size,
+            unit="B",
+            bar_format="{l_bar}{bar:20}{r_bar}",
+            colour="green",
+            unit_scale=True,
+            desc=versions[db_version]["files"][which_db]["filename"],
+        ) as pbar:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+                pbar.update(len(chunk))
         logger.info(
             f"Downloaded {versions[db_version]['files'][which_db]['filename']} successfully."
         )
         return outpath
-    else:
-        raise ConnectionError(f"Failed to download file: {response.status_code!s}")
+    raise ConnectionError(f"Failed to download file: {response.status_code!s}")
 
 
 def check_md5sum_file(versions, which_db, db_version, outpath):

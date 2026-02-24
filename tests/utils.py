@@ -2,7 +2,7 @@
 
 import unittest
 
-from phyloblitz.utils import lists_common_prefix, filter_paf_overhang
+from phyloblitz.utils import filter_paf_overhang, lists_common_prefix
 
 
 class TestReportFunctions(unittest.TestCase):

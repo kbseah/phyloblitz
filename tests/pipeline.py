@@ -1,6 +1,6 @@
 import unittest
 
-from phyloblitz.pipeline import parse_spoa_r2, count_spoa_aln_vars
+from phyloblitz.pipeline import count_spoa_aln_vars, parse_spoa_r2
 
 
 class TestReportFunctions(unittest.TestCase):

@@ -3,9 +3,9 @@
 import logging
 import re
 from collections import defaultdict
-from subprocess import PIPE, STDOUT, Popen
-from os import makedirs, access, W_OK
+from os import W_OK, access, makedirs
 from os.path import exists, isdir
+from subprocess import PIPE, STDOUT, Popen
 
 logger = logging.getLogger(__name__)
 
@@ -133,4 +133,3 @@ def check_outdir(outdir, resume=True):
             f"Output directory {outdir!s} already exists, but resume is False."
         )
 
-    return
