@@ -26,7 +26,7 @@ def list_versions():
                 "version": hit["metadata"]["version"],
                 "doi": hit["metadata"]["doi"],
                 "created": hit["created"],
-                "files": {}
+                "files": {},
             }
             for file in hit["files"]:
                 if "SSU" in file["key"]:
@@ -77,9 +77,13 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
             )
     logger.debug(f"Saving to {outpath!s}")
     if dryrun:
-        logger.info(f"Dry run: would download from {versions[db_version]['files'][which_db]['download_url']!s}")
+        logger.info(
+            f"Dry run: would download from {versions[db_version]['files'][which_db]['download_url']!s}"
+        )
         return outpath
-    response = requests.get(versions[db_version]["files"][which_db]["download_url"], stream=True)
+    response = requests.get(
+        versions[db_version]["files"][which_db]["download_url"], stream=True
+    )
     if response.status_code == 200:
         total_size = int(response.headers.get("Content-Length", 0))
         logger.debug(f"Expected total file size: {total_size!s} bytes")
@@ -95,12 +99,12 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
                     pbar.update(len(chunk))
-        logger.info(f"Downloaded {versions[db_version]['files'][which_db]['filename']} successfully.")
+        logger.info(
+            f"Downloaded {versions[db_version]['files'][which_db]['filename']} successfully."
+        )
         return outpath
     else:
-        raise ConnectionError(
-            f"Failed to download file: {response.status_code!s}"
-        )
+        raise ConnectionError(f"Failed to download file: {response.status_code!s}")
 
 
 def check_md5sum_file(versions, which_db, db_version, outpath):
@@ -113,9 +117,13 @@ def check_md5sum_file(versions, which_db, db_version, outpath):
     :return: True if checksum matches value in metadata
     :rtype: bool
     """
-    checksum_type, expected_checksum = versions[db_version]['files'][which_db]['checksum'].split(":")
+    checksum_type, expected_checksum = versions[db_version]["files"][which_db][
+        "checksum"
+    ].split(":")
     if checksum_type != "md5":
-        raise NotImplementedError(f"Checksum type {checksum_type!s} not supported. Only md5 is supported.")
+        raise NotImplementedError(
+            f"Checksum type {checksum_type!s} not supported. Only md5 is supported."
+        )
     md5_hash = hashlib.md5()
     with open(outpath, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):

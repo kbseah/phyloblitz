@@ -116,7 +116,7 @@ def main():
     default=False,
     is_flag=True,
 )
-# TODO: Log file 
+# TODO: Log file
 # TODO: Turn off progress bar
 def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug):
     logging.basicConfig(level=logging.DEBUG)
@@ -175,7 +175,9 @@ def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, deb
         logger.info(f"Database file downloaded to {filepath}")
 
     try:
-        checksum_ok = downloads.check_md5sum_file(versions, which_db, db_version, filepath)
+        checksum_ok = downloads.check_md5sum_file(
+            versions, which_db, db_version, filepath
+        )
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
