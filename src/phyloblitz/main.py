@@ -9,6 +9,8 @@ from phyloblitz import pipeline, downloads
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies, check_outdir
 
+from rich.logging import RichHandler
+
 click.rich_click.OPTION_GROUPS = {
     "phyloblitz download": [],
     "phyloblitz run": [
@@ -124,17 +126,12 @@ def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, deb
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    console_handler = logging.StreamHandler(sys.stderr)
-    if debug:
-        console_handler.setLevel(logging.DEBUG)
-    else:
-        console_handler.setLevel(logging.INFO)
+    loglevel = logging.DEBUG if debug else logging.INFO
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
+    root_logger.addHandler(RichHandler(level=loglevel))
 
     versions, latest = downloads.list_versions()
     logger.debug(f"Latest version is {latest!s}")
@@ -420,18 +417,13 @@ def run(
         )
     )
 
-    console_handler = logging.StreamHandler(sys.stderr)
-    if debug:
-        console_handler.setLevel(logging.DEBUG)
-    else:
-        console_handler.setLevel(logging.INFO)
+    loglevel = logging.DEBUG if debug else logging.INFO
+    root_logger.addHandler(RichHandler(level=loglevel))
+
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
-
     if log:
         logfile_handler = logging.FileHandler(log)
         logfile_handler.setFormatter(formatter)

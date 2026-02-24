@@ -19,6 +19,7 @@ oxli = ">=0.3.0,<0.4"
 requests = ">=2.32.5,<3"
 packaging = ">=26.0,<27"
 tqdm = ">=4.67.3,<5"
+rich = ">=14.3.3,<15"
 
 [package]
 name = "phyloblitz"
@@ -53,7 +54,7 @@ isonclust3 = ">=0.3.0,<0.4"
 test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
 ## Download reference databases ------------------------------------------------
 download = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2"""
-download_dry = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2 --dryrun --debug"""
+download_dry = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2 --dryrun --overwrite --debug"""
 ## isonclust3 ont --------------------------------------------------------------
 run = """phyloblitz run --resume --debug --threads 12 --platform lr:hq \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
