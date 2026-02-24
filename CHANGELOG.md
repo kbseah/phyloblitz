@@ -33,10 +33,12 @@
 
  - [x] Deprecate two-pass mode
  - [x] Subcommands for run and database download
+ - [x] Database download from Zenodo with checksums
+ - [x] Parse supplementary alignments by default
  - [ ] Avoid duplicate segments extracted from overlapping supplementary
        alignments
- - [ ] Database download from Zenodo with checksums
  - [ ] Fix the CSS stylesheet
+ - [ ] Greengenes2 database
 
 
 ## Future plans
