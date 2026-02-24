@@ -232,12 +232,10 @@ class Pipeline:
     def __init__(self, args):
         """Constructor for Pipeline."""
         self._ref = args["db"]  # Path to reference database Fasta file
-        self._refindex = args[
-            "dbindex"
-        ]  # Path to reference database Minimap2 index (optional)
-        self._reads = args[
-            "reads"
-        ]  # Path to reads to be processed in Fastq or Fastq.gz format
+        # Path to reference database Minimap2 index (optional)
+        self._refindex = args["dbindex"]
+        # Path to reads to be processed in Fastq or Fastq.gz format
+        self._reads = args["reads"]
         self._outdir = args["outdir"]  # Path to output folder
         self._prefix = args["prefix"]  # Filename prefix for output files
         self._platform = args["platform"]  # Sequencing mode, ont or pb
@@ -284,8 +282,8 @@ class Pipeline:
             if basename_only:
                 return os.path.basename(self._prefix + self.OUTFILE_SUFFIX[stage])
             return os.path.join(self._outdir, self._prefix + self.OUTFILE_SUFFIX[stage])
-        except KeyError:
-            raise Exception(f"Unknown intermediate file {stage}")
+        except KeyError as e:
+            raise Exception(f"Unknown intermediate file {stage}") from e
 
     def check_stage_file(stage, message):
         # TODO specify more than one output file; check required input files
@@ -1061,8 +1059,8 @@ class Pipeline:
                     for hdr in self._stats["cluster cons parsed"][c]:
                         fh.write(">" + hdr + "\n")
                         fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")
-        except KeyError:
-            raise Exception("Key `cluster cons parsed` not found, has spoa been run?")
+        except KeyError as e:
+            raise Exception("Key `cluster cons parsed` not found, has spoa been run?") from e
 
     @check_stage_file(
         stage="report_dvs_hist",

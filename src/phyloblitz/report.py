@@ -65,8 +65,8 @@ def dict2markdowntable(
     for k in keys:
         try:
             out.append(f"| {k!s} | {d[k]!s} |")
-        except KeyError:
-            raise Exception(f"Key {k} not defined in dict")
+        except KeyError as e:
+            raise Exception(f"Key {k} not defined in dict") from e
     return "\n".join(out)
 
 
