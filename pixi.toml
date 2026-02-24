@@ -18,6 +18,7 @@ pymarkovclustering = ">=0.1.1,<0.2"
 oxli = ">=0.3.0,<0.4"
 requests = ">=2.32.5,<3"
 packaging = ">=26.0,<27"
+tqdm = ">=4.67.3,<5"
 
 [package]
 name = "phyloblitz"
@@ -51,8 +52,8 @@ isonclust3 = ">=0.3.0,<0.4"
 ## Unit tests ------------------------------------------------------------------
 test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.pipeline"
 ## Download reference databases ------------------------------------------------
-download = """wget -q --output-document=138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \
-'https://zenodo.org/records/18627380/files/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta?download=1'"""
+download = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2"""
+download_dry = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2 --dryrun --debug"""
 ## isonclust3 ont --------------------------------------------------------------
 run = """phyloblitz run --resume --debug --threads 12 --platform lr:hq \
 --db 138.2/SILVA_SSURef_NR99.nocontam.masked.trimmed.NR99.fasta \

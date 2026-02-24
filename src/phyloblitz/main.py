@@ -117,6 +117,8 @@ def main():
     default=False,
     is_flag=True,
 )
+# TODO: Log file 
+# TODO: Turn off progress bar
 def download(list_versions, which_db, db_version, outdir, dryrun, overwrite, debug):
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()

@@ -2,6 +2,7 @@ import logging
 import requests
 import os.path
 from packaging.version import Version
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -73,19 +74,34 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
                         f"File {outpath!s} already exists, but overwrite is enabled. Overwriting."
                     )
                 else:
-                    raise FileExistsError(f"File {outpath!s} already exists, but overwrite disabled. Skipping download.")
+                    raise FileExistsError(
+                        f"File {outpath!s} already exists, but overwrite disabled. Skipping download."
+                    )
             logger.debug(f"Saving to {outpath!s}")
             if dryrun:
                 logger.info(f"Dry run: would download from {file['download_url']!s}")
                 return None
             response = requests.get(file["download_url"], stream=True)
             if response.status_code == 200:
+                total_size = int(response.headers.get("Content-Length", 0))
+                logger.debug(f"Expected total file size: {total_size!s} bytes")
                 with open(outpath, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                    with tqdm(
+                        total=total_size,
+                        unit="B",
+                        bar_format="{l_bar}{bar:20}{r_bar}",
+                        colour="green",
+                        unit_scale=True,
+                        desc=file["filename"],
+                    ) as pbar:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            pbar.update(len(chunk))
                 logger.info(f"Downloaded {file['filename']} successfully.")
                 # TODO: Verify checksum here
                 return outpath
             else:
-                raise ConnectionError(f"Failed to download file: {response.status_code!s}")
+                raise ConnectionError(
+                    f"Failed to download file: {response.status_code!s}"
+                )
     return None
