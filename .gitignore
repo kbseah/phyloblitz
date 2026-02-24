@@ -8,5 +8,6 @@ __pycache__
 test.log
 /138.1/
 /138.2/
+/pbz_db/
 /runtest/run*
 *.swp
