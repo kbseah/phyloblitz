@@ -55,9 +55,9 @@ def merge_intervals(intervals: list) -> list:
 def sam_seq_generator(
     sam_file: str | Path,
     minlen: int = 1200,
-    no_supplementary: bool = False,
+    no_supp: bool = False,
     flanking: int = 0,
-) -> tuple:
+) -> dict:
     """Filter SAM alignment to get read segments for all-vs-all mapping.
 
     This uses pysam.AlignedSegment.query_sequence; if the read is mapped to
@@ -74,11 +74,11 @@ def sam_seq_generator(
     :param sam_file: Path to SAM file
     :param minlen: Minimum query alignment length; adjust if targeting a
         different gene, e.g. LSU rRNA
-    :param no_supplementary: Ignore supplementary alignments
+    :param no_supp: Ignore supplementary alignments
     :param flanking: Additional flanking sequence to extract
-    :returns: tuple of read name, sequence, sequence quality scores, leading
-        flanking sequence, leading flanking sequence qualities, trailing
-        flanking sequence, trailing flanking sequence qualities.
+    :returns: dict of read name, start, stop, sequence, sequence quality
+        scores, leading flanking sequence, leading flanking sequence qualities,
+        trailing flanking sequence, trailing flanking sequence qualities.
     :rtype: tuple
     """
     logger.info("Filtering alignment for primary mappings with length >= %d", minlen)
@@ -88,26 +88,41 @@ def sam_seq_generator(
     for i in sam.fetch():
         if i.query_alignment_length < minlen or i.query_alignment_sequence is None:
             continue
-        if i.is_secondary or (i.is_supplementary and no_supplementary):
+        if i.is_secondary or (i.is_supplementary and no_supp):
             continue
-        if i.is_supplementary and not no_supplementary:
-            # TODO: Track reads that have supplementary alignments
+        if i.is_supplementary and not no_supp:
             logger.debug("Parsing supplementary alignment for read %s", i.query_name)
         mystart = max(0, i.query_alignment_start)
         myend = min(i.query_length, i.query_alignment_end)
-        # mapped segment
-        name = ":".join([str(i) for i in [i.query_name, mystart, myend]])
-        seq = i.query_sequence[mystart:myend]
-        quals = i.query_qualities_str[mystart:myend]
-        # pre-flank
         pre_start = max(0, i.query_alignment_start - flanking)
-        pre_seq = i.query_sequence[pre_start:mystart]
-        pre_quals = i.query_qualities_str[pre_start:mystart]
-        # post-flank
         post_end = min(i.query_length, i.query_alignment_end + flanking)
-        post_seq = i.query_sequence[myend:post_end]
-        post_quals = i.query_qualities_str[myend:post_end]
-        yield (name, seq, quals, pre_seq, pre_quals, post_seq, post_quals)
+        yield dict(
+            zip(
+                [
+                    "rname",
+                    "start",
+                    "end",
+                    "seq",
+                    "quals",
+                    "pre",
+                    "pre_quals",
+                    "post",
+                    "post_quals",
+                ],
+                [
+                    i.query_name,
+                    mystart,
+                    myend,
+                    i.query_sequence[mystart:myend],
+                    i.query_qualities_str[mystart:myend],
+                    i.query_sequence[pre_start:mystart],
+                    i.query_qualities_str[pre_start:mystart],
+                    i.query_sequence[myend:post_end],
+                    i.query_qualities_str[myend:post_end],
+                ],
+                strict=True,
+            )
+        )
 
 
 def spoa_assemble_fasta(label_fastq: tuple) -> tuple[str, str]:
@@ -402,7 +417,7 @@ class Pipeline:
     def extract_reads_for_ava(
         self,
         align_minlen: int = 1200,
-        no_supplementary: bool = False,
+        no_supp: bool = False,
         flanking: int = 0,
     ) -> None:
         """Extract read segments aligning to markers for all-vs-all mapping.
@@ -413,37 +428,26 @@ class Pipeline:
         they do not influence the marker clustering and assembly.
 
         :param align_minlen: Minimum alignment length in bp
-        :param no_supplementary: Ignore supplementary alignments if True
+        :param no_supp: Ignore supplementary alignments if True
         :param flanking: Length of flanking sequence to extract, in bp
         """
         sam_file = self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
         with Path.open(self.pathto("mapped_segments"), "w") as fq_fh:
-            for (
-                name,
-                seq,
-                quals,
-                pre_seq,
-                pre_quals,
-                post_seq,
-                post_quals,
-            ) in sam_seq_generator(
+            for rec in sam_seq_generator(
                 sam_file,
                 minlen=align_minlen,
-                no_supplementary=no_supplementary,
+                no_supp=no_supp,
                 flanking=flanking,
             ):
+                name = ":".join([str(rec[i]) for i in ["rname", "start", "end"]])
                 counter += 1
-                fq_fh.write("@" + name + "\n")
-                fq_fh.write(seq + "\n")
-                fq_fh.write("+" + "\n")
-                fq_fh.write(quals + "\n")
+                fq_fh.write(
+                    "@" + name + "\n" + rec["seq"] + "\n+\n" + rec["quals"] + "\n",
+                )
                 self._stats["flanking"][name] = {
-                    "pre": pre_seq,
-                    "pre_quals": pre_quals,
-                    "post": post_seq,
-                    "post_quals": post_quals,
+                    i: rec[i] for i in ["pre", "pre_quals", "post", "post_quals"]
                 }
         self._stats["runstats"].update({"mapped pass filter": counter})
         logger.info("Read segments extracted for all-vs-all mapping: %d", counter)

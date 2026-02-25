@@ -465,7 +465,7 @@ def run(
     # Extract reads for clustering
     p.extract_reads_for_ava(
         align_minlen=align_minlen,
-        no_supplementary=no_supplementary,
+        no_supp=no_supplementary,
         flanking=flanking,
     )
 
