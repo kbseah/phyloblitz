@@ -492,7 +492,7 @@ def run(
         flanking = MIN_FLANKING
     p.cluster_flanking_isonclust3()
     p.cluster_flanking_kmercount(k=11, minlen=500)
-    p.cluster_flanking_kmercount_plot(k=11, min_clust_size=min_clust_size)
+    p.cluster_flanking_kmercount_plot(min_clust_size=min_clust_size)
 
     # Taxonomy summary
     p.db_taxonomy()

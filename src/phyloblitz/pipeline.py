@@ -242,15 +242,26 @@ class Pipeline:
     """phyloblitz pipeline run object."""
 
     def __init__(self, args: dict) -> None:
-        """Construct Pipeline object."""
-        self._ref = args["db"]  # Path to reference database Fasta file
-        # Path to reference database Minimap2 index (optional)
+        """Construct Pipeline object.
+
+        Attributes:
+        * _ref : Path to reference database Fasta file
+        * _refindex : Optional path to reference database index
+        * _reads : Path to input reads in Fastq or Fastq.gz format
+        * _outdir : Output folder path
+        * _prefix : Filename prefix for output files
+        * _platform : Sequencing mode, passed as mapping preset to minimap2
+        * _resume : If True, resume partially executed run
+        * _stats : Dict with run metadata and processed results, for
+            troubleshooting and comparison of runs
+
+        """
+        self._ref = args["db"]
         self._refindex = args["dbindex"]
-        # Path to reads to be processed in Fastq or Fastq.gz format
         self._reads = args["reads"]
-        self._outdir = args["outdir"]  # Path to output folder
-        self._prefix = args["prefix"]  # Filename prefix for output files
-        self._platform = args["platform"]  # Sequencing mode, ont or pb
+        self._outdir = args["outdir"]
+        self._prefix = args["prefix"]
+        self._platform = args["platform"]
         self._resume = args["resume"]
         self._stats = {}
         self._stats["args"] = args
@@ -339,13 +350,21 @@ class Pipeline:
         stage="initial_map",
         message="Initial mapping of reads to identify target intervals",
     )
-    def run_minimap(self, threads=12, mode="map-ont", sample=None):
+    def run_minimap(self, threads=12, mode="map-ont", sample=None) -> int:
         """Map reads to reference database with minimap2.
 
-        Only report reads that are mapped.
+        This initial mapping is used to extract the marker sequence segments
+        from input long reads, and to summarize taxonomic composition of
+        library based on taxonomy of the reference hits.
+
+        Use mode presets for minimap2. Do not report unmapped reads or
+        secondary mappings. Report supplementary mappings as soft-clipped
+        (default hard-clipped) so the flanking sequence can be correctly parsed
+        by pysam.
 
         :param threads: Number of threads for minimap2 to use
-        :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
+        :param mode: Mapping preset for minimap2, one of: `map-ont`, `map-pb`,
+            "lr:hq", "map-hifi"
         :param sample: Number of reads to sample; if None then use all reads;
             also use this number as the random seed
         :returns: return code for samtools
@@ -479,9 +498,8 @@ class Pipeline:
 
         Segments aligning to marker database are extracted in Fastq format to a
         new file, for the next clustering steps. Flanking sequences are also
-        extracted, not to the Fastq file but to a separate dictionary in the
-        Pipeline object, so they do not influence the marker clustering and
-        assembly.
+        extracted, not to the Fastq file but Pipeline._stats["flanking"], so
+        they do not influence the marker clustering and assembly.
 
         :param align_minlen: Minimum alignment length in bp
         :param no_supplementary: Ignore supplementary alignments if True
@@ -523,15 +541,17 @@ class Pipeline:
         stage="ava_map",
         message="All-vs-all mapping of mapped reads with minimap2",
     )
-    def ava_map(self, mode: str = "map-ont", threads: int = 12):
+    def ava_map(self, mode: str = "map-ont", threads: int = 12) -> int:
         """All-vs-all mapping with minimap2 to generate clusters for assembly.
 
         Minimap2 presets for Nanopore and PacBio CLR are applied. For Nanopore
         Q20+ and PacBio HiFi/CCS reads, the "ava" presets were modified to
-        reflect their lower sequence error.
+        reflect their lower sequence error. PAF alignment written to file.
 
         :param mode: Mapping preset mode used for initial minimap2 mapping step
         :param threads: Number of threads for minimap2 to use
+        :returns: Return code of the minimap2 process
+        :rtype: int
         """
         presets = {
             "map-ont": ["-x", "ava-ont"],
@@ -562,7 +582,7 @@ class Pipeline:
         stage="ava_filter",
         message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
     )
-    def paf_file_filter_overhangs(self, max_overhang_frac=0.05):
+    def paf_file_filter_overhangs(self, max_overhang_frac=0.05) -> None:
         """Remove all-vs-all alignments with incompatible overhangs.
 
         All-vs-all alignments of extracted marker read segments will be
@@ -597,8 +617,9 @@ class Pipeline:
         Minimap2 reports per-base divergence for each PAF alignment in the dv:
         tag. We analyze the distribution of dv values from all-vs-all mappings
         as a reference-free measure of sequence error, and also use it to set
-        the cutoffs for clustering with the mcl method. Updates the _stats in
-        the Pipeline object.
+        the cutoffs for clustering with the mcl method. Updates Pipeline._stats
+        with a dict of dv values per read ("dvs"), and a list of minimum dv
+        value for each read ("min_dvs") to plot dv distribution.
         """
         logger.info("Reading dvs data from ava mapping")
         dvs = defaultdict(list)
@@ -636,7 +657,7 @@ class Pipeline:
         edge score. The threshold divergence value can be hardcoded, or
         adjusted to the observed distribution, to account for different
         sequencing errors across libraries and platforms. The default inflation
-        parameter was empirically chosen.
+        parameter was empirically chosen. Cluster output are files.
 
         :param dv_max: Maximum sequence divergence (dv:f tag in PAF file) to accept
         :param dv_max_auto: Set dv_max to max(0.001, 2 * median all-vs-all
@@ -671,14 +692,17 @@ class Pipeline:
         stage="isonclust3_cluster",
         message="Clustering with isonclust3",
     )
-    def isonclust3_cluster(self):
+    def isonclust3_cluster(self) -> int:
         """Cluster marker read segments with isONclust3.
 
         isONclust3 was originally designed for long-read transcriptome
         datasets, and uses minimizers with iterative cluster merging. The
         default preset for Nanopore, "ont", is applied here for both legacy and
         Q20+ Nanopore reads, while the "pacbio" preset is used for both PacBio
-        CLR and HiFi.
+        CLR and HiFi. Cluster output is a directory with multiple files.
+
+        :returns: Return code of the isONclust3 process.
+        :rtype: int
         """
         if self._platform in ["lr:hq", "map-ont"]:
             isonclust3_mode = "ont"
@@ -708,7 +732,7 @@ class Pipeline:
     def _cluster_seqs_from_mcl(
         self, mcl_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
     ) -> tuple:
-        """Extract sequences from each MCL cluster to separate Fastq files for assembly.
+        """Extract sequences from each MCL cluster to Fastq files.
 
         :param mcl_out: Path MCL output file
         :param reads: Path to reads from extract_reads_for_ava step
@@ -750,7 +774,7 @@ class Pipeline:
     def _cluster_seqs_from_isonclust3(
         self, isonclust3_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
     ) -> tuple:
-        """Extract sequences from each isONclust3 cluster to separate Fastq files for assembly.
+        """Extract sequences from each isONclust3 cluster to Fastq files.
 
         The numbering of clusters by isONclust3 itself is not consistent
         between the final_clusters.tsv file and the output fastq files; best to
@@ -806,9 +830,19 @@ class Pipeline:
     ) -> None:
         """Extract cluster sequences and assemble with spoa
 
-        Extract read segments for each cluster to separate Fastq files and
-        assemble consensus sequence for each with Spoa. Assembly step is
-        embarrassingly parallelized.
+        Cluster reads with specified clustering tool, extract read segments for
+        each cluster to separate Fastq files, and assemble consensus sequence
+        for each with Spoa. Assembly step is embarrassingly parallelized.
+
+        Updates Pipeline._stats["cluster2seq"] with lists of read names keyed
+        by cluster id. Some summary stats on clusters are written to
+        Pipeline._stats["runstats"].
+
+        Other per-cluster summaries in Pipeline._stats: "cluster variant
+        counts" -- number of variant sites by type for each read vs. its
+        cluster consensus; "cluster persite variant counts" -- per-site entropy
+        vs. consensus [WIP]; "cluster cons parsed" -- cluster alignment
+        including consensus, produced by spoa.
 
         :param cluster_tool: Clustering method used, either "mcl" or "isonclust3"
         :param threads: Number of parallel assembly jobs to run
@@ -887,7 +921,8 @@ class Pipeline:
         similar or even identical marker sequence, and end up represented in
         the same cluster. As a measure of the potential diversity in each
         cluster, sequence flanking the conserved markers is also extracted and
-        clustered, and the resulting number of clusters is reported.
+        clustered, and the resulting number of clusters is reported. Stored in
+        Pipeline._stats["cluster flanking numclust"]
         """
         logger.info("Clustering flanking sequences with isonclust3")
         if self._platform in ["lr:hq", "map-ont"]:
@@ -946,7 +981,7 @@ class Pipeline:
 
         As an alternative to clustering flanking sequences, report the k-mer
         multiplicity to be visualized with cluster_flanking_kmercount_plot().
-        Counts are stored in the _stats slot of the Pipeline object.
+        Stored in Pipeline._stats["flanking_kmer_histo"]
 
         :param k: K-mer length, in bp
         :param minlen: Only count k-mers for flanking sequence at least this length
@@ -973,16 +1008,15 @@ class Pipeline:
         stage="report_kmercount_plot",
         message="Generate k-mer multiplicity plot for report",
     )
-    def cluster_flanking_kmercount_plot(self, k=11, min_clust_size=5):
+    def cluster_flanking_kmercount_plot(self, min_clust_size: int = 5) -> None:
         """Plot k-mer multiplicity of flanking sequences for report.
 
         The k-mer multiplicity plot gives a visual impression of the sequence
         error and sequence depth for each cluster, and together with other
         metrics can help in judging whether there is adequate coverage for
         assembling the genome(s) represented by a cluster, in addition to the
-        potential strain diversity.
+        potential strain diversity. Image written to file.
 
-        :param k: K-mer length, in bp
         :param min_clust_size: Only report for clusters containing at least this
             number of reads.
         """
@@ -1019,7 +1053,7 @@ class Pipeline:
         """Get taxonomy string from SILVA headers in database Fasta file.
 
         Parse SILVA-style headers to get dict of taxonomy strings keyed by
-        accession; stored in the _acc2tax slot of Pipeline object.
+        accession, stored in the Pipeline._acc2tax attribute.
         """
         logger.info("Reading taxonomy from SILVA database file")
         self._acc2tax = {}
@@ -1056,6 +1090,9 @@ class Pipeline:
     ) -> None:
         """Summarize taxonomy at a specified taxonomy level from initial mapping.
 
+        Updates Pipeline._stats["initial_taxonomy"] with a Counter of the
+        observed taxonomy strings at the requested taxon level.
+
         :param minlen: Only consider alignments where query_alignment_length is
             this value and above.
         :param taxlevel: Taxon level to generate summary (1-based, where 1
@@ -1076,10 +1113,14 @@ class Pipeline:
         stage="cluster_tophits",
         message="Mapping assembled sequences to reference database with minimap2",
     )
-    def cluster_asm_tophits(self, threads=12):
+    def cluster_asm_tophits(self, threads: int = 12) -> int:
         """Map assembled sequences to reference DB and get top hits.
 
+        Find best reference match for cluster consensus sequences by aligning
+        with minimap2. Alignment is written to file.
+
         :param threads: Number of threads for minimap2 to use
+        :returns: Return code of the minimap2 process
         """
         cmd = [
             "minimap2",
@@ -1107,8 +1148,8 @@ class Pipeline:
     def summarize_tophit_paf(self) -> None:
         """Summarize top hits of assembled seqs mapped to SILVA database by minimap2.
 
-        Update _self slot with a dict of summary stats for each hit, keyed by
-        query sequence name.
+        Update Pipeline._stats with a dict of summary stats "cluster_tophits"
+        for each hit, keyed by query sequence name.
         """
         out = {}
 
@@ -1154,6 +1195,9 @@ class Pipeline:
         for rec in out.values():
             try:
                 # hyperlink to ENA record
+                # TODO: This only works for SILVA where accessions are derived
+                # from ENA accessions. May not work with other databases e.g.
+                # Greengenes
                 rec["tophit"] = (
                     "["
                     + rec["tname"]
@@ -1186,14 +1230,22 @@ class Pipeline:
         stage="report_json",
         message="Writing report stats in JSON format",
     )
-    def write_report_json(self):
-        """Dump run stats file in JSON format for troubleshooting."""
+    def write_report_json(self) -> None:
+        """Dump run stats file in JSON format.
+
+        Dump the Pipeline._stats attribute to a JSON file for troubleshooting
+        and comparison of different phyloblitz runs.
+        """
         self._stats.update({"endtime": str(datetime.now())})
         with Path.open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
 
-    def write_cluster_alns(self):
-        """Dump cluster alignments for troubleshooting."""
+    def write_cluster_alns(self) -> None:
+        """Dump cluster alignments for troubleshooting.
+
+        Write alignments in Fasta format with suffix "_aln_cluster_{c}.fasta"
+        where `c` is the cluster number.
+        """
         try:
             for c in self._stats["cluster cons parsed"]:
                 with Path.open(
@@ -1211,7 +1263,7 @@ class Pipeline:
         stage="report_dvs_hist",
         message="Generating plots for report",
     )
-    def write_report_histogram(self):
+    def write_report_histogram(self) -> None:
         """Write histogram graphic required for report."""
         if "dv_max_applied" in self._stats["runstats"]:
             vline = (self._stats["runstats"]["dv_max applied"],)
@@ -1229,7 +1281,7 @@ class Pipeline:
         stage="report_md",
         message="Writing report markdown",
     )
-    def write_report_markdown(self):
+    def write_report_markdown(self) -> None:
         """Write final report in markdown format."""
         with Path.open(self.pathto("report_md"), "w") as fh:
             fh.write(
@@ -1244,7 +1296,7 @@ class Pipeline:
         stage="report_html",
         message="Writing report HTML",
     )
-    def write_report_html(self):
+    def write_report_html(self) -> None:
         """Write final report in HTML format."""
         with Path.open(self.pathto("report_html"), "w") as fh:
             fh.write(
