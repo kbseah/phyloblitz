@@ -117,6 +117,7 @@ def main() -> None:
 def download(
     list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log
 ) -> None:
+    """Command line interface to download reference databases from Zenodo."""
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
@@ -138,15 +139,15 @@ def download(
     versions, latest = downloads.list_versions()
     logger.debug("Latest version is %s", latest)
     if list_versions:
-        for v in versions:
-            report = f"Version: {v}, DOI: {versions[v]['doi']}, Created: {versions[v]['created']}"
+        for v, meta in versions.items():
+            report = f"Version: {v}, DOI: {meta['doi']}, Created: {meta['created']}"
             if v == str(latest):
                 print("* " + report)
             else:
                 print("  " + report)
-            for marker in versions[v]["files"]:
+            for marker, filedata in meta["files"].items():
                 print(
-                    f"    Marker: {marker}, Filename: {versions[v]['files'][marker]['filename']}, Size: {versions[v]['files'][marker]['size']} bytes, Checksum: {versions[v]['files'][marker]['checksum']}"
+                    f"    Marker: {marker}, Filename: {filedata['filename']}, Size: {filedata['size']} bytes, Checksum: {filedata['checksum']}"
                 )
         sys.exit(0)
     if db_version == "latest":
@@ -364,6 +365,7 @@ def run(
     flanking,
     no_supplementary,
 ):
+    """Command line interface to run phyloblitz pipeline."""
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
@@ -439,13 +441,13 @@ def run(
         root_logger.addHandler(logfile_handler)
 
     logger.debug("Arguments:")
-    for i in args:
-        logger.debug(" %s : %s", str(i), str(args[i]))
+    for arg, val in args.items():
+        logger.debug(" %s : %s", str(arg), str(val))
 
     logger.debug("Dependencies:")
     deps = check_dependencies()
-    for d in deps:
-        logger.debug("  %s : %s", d, deps[d])
+    for dep, ver in deps.items():
+        logger.debug("  %s : %s", dep, ver)
 
     logger.info("Starting phyloblitz run ... ")
 

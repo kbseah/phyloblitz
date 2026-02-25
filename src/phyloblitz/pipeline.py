@@ -741,10 +741,10 @@ class Pipeline:
                 fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
                 fastq_handles[seq2cluster[name]].write(fastq_rec)
         cluster2seq = defaultdict(list)
-        for seq in seq2cluster:
-            cluster2seq[seq2cluster[seq]].append(seq)
-        for i in fastq_handles:
-            fastq_handles[i].close()
+        for seq, cluster in seq2cluster.items():
+            cluster2seq[cluster].append(seq)
+        for handle in fastq_handles.values():
+            handle.close()
         return fastq_handles, cluster2seq
 
     def _cluster_seqs_from_isonclust3(
@@ -789,8 +789,8 @@ class Pipeline:
             if seqname in seq2cluster and seq2cluster[seqname] in fastq_handles:
                 fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
                 fastq_handles[seq2cluster[seqname]].write(fastq_rec)
-        for i in fastq_handles:
-            fastq_handles[i].close()
+        for handle in fastq_handles.values():
+            handle.close()
         return fastq_handles, cluster2seq
 
     @check_stage_file(
@@ -850,8 +850,8 @@ class Pipeline:
                 [(c, handle.name) for c, handle in fastq_handles.items()],
             )
 
-        for i in fastq_handles.values():  # close NamedTemporaryFile handles
-            i.close()
+        for handle in fastq_handles.values():  # close NamedTemporaryFile handles
+            handle.close()
 
         cluster_cons = dict(cluster_cons_tuples)
 
@@ -966,7 +966,7 @@ class Pipeline:
                             self._stats["flanking"][seqid]["post"],
                         )
         self._stats["flanking kmer histo"] = {
-            cluster: kmer_tables[cluster].histo() for cluster in kmer_tables
+            cluster: kmer_table.histo() for cluster, kmer_table in kmer_tables.items()
         }
 
     @check_stage_file(
@@ -1067,7 +1067,7 @@ class Pipeline:
         self._stats.update(
             {
                 "initial_taxonomy": Counter(
-                    [";".join(i[0:taxlevel]) for i in common_taxstrings.values()]
+                    [";".join(i[0:taxlevel]) for i in common_taxstrings.values()],
                 ),
             },
         )
@@ -1134,15 +1134,14 @@ class Pipeline:
                         strict=False,
                     )
                 )
-                cigar = [i for i in spl if i.startswith("cg:Z:")][0]
+                cigar = next(i for i in spl if i.startswith("cg:Z:"))
                 # Calculate derived metrics from PAF fields
                 cigar_summary = parse_cigar_ops(cigar[5:])
                 hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
+                # remove redundant % sign for display
                 hits["align %id"] = "{:.2%}".format(
-                    int(hits["alnmatch"]) / int(hits["alnlen"])
-                ).rstrip(
-                    "%",
-                )  # remove redundant % sign for display
+                    int(hits["alnmatch"]) / int(hits["alnlen"]),
+                ).rstrip("%")
                 hits["query %aln"] = "{:.2%}".format(
                     (int(hits["qend"]) - int(hits["qstart"])) / int(hits["qlen"]),
                 ).rstrip("%")
@@ -1152,36 +1151,35 @@ class Pipeline:
                 out[spl[0]] = hits
 
         # Taxonomy of hit targets
-        for c in out:
+        for rec in out.values():
             try:
                 # hyperlink to ENA record
-                out[c]["tophit"] = (
+                rec["tophit"] = (
                     "["
-                    + out[c]["tname"]
+                    + rec["tname"]
                     + "](https://www.ebi.ac.uk/ena/browser/view/"
-                    + out[c]["tname"].split(".")[0]
+                    + rec["tname"].split(".")[0]
                     + ")"
                 )
-                out[c]["tophit taxonomy"] = ";".join(self._acc2tax[out[c]["tname"]])
-                out[c]["tophit species"] = self._acc2tax[out[c]["tname"]][-1]
+                rec["tophit taxonomy"] = ";".join(self._acc2tax[rec["tname"]])
+                rec["tophit species"] = self._acc2tax[rec["tname"]][-1]
                 # Higher taxonomy to class level, except for chloroplast and mitochondria
                 # Assumes SILVA taxonomy is in use
-                if out[c]["tophit taxonomy"].startswith(
+                if rec["tophit taxonomy"].startswith(
                     "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast",
                 ):
-                    out[c]["higher taxonomy"] = "[Eukaryotic organelle Chloroplast]"
-                elif out[c]["tophit taxonomy"].startswith(
+                    rec["higher taxonomy"] = "[Eukaryotic organelle Chloroplast]"
+                elif rec["tophit taxonomy"].startswith(
                     "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria",
                 ):
-                    out[c]["higher taxonomy"] = "[Eukaryotic organelle Mitochondria]"
+                    rec["higher taxonomy"] = "[Eukaryotic organelle Mitochondria]"
                 else:
-                    out[c]["higher taxonomy"] = "; ".join(
-                        self._acc2tax[out[c]["tname"]][0:-1],
+                    rec["higher taxonomy"] = "; ".join(
+                        self._acc2tax[rec["tname"]][0:-1],
                     )
             except KeyError as e:
-                raise KeyError(
-                    f"Accession {out[c]['tname']} not found in database?"
-                ) from e
+                e.add_note(f"Accession {rec['tname']} not found in database?")
+                raise
         self._stats.update({"cluster_tophits": out})
 
     @check_stage_file(
@@ -1203,13 +1201,11 @@ class Pipeline:
                     / Path(self._prefix + "_aln_cluster_" + str(c) + ".fasta"),
                     "w",
                 ) as fh:
-                    for hdr in self._stats["cluster cons parsed"][c]:
-                        fh.write(">" + hdr + "\n")
-                        fh.write(self._stats["cluster cons parsed"][c][hdr] + "\n")
+                    for hdr, seq in self._stats["cluster cons parsed"][c].items():
+                        fh.write(">" + hdr + "\n" + seq + "\n")
         except KeyError as e:
-            raise Exception(
-                "Key `cluster cons parsed` not found, has spoa been run?"
-            ) from e
+            e.add_note("Key `cluster cons parsed` not found, has spoa been run?")
+            raise
 
     @check_stage_file(
         stage="report_dvs_hist",
