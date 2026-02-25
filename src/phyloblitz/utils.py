@@ -1,8 +1,8 @@
 import logging
 import re
 from collections import defaultdict
-from os import W_OK, access, makedirs
-from os.path import exists, isdir
+from os import W_OK, access
+from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen
 from sys import version as python_version
 from matplotlib import __version__ as matplotlib_version
@@ -132,10 +132,11 @@ def check_outdir(outdir, resume=True):
     :param outdir: Path to output directory
     :param resume: If True, allow existing output directory to be used for resuming
     """
-    if not exists(outdir):
-        makedirs(outdir, exist_ok=False)
+    outdir = Path(outdir)
+    if not Path.exists(outdir):
+        Path.mkdir(outdir, parents=True, exist_ok=False)
         logger.debug("Created output directory: %s", outdir)
-    elif not isdir(outdir):
+    elif not Path.is_dir(outdir):
         msg = f"Output path {outdir!s} exists but is not a directory."
         raise NotADirectoryError(msg)
     # outdir exists but is not writable

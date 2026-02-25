@@ -1,12 +1,12 @@
 import json
 import logging
-import os.path
 import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from functools import wraps
 from multiprocessing import Pool
+from pathlib import Path
 from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
@@ -32,7 +32,7 @@ from phyloblitz.utils import (
 logger = logging.getLogger(__name__)
 
 
-def get_firstpass_intervals(sam_file: str, minlen: int = 1200) -> dict:
+def get_firstpass_intervals(sam_file: str | Path, minlen: int = 1200) -> dict:
     """Filter initial alignment to get primary mappings for all-vs-all mapping.
 
     :param sam_file: Path to SAM file from initial mapping step
@@ -77,7 +77,10 @@ def merge_intervals(intervals: list) -> list:
 
 
 def sam_seq_generator(
-    sam_file: str, minlen: int = 1200, no_supplementary: bool = False, flanking: int = 0
+    sam_file: str | Path,
+    minlen: int = 1200,
+    no_supplementary: bool = False,
+    flanking: int = 0,
 ) -> tuple:
     """Filter SAM alignment to get primary mappings for all-vs-all mapping.
 
@@ -142,7 +145,7 @@ def spoa_assemble_fasta(label_fastq: tuple) -> tuple[str, str]:
     """
     label, fastq = label_fastq
     cmd = ["spoa", "-r", "2", fastq]
-    logger.debug("spoa command: %s", " ".join(cmd))
+    logger.debug("spoa command: %s", " ".join([str(i) for i in cmd]))
     proc = Popen(cmd, stdout=PIPE, text=True)
     # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
     # ignoring stderr from spoa for now
@@ -212,8 +215,8 @@ def count_spoa_aln_vars(seqs: dict) -> dict:
     return var
 
 
-def count_spoa_aln_persite_vars(seqs: dict) -> dict:  # TODO WIP
-    """Count mismatches/gaps per alignment position for clustered sequences vs consensus.
+def count_spoa_aln_persite_vars(seqs: dict) -> dict:
+    """[WIP] Calculate entropy per alignment position for clustered sequences vs consensus.
 
     If mismatches/gaps between sequences and the consensus are solely due to
     technical sequencing error, rather than erroneous clustering of divergent
@@ -279,19 +282,20 @@ class Pipeline:
         :returns: True if file already exists at expected path
         :rtype: bool
         """
-        return os.path.isfile(self.pathto(stage))
+        return Path.is_file(self.pathto(stage))
 
-    def pathto(self, stage: str, basename_only: bool = False):
+    def pathto(self, stage: str, basename_only: bool = False) -> Path:
         """Combine output directory prefix and filenames to intermediate file path.
 
         :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
         :param basename_only: Only report the base filename if True
         :returns: Expected path to intermediate output file
+        :rtype: Path
         """
         try:
             if basename_only:
-                return os.path.basename(self._prefix + self.OUTFILE_SUFFIX[stage])
-            return os.path.join(self._outdir, self._prefix + self.OUTFILE_SUFFIX[stage])
+                return Path(Path(self._prefix + self.OUTFILE_SUFFIX[stage]).name)
+            return Path(self._outdir) / Path(self._prefix + self.OUTFILE_SUFFIX[stage])
         except KeyError as e:
             raise Exception(f"Unknown intermediate file {stage}") from e
 
@@ -370,7 +374,7 @@ class Pipeline:
             logger.debug("Sampled reads in temporary file %s", temp_infile.name)
 
         logger.info("Mapping reads to reference database with minimap2")
-        with open(self.pathto("initial_map"), "w") as sam_fh:
+        with Path.open(self.pathto("initial_map"), "w") as sam_fh:
             cmd1 = [
                 "minimap2",
                 "-ax",
@@ -385,7 +389,7 @@ class Pipeline:
                 if self._refindex is not None
                 else cmd1.extend([self._ref, infile])
             )
-            logger.debug("minimap command: %s", " ".join(cmd1))
+            logger.debug("minimap command: %s", " ".join([str(i) for i in cmd1]))
             proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
             nreads = 0
             for l in proc1.stderr:
@@ -411,7 +415,7 @@ class Pipeline:
         :rtype: tuple
         """
         # Don't use mappy because it doesn't support all-vs-all yet
-        with open(self.pathto("second_map"), "w") as sam_fh:
+        with Path.open(self.pathto("second_map"), "w") as sam_fh:
             cmd1 = [
                 "minimap2",
                 "-ax",
@@ -426,7 +430,7 @@ class Pipeline:
                 if self._refindex is not None
                 else cmd1.extend([self._ref, self.pathto("intervals_fastq")])
             )
-            logger.debug("minimap command: %s", " ".join(cmd1))
+            logger.debug("minimap command: %s", " ".join([str(i) for i in cmd1]))
             proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
             nreads = 0
             for l in proc1.stderr:
@@ -448,7 +452,7 @@ class Pipeline:
         )
         self._stats.update({"merged_intervals": merged_intervals})
         counter = 0
-        with open(self.pathto("intervals_fastq"), "w") as fh:
+        with Path.open(self.pathto("intervals_fastq"), "w") as fh:
             for name, seq, qual in pyfastx.Fastx(self._reads):
                 if name in merged_intervals:
                     for start, end in merged_intervals[name]:
@@ -486,7 +490,7 @@ class Pipeline:
         sam_file = self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
-        with open(self.pathto("mapped_segments"), "w") as fq_fh:
+        with Path.open(self.pathto("mapped_segments"), "w") as fq_fh:
             for (
                 name,
                 seq,
@@ -535,7 +539,7 @@ class Pipeline:
             "lr:hq": ["-x", "lr:hq", "-Xw5", "-e0", "-m100", "-r2k"],
             "map-hifi": ["-x", "map-hifi", "-Xw5", "-e0", "-m100"],
         }
-        with open(self.pathto("ava_map"), "w") as paf_fh:
+        with Path.open(self.pathto("ava_map"), "w") as paf_fh:
             cmd = (
                 [
                     "minimap2",
@@ -548,7 +552,7 @@ class Pipeline:
                     self.pathto("mapped_segments"),
                 ]
             )
-            logger.debug("minimap command: %s", " ".join(cmd))
+            logger.debug("minimap command: %s", " ".join([str(i) for i in cmd]))
             proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
             for l in proc.stderr:
                 logger.debug("  minimap log: %s", l.decode().rstrip())
@@ -576,8 +580,8 @@ class Pipeline:
         counter_all = 0
         counter = 0
         with (
-            open(self.pathto("ava_map")) as fh_in,
-            open(self.pathto("ava_filter"), "w") as fh_out,
+            Path.open(self.pathto("ava_map")) as fh_in,
+            Path.open(self.pathto("ava_filter"), "w") as fh_out,
         ):
             for line in fh_in:
                 counter_all += 1
@@ -598,14 +602,14 @@ class Pipeline:
         """
         logger.info("Reading dvs data from ava mapping")
         dvs = defaultdict(list)
-        with open(self.pathto("ava_filter")) as fh:
+        with Path.open(self.pathto("ava_filter")) as fh:
             for line in fh:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
                 dv = re.findall(r"dv:f:([\d\.]+)", line)
                 assert (
                     len(dv) == 1
-                ), f"Problem in PAF file {self.pathto('ava_filter')}: more than one dv tag in entry"
+                ), f"Problem in PAF file {str(self.pathto('ava_filter'))}: more than one dv tag in entry"
                 dvs[query].append(float(dv[0]))
         self._stats.update({"dvs": dvs})
         # min dv for each read, to get dv distribution and median to
@@ -646,7 +650,7 @@ class Pipeline:
                 2 * float(self._stats["runstats"]["ava min dvs median"]),
             )
         edges = []
-        with open(self.pathto("ava_filter")) as fh_paf:
+        with Path.open(self.pathto("ava_filter")) as fh_paf:
             for line in fh_paf:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
@@ -660,7 +664,7 @@ class Pipeline:
         matrix, labels = pymcl.edges_to_sparse_matrix(edges)
         mcl_matrix = pymcl.mcl(matrix, inflation=inflation)
         clusters = pymcl.extract_clusters(mcl_matrix, labels)
-        with open(self.pathto("mcl_cluster"), "w") as fh:
+        with Path.open(self.pathto("mcl_cluster"), "w") as fh:
             fh.writelines("\t".join(c) + "\n" for c in clusters)
 
     @check_stage_file(
@@ -681,8 +685,8 @@ class Pipeline:
         elif self._platform in ["map-hifi", "map-pb"]:
             isonclust3_mode = "pacbio"
         # isonclust3 takes output folder path as argument, automatically
-        # creates `clustering` subfolder
-        outfolder = os.path.dirname(os.path.dirname(self.pathto("isonclust3_cluster")))
+        # creates `clustering` subfolder, so go two levels up
+        outfolder = self.pathto("isonclust3_cluster").parent.parent
         cmd = [
             "isONclust3",
             "--no-fastq",
@@ -695,14 +699,14 @@ class Pipeline:
         ]
         if isonclust3_mode == "ont":
             cmd.append("--post-cluster")
-        logger.debug("isonclust3 command: %s", " ".join(cmd))
+        logger.debug("isonclust3 command: %s", " ".join([str(i) for i in cmd]))
         proc = Popen(cmd, stdout=PIPE)
         for l in proc.stdout:
             logger.debug("  isonclust3 log: %s", l.decode().rstrip())
         return proc.wait()
 
     def _cluster_seqs_from_mcl(
-        self, mcl_out, reads, keeptmp, min_clust_size=5
+        self, mcl_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
     ) -> tuple:
         """Extract sequences from each MCL cluster to separate Fastq files for assembly.
 
@@ -716,7 +720,7 @@ class Pipeline:
         counter = 0
         fastq_handles = {}
         seq2cluster = {}
-        with open(mcl_out) as fh:
+        with Path.open(mcl_out) as fh:
             for line in fh:
                 seqs = line.rstrip().split("\t")
                 logger.info("Cluster %d comprises %d sequences", counter, len(seqs))
@@ -744,7 +748,7 @@ class Pipeline:
         return fastq_handles, cluster2seq
 
     def _cluster_seqs_from_isonclust3(
-        self, isonclust3_out, reads, keeptmp, min_clust_size=5
+        self, isonclust3_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
     ) -> tuple:
         """Extract sequences from each isONclust3 cluster to separate Fastq files for assembly.
 
@@ -761,7 +765,7 @@ class Pipeline:
         """
         fastq_handles = {}
         seq2cluster = {}
-        with open(isonclust3_out) as fh:
+        with Path.open(isonclust3_out) as fh:
             for line in fh:
                 (clust, seqname) = line.rstrip().split("\t")
                 seq2cluster[seqname] = clust
@@ -866,7 +870,7 @@ class Pipeline:
                 "cluster cons parsed": cluster_cons_parsed,
             },
         )
-        with open(self.pathto("cluster_asm"), "w") as fh:
+        with Path.open(self.pathto("cluster_asm"), "w") as fh:
             fh.writelines(
                 f">cluster_{c!s} Consensus\n"
                 + cluster_cons_parsed[c]["Consensus"].replace("-", "")
@@ -919,7 +923,9 @@ class Pipeline:
                     ]
                     if isonclust3_mode == "ont":
                         cmd.append("--post-cluster")
-                    logger.debug("isonclust3 command: %s", " ".join(cmd))
+                    logger.debug(
+                        "isonclust3 command: %s", " ".join([str(i) for i in cmd])
+                    )
                     proc = Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
                     proc_stdout, _proc_stderr = proc.communicate()
                     num_clusters = re.search(
@@ -1017,7 +1023,7 @@ class Pipeline:
         """
         logger.info("Reading taxonomy from SILVA database file")
         self._acc2tax = {}
-        with open(self._ref) as fh:
+        with Path.open(self._ref) as fh:
             for line in fh:
                 if line.startswith(">"):
                     spl = line.lstrip(">").rstrip().split(" ")
@@ -1026,7 +1032,9 @@ class Pipeline:
                     self._acc2tax[acc] = taxstring
         logger.debug(" Accessions read: %d", len(self._acc2tax))
 
-    def _per_read_consensus_taxonomy(self, sam_file: str, minlen: int = 1200) -> dict:
+    def _per_read_consensus_taxonomy(
+        self, sam_file: str | Path, minlen: int = 1200
+    ) -> dict:
         """Consensus taxonomy of a single read from initial mapping with minimap2.
 
         :param sam_file: Path to SAM file of initial mapping
@@ -1090,7 +1098,7 @@ class Pipeline:
             if self._refindex is not None
             else cmd.extend([self._ref, self.pathto("cluster_asm")])
         )
-        logger.debug("minimap command: %s", " ".join(cmd))
+        logger.debug("minimap command: %s", " ".join([str(i) for i in cmd]))
         proc = Popen(cmd, stderr=PIPE)
         for l in proc.stderr:
             logger.debug("  minimap log: %s", l.decode().rstrip())
@@ -1104,7 +1112,7 @@ class Pipeline:
         """
         out = {}
 
-        with open(self.pathto("cluster_tophits")) as fh:
+        with Path.open(self.pathto("cluster_tophits")) as fh:
             for line in fh:
                 spl = line.rstrip().split("\t")
                 hits = dict(
@@ -1183,17 +1191,16 @@ class Pipeline:
     def write_report_json(self):
         """Dump run stats file in JSON format for troubleshooting."""
         self._stats.update({"endtime": str(datetime.now())})
-        with open(self.pathto("report_json"), "w") as fh:
+        with Path.open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
 
     def write_cluster_alns(self):
         """Dump cluster alignments for troubleshooting."""
         try:
             for c in self._stats["cluster cons parsed"]:
-                with open(
-                    os.path.join(
-                        self._outdir, self._prefix + "_aln_cluster_" + str(c) + ".fasta"
-                    ),
+                with Path.open(
+                    Path(self._outdir)
+                    / Path(self._prefix + "_aln_cluster_" + str(c) + ".fasta"),
                     "w",
                 ) as fh:
                     for hdr in self._stats["cluster cons parsed"][c]:
@@ -1228,7 +1235,7 @@ class Pipeline:
     )
     def write_report_markdown(self):
         """Write final report in markdown format."""
-        with open(self.pathto("report_md"), "w") as fh:
+        with Path.open(self.pathto("report_md"), "w") as fh:
             fh.write(
                 generate_report_md(
                     self._stats,
@@ -1243,7 +1250,7 @@ class Pipeline:
     )
     def write_report_html(self):
         """Write final report in HTML format."""
-        with open(self.pathto("report_html"), "w") as fh:
+        with Path.open(self.pathto("report_html"), "w") as fh:
             fh.write(
                 generate_report_html(
                     self._stats,

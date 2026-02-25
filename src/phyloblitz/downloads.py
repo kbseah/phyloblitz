@@ -1,9 +1,9 @@
 import hashlib
 import logging
-import os.path
-
 import requests
+
 from packaging.version import Version
+from pathlib import Path
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 DB_URL_SILVA = "https://zenodo.org/api/records/18627380/versions"
 
 
-def list_versions():
+def list_versions() -> tuple[dict, Version | None]:
     """List available versions of reference databases on Zenodo.
 
     :return: A dict of versions with their metadata keyed by version number,
@@ -46,10 +46,17 @@ def list_versions():
                 }
         return versions, max([Version(v) for v in versions])
     logger.error("Failed to fetch versions: %s", str(response.status_code))
-    return [], None
+    return {}, None
 
 
-def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite=False):
+def get_file(
+    versions: dict,
+    which_db: str,
+    db_version: str,
+    outdir: str = ".",
+    dryrun: bool = False,
+    overwrite: bool = False,
+) -> Path:
     """Download reference database file from Zenodo.
 
     :param versions: A dict of versions with their metadata keyed by version
@@ -68,8 +75,8 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
         msg = f"{which_db!s} database not found in version {db_version!s}."
         raise ValueError(msg)
     logger.info("Downloading %s database version %s ...", which_db, db_version)
-    outpath = os.path.join(outdir, versions[db_version]["files"][which_db]["filename"])
-    if os.path.exists(outpath):
+    outpath = Path(outdir) / Path(versions[db_version]["files"][which_db]["filename"])
+    if Path.exists(outpath):
         if overwrite:
             logger.warning(
                 "File %s already exists, but overwrite is enabled. Overwriting.",
@@ -93,7 +100,7 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
         total_size = int(response.headers.get("Content-Length", 0))
         logger.debug("Expected total file size: %d bytes", total_size)
         with (
-            open(outpath, "wb") as f,
+            Path.open(outpath, "wb") as f,
             tqdm(
                 total=total_size,
                 unit="B",
@@ -114,7 +121,9 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
     raise ConnectionError(f"Failed to download file: {response.status_code!s}")
 
 
-def check_md5sum_file(versions, which_db, db_version, outpath):
+def check_md5sum_file(
+    versions: dict, which_db: str, db_version: str, outpath: Path
+) -> bool:
     """Check MD5 checksum of downloaded file.
 
     :param versions: A dict of versions with their metadata keyed by version
@@ -132,7 +141,7 @@ def check_md5sum_file(versions, which_db, db_version, outpath):
         msg = f"Checksum type {checksum_type!s} not supported. Only md5 is supported."
         raise NotImplementedError(msg)
     md5_hash = hashlib.md5()
-    with open(outpath, "rb") as f:
+    with Path.open(outpath, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
             md5_hash.update(byte_block)
     calculated_md5 = md5_hash.hexdigest()
