@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_firstpass_intervals(sam_file: str | Path, minlen: int = 1200) -> dict:
-    """Filter initial alignment to get primary mappings for all-vs-all mapping.
+    """[DEPRECATED] Filter initial alignment to get primary mappings for all-vs-all mapping.
 
     :param sam_file: Path to SAM file from initial mapping step
     :param minlen: Minimum query alignment length; adjust if targeting a
-         ifferent gene, e.g. LSU rRNA
+         different gene, e.g. LSU rRNA
     :returns: Lists of intervals with hits per read, keyed by read name
     :rtype: dict
     """
@@ -62,14 +62,17 @@ def get_firstpass_intervals(sam_file: str | Path, minlen: int = 1200) -> dict:
 def merge_intervals(intervals: list) -> list:
     """Merge overlapping numerical intervals.
 
-    :param intervals: List of tuples of (start, end) coordinates
-    :returns: List of tuples of intervals with overlaps merged
+    Intervals which touch will be merged, e.g. (0, 10), (10, 20) --> (0, 20).
+
+    :param intervals: List of tuples of [start, end) 0-based pythonic,
+        non-negative coordinates.
+    :returns: List of tuples of intervals with overlaps merged, sorted by start
     :rtype: list
     """
     intervals.sort(key=lambda i: i[0])  # sort in place
     merged = [intervals[0]]
     for curr in intervals[1:]:
-        if curr[0] < merged[-1][1]:
+        if curr[0] <= merged[-1][1]:
             merged[-1] = (merged[-1][0], max(curr[1], merged[-1][1]))
         else:
             merged.append(curr)
@@ -82,7 +85,7 @@ def sam_seq_generator(
     no_supplementary: bool = False,
     flanking: int = 0,
 ) -> tuple:
-    """Filter SAM alignment to get primary mappings for all-vs-all mapping.
+    """Filter SAM alignment to get read segments for all-vs-all mapping.
 
     This uses pysam.AlignedSegment.query_sequence; if the read is mapped to
     reverse strand, the sequence and coordinates are already

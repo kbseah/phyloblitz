@@ -1,6 +1,6 @@
 import unittest
 
-from phyloblitz.pipeline import count_spoa_aln_vars, parse_spoa_r2
+from phyloblitz.pipeline import count_spoa_aln_vars, merge_intervals, parse_spoa_r2
 
 
 class TestReportFunctions(unittest.TestCase):
@@ -24,6 +24,23 @@ class TestReportFunctions(unittest.TestCase):
                 o["S1"]["query_gap"],
             ],
             [3, 2, 3, 1, 1],
+        )
+
+    def test_merge_intervals(self):
+        intervals = [
+            (1, 5),
+            (20, 25),
+            (24, 30),
+            (80, 85),
+            (85, 90),
+            (92, 95),
+            (96, 100),
+        ]
+        result = [(1, 5), (20, 30), (80, 90), (92, 95), (96, 100)]
+        out = merge_intervals(intervals)
+        self.assertEqual(
+            sorted(result),
+            sorted(out),
         )
 
 
