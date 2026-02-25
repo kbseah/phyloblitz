@@ -191,7 +191,7 @@ as a direct measure of abundance, because the number of copies of rRNA genes
 per genome is variable between species. Eukaryotes especially often have high
 copy rRNA copy numbers.
 
-{dict2markdowntable(stats['initial_taxonomy'], order_by_value=True, col1='Taxon', col2='Read count')}
+{dict2markdowntable(stats["initial_taxonomy"], order_by_value=True, col1="Taxon", col2="Read count")}
 
 ## Assembled marker sequence clusters
 
@@ -203,7 +203,7 @@ design. Clusters with a high number of underlying reads but low alignment
 identity to a reference sequence may represent novel taxa, but should be
 checked for sequence chimerism or misassembly.
 
-{dod2markdowntable(per_cluster_summarize(stats), cluster_table_fields, col1='Cluster ID')}
+{dod2markdowntable(per_cluster_summarize(stats), cluster_table_fields, col1="Cluster ID")}
 
 <figure>
 

@@ -32,33 +32,6 @@ from phyloblitz.utils import (
 logger = logging.getLogger(__name__)
 
 
-def get_firstpass_intervals(sam_file: str | Path, minlen: int = 1200) -> dict:
-    """[DEPRECATED] Filter initial alignment to get primary mappings for all-vs-all mapping.
-
-    :param sam_file: Path to SAM file from initial mapping step
-    :param minlen: Minimum query alignment length; adjust if targeting a
-         different gene, e.g. LSU rRNA
-    :returns: Lists of intervals with hits per read, keyed by read name
-    :rtype: dict
-    """
-    logger.info("Filtering initial alignment to get aligned regions to extract")
-    regions = defaultdict(list)
-    sam = pysam.AlignmentFile(sam_file, "r")
-    for i in sam.fetch():
-        if i.query_alignment_length >= minlen:
-            # include secondary and supplementary alignments
-            # if sequence is left-hardclipped, correct the coordinates
-            # because pysam's query_alignment_start does not count hardclips!
-            qstart, qend = i.query_alignment_start, i.query_alignment_end
-            if i.cigartuples[0][0] == 5:
-                qstart += i.cigartuples[0][1]
-                qend += i.cigartuples[0][1]
-            regions[i.query_name].append((qstart, qend))
-    logger.debug("Reads processed %d", len(regions))
-    # merge intervals for each read
-    return {i: merge_intervals(regions[i]) for i in regions}
-
-
 def merge_intervals(intervals: list) -> list:
     """Merge overlapping numerical intervals.
 
@@ -421,71 +394,6 @@ class Pipeline:
                 logger.debug("  minimap log: %s", l.decode().rstrip())
             self._stats["runstats"].update({"total input reads": nreads})
             return proc1.wait()
-
-    @check_stage_file(
-        stage="second_map",
-        message="[DEPRECATED] Twopass mode: Second mapping of extracted intervals for taxonomic summary",
-    )
-    def run_minimap_secondmap(self, threads=12, mode="map-ont"):
-        """DEPRECATED Map reads to reference database with minimap2.
-
-        Only report reads that are mapped.
-
-        :param threads: Number of threads for minimap2 to use
-        :param mode: Mapping preset for minimap2, either `map-ont` or `map-pb`
-        :returns: return code for samtools
-        :rtype: tuple
-        """
-        # Don't use mappy because it doesn't support all-vs-all yet
-        with Path.open(self.pathto("second_map"), "w") as sam_fh:
-            cmd1 = [
-                "minimap2",
-                "-ax",
-                mode,
-                "--sam-hit-only",
-                "--secondary=no",
-                "-Y",
-                f"-t {threads!s}",
-            ]
-            (
-                cmd1.extend([self._refindex, self.pathto("intervals_fastq")])
-                if self._refindex is not None
-                else cmd1.extend([self._ref, self.pathto("intervals_fastq")])
-            )
-            logger.debug("minimap command: %s", " ".join([str(i) for i in cmd1]))
-            proc1 = Popen(cmd1, stdout=sam_fh, stderr=PIPE)
-            nreads = 0
-            for l in proc1.stderr:
-                nreads_s = re.search(r"mapped (\d+) sequences", l.decode())
-                if nreads_s:
-                    nreads += int(nreads_s.group(1))
-                logger.debug("  minimap log: %s", l.decode().rstrip())
-            self._stats["runstats"].update({"total input reads secondmap": nreads})
-            return proc1.wait()
-
-    @check_stage_file(
-        stage="intervals_fastq",
-        message="[DEPRECATED] Twopass mode: Extract aligned intervals on reads",
-    )
-    def twopass_extract_read_intervals(self, minlen=1200):
-        """DEPRECATED"""
-        merged_intervals = get_firstpass_intervals(
-            self.pathto("initial_map"), minlen=minlen
-        )
-        self._stats.update({"merged_intervals": merged_intervals})
-        counter = 0
-        with Path.open(self.pathto("intervals_fastq"), "w") as fh:
-            for name, seq, qual in pyfastx.Fastx(self._reads):
-                if name in merged_intervals:
-                    for start, end in merged_intervals[name]:
-                        newname = ":".join([str(i) for i in [name, start, end]])
-                        fh.write("@" + newname + "\n")
-                        fh.write(seq[start:end] + "\n")
-                        fh.write("+\n")
-                        fh.write(qual[start:end] + "\n")
-                        counter += 1
-        self._stats["runstats"].update({"firstpass intervals extracted": counter})
-        logger.info("Twopass mode: Read intervals extracted: %d", counter)
 
     @check_stage_file(
         stage="mapped_segments",
