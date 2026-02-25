@@ -86,7 +86,8 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
         )
         return outpath
     response = requests.get(
-        versions[db_version]["files"][which_db]["download_url"], stream=True,
+        versions[db_version]["files"][which_db]["download_url"],
+        stream=True,
     )
     if response.status_code == 200:
         total_size = int(response.headers.get("Content-Length", 0))
@@ -107,7 +108,7 @@ def get_file(versions, which_db, db_version, outdir=".", dryrun=False, overwrite
                 pbar.update(len(chunk))
         logger.info(
             "Downloaded %s successfully.",
-            versions[db_version]['files'][which_db]["filename"],
+            versions[db_version]["files"][which_db]["filename"],
         )
         return outpath
     raise ConnectionError(f"Failed to download file: {response.status_code!s}")
