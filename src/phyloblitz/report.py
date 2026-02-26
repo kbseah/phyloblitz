@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from mistune import create_markdown, html
@@ -30,13 +31,13 @@ HTML_TEMPLATE = """
 
 
 def dict2markdowntable(
-    d,
-    keys=None,
-    col1="Parameter",
-    col2="Value",
-    order_by_value=False,
-    order_descending=True,
-):
+    d: dict,
+    keys: list | None = None,
+    col1: str = "Parameter",
+    col2: str = "Value",
+    order_by_value: bool = False,
+    order_descending: bool = True,
+) -> str:
     """Convert dict to a markdown table
 
     Key will be cast as row names
@@ -71,8 +72,13 @@ def dict2markdowntable(
 
 
 def dod2markdowntable(
-    d, keys, order_by_value=True, order_descending=True, order_by="numseq", col1="Name"
-):
+    d: dict,
+    keys: list,
+    order_by_value: bool = True,
+    order_descending: bool = True,
+    order_by: str = "numseq",
+    col1: str = "Name",
+) -> str:
     """Convert dict of dicts to a markdown table.
 
     The first key will be cast as row names, second key as column names.
@@ -86,7 +92,8 @@ def dod2markdowntable(
     :returns: Text table in markdown format
     :rtype: str
     """
-    assert order_by in keys
+    if order_by not in keys:
+        raise KeyError
     out = []
     out.append(f"| {col1} | " + " | ".join(keys) + " |")
     out.append("| :----: | " + " | ".join([":----:"] * len(keys)) + " |")
@@ -105,7 +112,13 @@ def dod2markdowntable(
     return "\n".join(out)
 
 
-def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
+def generate_histogram(
+    vals,
+    vline: int | float,
+    title: str,
+    outfile: str | Path,
+    figsize: tuple[int, int] = (3, 2),
+) -> None:
     """Generate plots for report file.
 
     :param vals: Iterable of values to generate histogram for
@@ -124,7 +137,9 @@ def generate_histogram(vals, vline, title, outfile, figsize=(3, 2)):
     fig.savefig(outfile)
 
 
-def generate_report_md(stats, histogram_file_path, kmercount_plot_path):
+def generate_report_md(
+    stats: dict, histogram_file_path: str | Path, kmercount_plot_path: str | Path
+) -> str:
     """Generate markdown report from stats collected during phyloblitz run.
 
     :param stats: `stats` dict produced in phyloblitz.main.main
@@ -244,7 +259,11 @@ HTML styling with [Simple.css](https://simplecss.org/)
     return format_md(raw)
 
 
-def generate_report_html(stats, histogram_file_path, kmercount_plot_path):
+def generate_report_html(
+    stats: dict,
+    histogram_file_path: str | Path,
+    kmercount_plot_path: str | Path,
+) -> str:
     """Generate HTML report from stats collected during phyloblitz run.
 
     Same parameters as `generate_report_md`
@@ -258,7 +277,14 @@ def generate_report_html(stats, histogram_file_path, kmercount_plot_path):
     ).replace("{{title}}", "phyloblitz run report")
 
 
-def per_cluster_summarize(stats):
+def per_cluster_summarize(stats: dict) -> dict:
+    """Summarize stats for each read cluster.
+
+    :param stats: Pipeline._stats dict
+    :returns: Dict of summary stats keyed by cluster ID (numbered, prefixed
+        with "cluster_")
+    :rtype: dict
+    """
     out = defaultdict(lambda: defaultdict(dict))
     for c in stats["cluster2seq"]:
         # unique reads from which mapped segments are derived
