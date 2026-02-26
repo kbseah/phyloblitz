@@ -542,9 +542,9 @@ class Pipeline:
                 spl = line.rstrip().split("\t")
                 query = spl[0]
                 dv = re.findall(r"dv:f:([\d\.]+)", line)
-                assert (
-                    len(dv) == 1
-                ), f"Problem in PAF file {str(self.pathto('ava_filter'))}: more than one dv tag in entry"
+                if len(dv) != 1:
+                    msg = f"Problem in PAF file {str(self.pathto('ava_filter'))}: more than one dv tag in entry"
+                    raise ValueError(msg)
                 dvs[query].append(float(dv[0]))
         self._stats.update({"dvs": dvs})
         # min dv for each read, to get dv distribution and median to
