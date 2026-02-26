@@ -433,6 +433,7 @@ class Pipeline:
         sam_file = self.pathto("initial_map")
         counter = 0
         self._stats["flanking"] = {}
+        self._stats["reads2segment"] = {}
         with Path.open(self.pathto("mapped_segments"), "w") as fq_fh:
             for rec in sam_seq_generator(
                 sam_file,
@@ -441,6 +442,30 @@ class Pipeline:
                 flanking=flanking,
             ):
                 name = ":".join([str(rec[i]) for i in ["rname", "start", "end"]])
+                if rec["rname"] not in self._stats["reads2segment"]:
+                    # Update reads2segment
+                    self._stats["reads2segment"][rec["rname"]] = [
+                        (rec["start"], rec["end"], name),
+                    ]
+                else:
+                    # Check whether overlapping segment is already present
+                    merged = [
+                        (
+                            other_name,
+                            merge_intervals([(s, e), (rec["start"], rec["end"])]),
+                        )
+                        for (s, e, other_name) in self._stats["reads2segment"][
+                            rec["rname"]
+                        ]
+                    ]
+                    merged = [i for i in merged if len(i[1]) == 1]
+                    if len(merged) > 0:
+                        logger.debug(
+                            "Segment %s overlaps with: %s ... skipping...",
+                            name,
+                            ", ".join([i[0] for i in merged]),
+                        )
+                        continue
                 counter += 1
                 fq_fh.write(
                     "@" + name + "\n" + rec["seq"] + "\n+\n" + rec["quals"] + "\n",
