@@ -29,31 +29,31 @@
  - [x] Account for multiple SSUs in one read; see supplementary alignments
 
 
-## v0.3.0 targets
+## v1.0.0 targets
 
+ - [x] Pretty log messages
  - [x] Deprecate two-pass mode
  - [x] Subcommands for run and database download
  - [x] Database download from Zenodo with checksums
  - [x] Parse supplementary alignments by default
- - [ ] Avoid duplicate segments extracted from overlapping supplementary
-       alignments
+ - [x] Skip duplicate segments extracted from overlapping alignments
+ - [ ] Downsample clusters with too many reads for assembly (~500 should be ok)
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
-
-
-## Future plans
-
  - [ ] Multisample comparison and co-assembly
+
+
+## Future plans/ideas
+
+ - [ ] Detailed documentation
+ - [ ] MultiQC integration
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
        Aestuariibacter sequence in SRR28830816
- - [ ] Divergence of reads in each cluster from consensus to detect potential
-       chimeras
- - [ ] Detailed documentation
+ - [ ] Divergence of reads vs consensus in cluster to detect chimeras
  - [ ] Does extracting flanking sequence context improve strain resolution?
      - [ ] Filter out all-vs-all hits with overhangs
      - [ ] Investigate effect of dv cutoff values and clustering methods
  - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Benchmarking against defined test datasets
- - [ ] MultiQC integration
  - [ ] Extract the ITS too?
