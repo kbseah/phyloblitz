@@ -183,26 +183,24 @@ def count_spoa_aln_vars(seqs: dict) -> dict:
     :rtype: dict
     """
     var = defaultdict(lambda: defaultdict(int))
-    for hdr in seqs:
-        if hdr != "Consensus":
-            # get coordinates without trailing and leading gaps
-            span = re.search(r"^-*([^-].*[^-])-*$", seqs[hdr]).span(1)
-            var[hdr]["query_lead_gap"] = span[0]
-            var[hdr]["query_trail_gap"] = len(seqs[hdr]) - span[1]
-            for i in range(span[0], span[1]):
-                if seqs[hdr][i] == seqs["Consensus"][i] and seqs[hdr][i] != "-":
-                    # Matching base but not common gap
-                    var[hdr]["match"] += 1
-                elif seqs[hdr][i] == "-" and seqs["Consensus"][i] != "-":
-                    var[hdr]["query_gap"] += 1
-                elif seqs[hdr][i] != "-" and seqs["Consensus"][i] == "-":
-                    var[hdr]["cons_gap"] += 1
-                elif (
-                    seqs[hdr][i] != "-"
-                    and seqs["Consensus"][i] != "-"
-                    and seqs[hdr][i] != seqs["Consensus"][i]
-                ):
-                    var[hdr]["mismatch"] += 1
+    cons = seqs["Consensus"]
+    for hdr, seq in seqs.items():
+        if hdr == "Consensus":
+            continue
+        # get coordinates without trailing and leading gaps
+        span = re.search(r"^-*([^-].*[^-])-*$", seq).span(1)
+        var[hdr]["query_lead_gap"] = span[0]
+        var[hdr]["query_trail_gap"] = len(seq) - span[1]
+        for i in range(span[0], span[1]):
+            if seq[i] == cons[i] and seq[i] != "-":
+                # Matching base but not common gap
+                var[hdr]["match"] += 1
+            elif seq[i] == "-" and cons[i] != "-":
+                var[hdr]["query_gap"] += 1
+            elif seq[i] != "-" and cons[i] == "-":
+                var[hdr]["cons_gap"] += 1
+            elif seq[i] != "-" and cons[i] != "-" and seq[i] != cons[i]:
+                var[hdr]["mismatch"] += 1
     return var
 
 
@@ -299,7 +297,8 @@ class Pipeline:
                 return Path(Path(self._prefix + self.OUTFILE_SUFFIX[stage]).name)
             return Path(self._outdir) / Path(self._prefix + self.OUTFILE_SUFFIX[stage])
         except KeyError as e:
-            raise Exception(f"Unknown intermediate file {stage}") from e
+            e.add_not(f"Unknown intermediate file {stage}")
+            raise
 
     def check_stage_file(stage: str, message: str):
         """Check whether outputs for each stage of Pipeline already exist.
