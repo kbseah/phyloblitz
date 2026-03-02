@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import wraps
 from multiprocessing import Pool
 from pathlib import Path
+from random import sample
 from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
@@ -766,6 +767,7 @@ class Pipeline:
         threads: int = 12,
         keeptmp: bool = False,
         min_clust_size: int = 5,
+        max_clust_size: int = 500,
     ) -> None:
         """Extract cluster sequences and assemble with spoa
 
@@ -788,6 +790,7 @@ class Pipeline:
         :param keeptmp: If True, do not delete Fastq files with extracted reads
         :param min_clust_size: Only assemble clusters containing at least this
             number of reads.
+        :param max_clust_size: Downsample reads for clusters above this size.
         """
         if cluster_tool == "mcl":
             fastq_handles, cluster2seq = self._cluster_seqs_from_mcl(
@@ -815,7 +818,26 @@ class Pipeline:
                 ),
             },
         )
-        # TODO downsample if >500 sequences in cluster
+        # Downsample if >500 sequences in cluster
+        for c, seqs in cluster2seq.items():
+            if len(seqs) > max_clust_size:
+                logger.debug("Cluster %s has %d reads, downsampling ...", c, len(seqs))
+                logger.debug("Downsampling from file %s", fastq_handles[c].name)
+                fq = pyfastx.Fastq(fastq_handles[c].name)
+                logger.debug("Opened file handle %s", str(fq))
+                selected_idx = sorted(sample(range(len(fq)), k=max_clust_size))
+                # Do not use a context manager here because we need file later
+                newhandle = NamedTemporaryFile(
+                    suffix=".fastq",
+                    mode="w",
+                    delete=(not keeptmp),
+                    delete_on_close=False,
+                )
+                logger.debug("Created new temporary file %s", str(newhandle.name))
+                for idx in selected_idx:
+                    newhandle.write(fq[idx].raw)
+                fastq_handles[c] = newhandle
+                newhandle.close()
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(

@@ -34,6 +34,7 @@ click.rich_click.OPTION_GROUPS = {
                 "align_minlen",
                 "summary_taxlevel",
                 "min_clust_size",
+                "max_clust_size",
                 "flanking",
                 "no_supplementary",
                 "resume",
@@ -298,6 +299,13 @@ def download(
     show_default=True,
 )
 @click.option(
+    "--max_clust_size",
+    help="Clusters above this size will be downsampled for consensus assembly",
+    default=500,
+    type=int,
+    show_default=True,
+)
+@click.option(
     "--flanking",
     help="Sequence flanking the mapped hits on query reads to extract",
     default=1000,
@@ -357,6 +365,7 @@ def run(
     align_minlen,
     summary_taxlevel,
     min_clust_size,
+    max_clust_size,
     resume,
     debug,
     dv_max,
@@ -390,6 +399,7 @@ def run(
                 "align_minlen",
                 "summary_taxlevel",
                 "min_clust_size",
+                "max_clust_size",
                 "resume",
                 "debug",
                 "dv_max",
@@ -415,6 +425,7 @@ def run(
                 align_minlen,
                 summary_taxlevel,
                 min_clust_size,
+                max_clust_size,
                 resume,
                 debug,
                 dv_max,
@@ -484,6 +495,7 @@ def run(
         threads=threads,
         keeptmp=keeptmp,
         min_clust_size=min_clust_size,
+        max_clust_size=max_clust_size,
     )
 
     # Cluster flanking sequences
