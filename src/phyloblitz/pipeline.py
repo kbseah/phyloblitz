@@ -341,7 +341,13 @@ class Pipeline:
         stage="initial_map",
         message="Initial mapping of reads to identify target intervals",
     )
-    def run_minimap(self, threads=12, mode="map-ont", sample=None) -> int:
+    def run_minimap(
+        self,
+        threads: int = 12,
+        mode: str = "map-ont",
+        sample: int | None = None,
+        keeptmp: bool = False,
+    ) -> int:
         """Map reads to reference database with minimap2.
 
         This initial mapping is used to extract the marker sequence segments
@@ -355,9 +361,10 @@ class Pipeline:
 
         :param threads: Number of threads for minimap2 to use
         :param mode: Mapping preset for minimap2, one of: `map-ont`, `map-pb`,
-            "lr:hq", "map-hifi"
+            `lr:hq`, `map-hifi`
         :param sample: Number of reads to sample; if None then use all reads;
             also use this number as the random seed
+        :param keeptmp: Keep temporary file?
         :returns: return code for samtools
         :rtype: tuple
         """
@@ -365,8 +372,13 @@ class Pipeline:
         infile = self._reads
         if sample is not None:
             logger.info("Taking sample of %d reads", sample)
-            # TODO use pyfastx Python API instead of CLI
-            temp_infile = NamedTemporaryFile()  # TODO keeptmp
+            # TODO: use pyfastx Python API instead of CLI
+            temp_infile = NamedTemporaryFile(
+                suffix=".fastq",
+                mode="w",
+                delete=(not keeptmp),
+                delete_on_close=False,
+            )
             cmd = [
                 "pyfastx",
                 "sample",
@@ -998,6 +1010,7 @@ class Pipeline:
         }
         max_kmer_cov = max([max([j[0] for j in histos[i]]) for i in histos])
         fig_height = len(cluster_ids) * 0.6
+        # TODO: if only one cluster, axs is not subscriptable
         fig, axs = plt.subplots(
             len(histos),
             sharex=True,

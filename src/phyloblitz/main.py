@@ -471,7 +471,7 @@ def run(
         sys.exit(1)
 
     p = pipeline.Pipeline(args)
-    p.run_minimap(threads=threads, mode=platform, sample=num_reads)
+    p.run_minimap(threads=threads, mode=platform, sample=num_reads, keeptmp=keeptmp)
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
