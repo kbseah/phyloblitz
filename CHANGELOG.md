@@ -37,15 +37,15 @@
  - [x] Database download from Zenodo with checksums
  - [x] Parse supplementary alignments by default
  - [x] Skip duplicate segments extracted from overlapping alignments
- - [ ] Downsample clusters with too many reads for assembly (~500 should be ok)
+ - [x] Downsample clusters with too many reads for assembly (~500 should be ok)
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
  - [ ] Multisample comparison and co-assembly
+ - [ ] Detailed documentation
 
 
 ## Future plans/ideas
 
- - [ ] Detailed documentation
  - [ ] MultiQC integration
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
