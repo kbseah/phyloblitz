@@ -437,7 +437,7 @@ class Pipeline:
 
         Segments aligning to marker database are extracted in Fastq format to a
         new file, for the next clustering steps. Flanking sequences are also
-        extracted, not to the Fastq file but Pipeline._stats["flanking"], so
+        extracted, not to the Fastq file but Pipeline._stats["segments"], so
         they do not influence the marker clustering and assembly.
 
         :param align_minlen: Minimum alignment length in bp
@@ -446,8 +446,8 @@ class Pipeline:
         """
         sam_file = self.pathto("initial_map")
         counter = 0
-        self._stats["flanking"] = {}
         self._stats["reads2segment"] = {}
+        self._stats["segments"] = {}
         with Path.open(self.pathto("mapped_segments"), "w") as fq_fh:
             for rec in sam_seq_generator(
                 sam_file,
@@ -484,9 +484,7 @@ class Pipeline:
                 fq_fh.write(
                     "@" + name + "\n" + rec["seq"] + "\n+\n" + rec["quals"] + "\n",
                 )
-                self._stats["flanking"][name] = {
-                    i: rec[i] for i in ["pre", "pre_quals", "post", "post_quals"]
-                }
+                self._stats["segments"][name] = rec
         self._stats["runstats"].update({"mapped pass filter": counter})
         logger.info("Read segments extracted for all-vs-all mapping: %d", counter)
 
@@ -744,7 +742,7 @@ class Pipeline:
         seq2cluster = {}
         with Path.open(isonclust3_out) as fh:
             for line in fh:
-                (clust, seqname) = line.rstrip().split("\t")
+                clust, seqname = line.rstrip().split("\t")
                 seq2cluster[seqname] = clust
         cluster2seq = defaultdict(list)
         for seqname in seq2cluster:
@@ -913,14 +911,14 @@ class Pipeline:
             with NamedTemporaryFile(suffix=".fastq", mode="w") as fq:
                 for seqid in self._stats["cluster2seq"][cluster]:
                     seq = (
-                        self._stats["flanking"][seqid]["pre"]
+                        self._stats["segments"][seqid]["pre"]
                         + "NNNNNNNNNN"
-                        + self._stats["flanking"][seqid]["post"]
+                        + self._stats["segments"][seqid]["post"]
                     )
                     quals = (
-                        self._stats["flanking"][seqid]["pre_quals"]
+                        self._stats["segments"][seqid]["pre_quals"]
                         + "@@@@@@@@@@"
-                        + self._stats["flanking"][seqid]["post_quals"]
+                        + self._stats["segments"][seqid]["post_quals"]
                     )
                     fq.write("@" + seqid + "\n" + seq + "\n+\n" + quals + "\n")
                 with TemporaryDirectory() as tmpdir:
@@ -969,14 +967,14 @@ class Pipeline:
         for cluster in self._stats["cluster2seq"]:
             kmer_tables[cluster] = oxli.KmerCountTable(k)
             for seqid in self._stats["cluster2seq"][cluster]:
-                if seqid in self._stats["flanking"]:
-                    if len(self._stats["flanking"][seqid]["pre"]) > minlen:
+                if seqid in self._stats["segments"]:
+                    if len(self._stats["segments"][seqid]["pre"]) > minlen:
                         kmer_tables[cluster].consume(
-                            self._stats["flanking"][seqid]["pre"],
+                            self._stats["segments"][seqid]["pre"],
                         )
-                    if len(self._stats["flanking"][seqid]["post"]) > minlen:
+                    if len(self._stats["segments"][seqid]["post"]) > minlen:
                         kmer_tables[cluster].consume(
-                            self._stats["flanking"][seqid]["post"],
+                            self._stats["segments"][seqid]["post"],
                         )
         self._stats["flanking kmer histo"] = {
             cluster: kmer_table.histo() for cluster, kmer_table in kmer_tables.items()
