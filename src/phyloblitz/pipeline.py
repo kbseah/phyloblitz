@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import wraps
 from multiprocessing import Pool
 from pathlib import Path
-from random import sample
+from random import sample, seed
 from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
@@ -365,6 +365,7 @@ class Pipeline:
         infile = self._reads
         if sample is not None:
             logger.info("Taking sample of %d reads", sample)
+            # TODO use pyfastx Python API instead of CLI
             temp_infile = NamedTemporaryFile()  # TODO keeptmp
             cmd = [
                 "pyfastx",
@@ -765,6 +766,7 @@ class Pipeline:
         self,
         cluster_tool: str = "isonclust3",
         threads: int = 12,
+        rseed: int = 12345,
         keeptmp: bool = False,
         min_clust_size: int = 5,
         max_clust_size: int = 500,
@@ -785,9 +787,10 @@ class Pipeline:
         vs. consensus [WIP]; "cluster cons parsed" -- cluster alignment
         including consensus, produced by spoa.
 
-        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3"
-        :param threads: Number of parallel assembly jobs to run
-        :param keeptmp: If True, do not delete Fastq files with extracted reads
+        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3".
+        :param threads: Number of parallel assembly jobs to run.
+        :param rseed: Random seed for downsampling reads in large clusters.
+        :param keeptmp: If True, do not delete Fastq files with extracted reads.
         :param min_clust_size: Only assemble clusters containing at least this
             number of reads.
         :param max_clust_size: Downsample reads for clusters above this size.
@@ -819,6 +822,8 @@ class Pipeline:
             },
         )
         # Downsample if >500 sequences in cluster
+        logger.debug("Random seed %d", rseed)
+        seed(rseed)
         for c, seqs in cluster2seq.items():
             if len(seqs) > max_clust_size:
                 logger.debug("Cluster %s has %d reads, downsampling ...", c, len(seqs))
