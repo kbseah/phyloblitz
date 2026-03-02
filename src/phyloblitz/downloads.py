@@ -1,3 +1,5 @@
+"""Functions to download preformatted databases for phyloblitz."""
+
 import hashlib
 import logging
 import requests

@@ -1,3 +1,5 @@
+"""Main command line functions for phyloblitz."""
+
 import logging
 import sys
 

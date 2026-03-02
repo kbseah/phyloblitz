@@ -1,3 +1,5 @@
+"""Functions and templates to generate phyloblitz reports."""
+
 import logging
 from collections import defaultdict
 from pathlib import Path

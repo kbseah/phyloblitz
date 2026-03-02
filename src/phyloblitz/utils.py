@@ -1,3 +1,5 @@
+"""Shared utility functions for phyloblitz."""
+
 import logging
 import re
 from collections import defaultdict
