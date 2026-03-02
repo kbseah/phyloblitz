@@ -473,6 +473,7 @@ def run(
         sys.exit(1)
 
     p = pipeline.Pipeline(args)
+    p.checksum_db()
     p.run_minimap(threads=threads, mode=platform, sample=num_reads, keeptmp=keeptmp)
 
     # Extract reads for clustering
