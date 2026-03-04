@@ -7,6 +7,7 @@ import rich_click as click
 from rich.logging import RichHandler
 
 from phyloblitz import downloads, pipeline
+from phyloblitz.compare import Compare
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import check_dependencies, check_outdir
 
@@ -49,6 +50,7 @@ click.rich_click.OPTION_GROUPS = {
             "options": ["dv_max", "dv_max_auto", "inflation"],
         },
     ],
+    "phyloblitz compare": [],
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -532,3 +534,57 @@ def run(
 
     if log:
         logfile_handler.close()
+
+
+@main.command(
+    context_settings=CONTEXT_SETTINGS,
+    help="Compare phyloblitz runs.",
+    no_args_is_help=True,
+)
+@click.option(
+    "--input_table",
+    help="Path to table of sample names and report file paths to compare, in TSV format with columns 'sample' and 'report'",
+    type=click.Path(exists=True),
+    default=None,
+)
+@click.option(
+    "--log",
+    help="Path to write log file",
+    type=click.Path(exists=True),
+    default=None,
+)
+@click.option(
+    "--debug",
+    help="Display logging DEBUG level messages to console",
+    default=False,
+    is_flag=True,
+)
+def compare(input_table, log, debug) -> None:
+    """Compare phyloblitz runs.
+
+    Runs should be produced by the same sequencing platform, and processed by
+    the same phyloblitz version and reference database. Compares the different
+    libraries by re-clustering the pooled reads and comparing which samples are
+    represented in each cluster.
+    """
+    logging.basicConfig(level=logging.DEBUG)
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()  # avoid duplicate handlers
+    logger = logging.getLogger(__name__)  # Logger for this module
+
+    loglevel = logging.DEBUG if debug else logging.INFO
+    root_logger.addHandler(RichHandler(level=loglevel))
+
+    formatter = logging.Formatter(
+        "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    if log:
+        logfile_handler = logging.FileHandler(log)
+        logfile_handler.setFormatter(formatter)
+        logfile_handler.setLevel(logging.DEBUG)
+        root_logger.addHandler(logfile_handler)
+
+    c = Compare(infile=input_table)
+    if not c.check_database_checksums():
+        sys.exit(1)
