@@ -150,3 +150,31 @@ def check_outdir(outdir, resume=True):
     else:
         msg = f"Output directory {outdir!s} already exists, but resume is False."
         raise FileExistsError(msg)
+
+
+def run_isonclust3(reads: str | Path, mode: str, outfolder: str | Path) -> int:
+    """Run isONclust3.
+
+    :param reads: Path to reads in Fastq format
+    :param mode: Either "ont" or "pacbio"
+    :param outfolder: Path to folder to write results
+    :returns: Return code of the isONclust3 process.
+    :rtype: int
+    """
+    cmd = [
+        "isONclust3",
+        "--no-fastq",
+        "--fastq",
+        reads,
+        "--mode",
+        mode,
+        "--outfolder",
+        outfolder,
+    ]
+    if mode == "ont":
+        cmd.append("--post-cluster")
+    logger.debug("isonclust3 command: %s", " ".join([str(i) for i in cmd]))
+    proc = Popen(cmd, stdout=PIPE)
+    for l in proc.stdout:
+        logger.debug("  isonclust3 log: %s", l.decode().rstrip())
+    return proc.wait()

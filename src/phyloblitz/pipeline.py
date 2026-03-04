@@ -28,6 +28,7 @@ from phyloblitz.utils import (
     filter_paf_overhang,
     lists_common_prefix,
     parse_cigar_ops,
+    run_isonclust3,
 )
 from hashlib import md5
 
@@ -671,29 +672,14 @@ class Pipeline:
         :rtype: int
         """
         if self._platform in ["lr:hq", "map-ont"]:
-            isonclust3_mode = "ont"
+            mode = "ont"
         elif self._platform in ["map-hifi", "map-pb"]:
-            isonclust3_mode = "pacbio"
+            mode = "pacbio"
         # isonclust3 takes output folder path as argument, automatically
         # creates `clustering` subfolder, so go two levels up
         outfolder = self.pathto("isonclust3_cluster").parent.parent
-        cmd = [
-            "isONclust3",
-            "--no-fastq",
-            "--fastq",
-            self.pathto("mapped_segments"),
-            "--mode",
-            isonclust3_mode,
-            "--outfolder",
-            outfolder,
-        ]
-        if isonclust3_mode == "ont":
-            cmd.append("--post-cluster")
-        logger.debug("isonclust3 command: %s", " ".join([str(i) for i in cmd]))
-        proc = Popen(cmd, stdout=PIPE)
-        for l in proc.stdout:
-            logger.debug("  isonclust3 log: %s", l.decode().rstrip())
-        return proc.wait()
+        reads = self.pathto("mapped_segments")
+        return run_isonclust3(reads=reads, mode=mode, outfolder=outfolder)
 
     def _cluster_seqs_from_mcl(
         self, mcl_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
