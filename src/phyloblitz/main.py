@@ -542,10 +542,23 @@ def run(
     no_args_is_help=True,
 )
 @click.option(
+    "--db",
+    "-d",
+    help="Path to preprocessed SILVA database fasta file",
+    type=click.Path(exists=True),
+    required=True,
+)
+@click.option(
     "--input_table",
-    help="Path to table of sample names and report file paths to compare, in TSV format with columns 'sample' and 'report'",
+    help="Path to table of sample names and report JSON file paths to compare, in TSV format with columns 'sample' and 'report'",
     type=click.Path(exists=True),
     default=None,
+)
+@click.option(
+    "--ignore_db_mismatch",
+    help="Continue even if different databases were used to generate reports",
+    default=False,
+    is_flag=True,
 )
 @click.option(
     "--log",
@@ -559,13 +572,14 @@ def run(
     default=False,
     is_flag=True,
 )
-def compare(input_table, log, debug) -> None:
+def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
     """Compare phyloblitz runs.
 
-    Runs should be produced by the same sequencing platform, and processed by
-    the same phyloblitz version and reference database. Compares the different
-    libraries by re-clustering the pooled reads and comparing which samples are
-    represented in each cluster.
+    Takes JSON results files from phyloblitz runs. Runs should be produced by
+    the same sequencing platform, and processed by the same phyloblitz version
+    and reference database. Compares the different libraries by re-clustering
+    the pooled reads and comparing which samples are represented in each
+    cluster.
     """
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
@@ -585,6 +599,12 @@ def compare(input_table, log, debug) -> None:
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
-    c = Compare(infile=input_table)
+    c = Compare(db=db, infile=input_table)
+    c.checksum_db()
     if not c.check_database_checksums():
-        sys.exit(1)
+        if ignore_db_mismatch:
+            logger.info(
+                "Continuing because --ignore_db_mismatch specified. I assume you know what you are doing..."
+            )
+        else:
+            sys.exit(1)
