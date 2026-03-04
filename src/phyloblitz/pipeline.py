@@ -18,6 +18,7 @@ import pyfastx
 import pymarkovclustering as pymcl
 import pysam
 
+from phyloblitz.__about__ import __version__
 from phyloblitz.report import (
     generate_histogram,
     generate_report_html,
@@ -256,6 +257,7 @@ class Pipeline:
         self._platform = args["platform"]
         self._resume = args["resume"]
         self._stats = {}
+        self._stats["version"] = __version__
         self._stats["args"] = args
         self._stats["runstats"] = {}
         self._stats["starttime"] = str(datetime.now())
