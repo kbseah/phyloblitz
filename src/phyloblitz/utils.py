@@ -3,6 +3,7 @@
 import logging
 import re
 from collections import defaultdict
+from hashlib import md5
 from os import W_OK, access
 from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen
@@ -150,6 +151,14 @@ def check_outdir(outdir, resume=True):
     else:
         msg = f"Output directory {outdir!s} already exists, but resume is False."
         raise FileExistsError(msg)
+
+
+def run_md5(file: str | Path) -> str:
+    md5_hash = md5()
+    with Path.open(file, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            md5_hash.update(byte_block)
+    return md5_hash.hexdigest()
 
 
 def run_isonclust3(reads: str | Path, mode: str, outfolder: str | Path) -> int:

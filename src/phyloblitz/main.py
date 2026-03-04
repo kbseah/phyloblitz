@@ -475,7 +475,6 @@ def run(
         sys.exit(1)
 
     p = pipeline.Pipeline(args)
-    p.checksum_db()
     p.run_minimap(threads=threads, mode=platform, sample=num_reads, keeptmp=keeptmp)
 
     # Extract reads for clustering
@@ -600,7 +599,6 @@ def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
         root_logger.addHandler(logfile_handler)
 
     c = Compare(db=db, infile=input_table)
-    c.checksum_db()
     if not c.check_database_checksums():
         if ignore_db_mismatch:
             logger.info(

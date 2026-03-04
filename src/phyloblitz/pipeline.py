@@ -30,8 +30,8 @@ from phyloblitz.utils import (
     lists_common_prefix,
     parse_cigar_ops,
     run_isonclust3,
+    run_md5,
 )
-from hashlib import md5
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +261,10 @@ class Pipeline:
         self._stats["args"] = args
         self._stats["runstats"] = {}
         self._stats["starttime"] = str(datetime.now())
+        self._stats["db_md5"] = run_md5(args["db"])
+        logger.debug(
+            "Database file %s has MD5 checksum %s", self._ref, self._stats["db_md5"]
+        )
 
     OUTFILE_SUFFIX = {
         "initial_map": "_minimap_initial.sam",
@@ -279,20 +283,6 @@ class Pipeline:
         "report_dvs_hist": "_report_dvs_hist.png",
         "report_kmercount_plot": "_report_kmercount_plot.png",
     }
-
-    def checksum_db(self) -> None:
-        """Checksum database file for validation when comparing samples.
-
-        Get path to reference database from Pipeline._ref attribute. Write
-        checksum in Pipeline._stats["db_md5"].
-        """
-        md5_hash = md5()
-        with Path.open(self._ref, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                md5_hash.update(byte_block)
-        checksum = md5_hash.hexdigest()
-        logger.debug("Database file %s has MD5 checksum %s", self._ref, checksum)
-        self._stats["db_md5"] = checksum
 
     def check_run_file(self, stage: str) -> bool:
         """Check if intermediate output file has been created.
