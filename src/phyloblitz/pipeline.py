@@ -774,7 +774,7 @@ class Pipeline:
         min_clust_size: int = 5,
         max_clust_size: int = 500,
     ) -> None:
-        """Extract cluster sequences and assemble with spoa
+        """Extract cluster sequences and assemble with spoa.
 
         Cluster reads with specified clustering tool, extract read segments for
         each cluster to separate Fastq files, and assemble consensus sequence

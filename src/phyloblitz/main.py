@@ -606,3 +606,10 @@ def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
             )
         else:
             sys.exit(1)
+
+    if not c.check_sequencing_platforms():
+        sys.exit(1)
+
+    if not c.segment_by_sample():
+        logger.error("Repeated read segment names were found")
+        sys.exit(1)
