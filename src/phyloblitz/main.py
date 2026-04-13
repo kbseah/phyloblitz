@@ -554,6 +554,19 @@ def run(
     default=None,
 )
 @click.option(
+    "--outdir",
+    help="Output folder path",
+    default="pbz_compare",
+    show_default=True,
+    type=click.Path(),
+)
+@click.option(
+    "--prefix",
+    help="Output filename prefix",
+    default="pbz_compare",
+    show_default=True,
+)
+@click.option(
     "--ignore_db_mismatch",
     help="Continue even if different databases were used to generate reports",
     default=False,
@@ -571,7 +584,7 @@ def run(
     default=False,
     is_flag=True,
 )
-def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
+def compare(db, input_table, outdir, prefix, ignore_db_mismatch, log, debug) -> None:
     """Compare phyloblitz runs.
 
     Takes JSON results files from phyloblitz runs. Runs should be produced by
@@ -598,7 +611,16 @@ def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
-    c = Compare(db=db, infile=input_table)
+    c = Compare(db=db, infile=input_table, outdir=outdir, prefix=prefix)
+
+    logger.info("Creating output folder %s", outdir)
+    try:
+        check_outdir(outdir, resume=True)
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
+
+    # Check for various potential issues
     if not c.check_database_checksums():
         if ignore_db_mismatch:
             logger.info(
@@ -613,3 +635,8 @@ def compare(db, input_table, ignore_db_mismatch, log, debug) -> None:
     if not c.segment_by_sample():
         logger.error("Repeated read segment names were found")
         sys.exit(1)
+
+    c.write_segments_to_fastq()
+
+    logger.info("Run isonclust3 clustering of pooled segments ...")
+    c.cluster_segments()
