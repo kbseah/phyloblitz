@@ -127,7 +127,7 @@ def sam_seq_generator(
                     i.query_qualities_str[myend:post_end],
                 ],
                 strict=True,
-            )
+            ),
         )
 
 
@@ -734,7 +734,7 @@ class Pipeline:
                     [i for i in cluster2seq if len(cluster2seq[i]) > 5]
                 ),
                 "total reads in clusters": sum(
-                    [len(cluster2seq[c]) for c in cluster2seq]
+                    [len(cluster2seq[c]) for c in cluster2seq],
                 ),
             },
         )
@@ -842,7 +842,7 @@ class Pipeline:
                     if isonclust3_mode == "ont":
                         cmd.append("--post-cluster")
                     logger.debug(
-                        "isonclust3 command: %s", " ".join([str(i) for i in cmd])
+                        "isonclust3 command: %s", " ".join([str(i) for i in cmd]),
                     )
                     proc = Popen(cmd, stdout=PIPE, stderr=PIPE, text=True)
                     proc_stdout, _proc_stderr = proc.communicate()
@@ -1057,7 +1057,7 @@ class Pipeline:
                         ],
                         spl[0:11],
                         strict=False,
-                    )
+                    ),
                 )
                 cigar = next(i for i in spl if i.startswith("cg:Z:"))
                 # Calculate derived metrics from PAF fields

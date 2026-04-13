@@ -10,7 +10,7 @@ from phyloblitz.utils import run_isonclust3, run_md5
 logger = logging.getLogger(__name__)
 
 
-def read_tsv(filepath:str|Path) -> dict[list]:
+def read_tsv(filepath: str | Path) -> dict[list]:
     """Read TSV file to dict oriented by column.
 
     :param filepath: Path to TSV file to parse.
@@ -28,7 +28,9 @@ def read_tsv(filepath:str|Path) -> dict[list]:
 
 
 class Compare:
-    def __init__(self, db: str | Path, infile: str | Path, outdir: str|Path, prefix:str) -> None:
+    def __init__(
+        self, db: str | Path, infile: str | Path, outdir: str | Path, prefix: str
+    ) -> None:
         df = read_tsv(infile)
         samples = df["sample"]
         reports = df["report"]
@@ -100,7 +102,9 @@ class Compare:
             if len(platforms) > 1:
                 logger.error("Mismatched sequencing platforms found")
                 for s in self._reports:
-                    logger.debug("Sample %s platform %s", s, self._reports[s]["args"]["platform"])
+                    logger.debug(
+                        "Sample %s platform %s", s, self._reports[s]["args"]["platform"]
+                    )
                 return False
             self._platform = next(iter(platforms))
             logger.info(
@@ -112,7 +116,7 @@ class Compare:
             e.add_note("Reports must be produced by phyloblitz v1.0.0 or higher")
             raise
 
-    def segment_by_sample(self)-> bool:
+    def segment_by_sample(self) -> bool:
         """Create mapping of read segments to samples.
 
         Needed for clustering and for comparing the clusters across samples.
@@ -123,22 +127,32 @@ class Compare:
         for sample, report in self._reports.items():
             for segment in report["segments"]:
                 if segment in self._segment2sample:
-                    logger.debug( "Segment %s seen more than once", segment)
+                    logger.debug("Segment %s seen more than once", segment)
                     returned = False
                 self._segment2sample[segment] = sample
         return returned
 
-    def write_segments_to_fastq(self)->None:
+    def write_segments_to_fastq(self) -> None:
         """Write read segments to Fastq file for clustering."""
         fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
         # If file already exists, remove it to avoid appending to an old file
         if fastq_path.exists():
-            logger.warning("Fastq file %s already exists, it will be overwritten", fastq_path)
+            logger.warning(
+                "Fastq file %s already exists, it will be overwritten", fastq_path
+            )
             fastq_path.unlink()
         with Path.open(fastq_path, "a") as fh:
             for report in self._reports.values():
                 for seg_name, seg_dict in report["segments"].items():
-                    fastq_rec = "@" + seg_name + "\n" + seg_dict["seq"] + "\n+\n" + seg_dict["quals"] + "\n"
+                    fastq_rec = (
+                        "@"
+                        + seg_name
+                        + "\n"
+                        + seg_dict["seq"]
+                        + "\n+\n"
+                        + seg_dict["quals"]
+                        + "\n"
+                    )
                     fh.write(fastq_rec)
 
     def cluster_segments(self) -> int:
