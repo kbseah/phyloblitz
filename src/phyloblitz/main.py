@@ -640,3 +640,6 @@ def compare(db, input_table, outdir, prefix, ignore_db_mismatch, log, debug) -> 
 
     logger.info("Run isonclust3 clustering of pooled segments ...")
     c.cluster_segments()
+
+    logger.info("Map cluster memberships to samples ...")
+    c.cluster_memberships()

@@ -5,7 +5,7 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
-from phyloblitz.utils import run_isonclust3, run_md5
+from phyloblitz.utils import run_isonclust3, run_md5, cluster_seqs_from_isonclust3
 
 logger = logging.getLogger(__name__)
 
@@ -164,3 +164,28 @@ class Compare:
         fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
         outfolder = Path(self._outdir) / Path(self._prefix + "_clusters")
         return run_isonclust3(fastq_path, mode, outfolder)
+
+    def cluster_memberships(self) -> None:
+        """Map cluster memberships to samples."""
+        fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
+        isonclust3_out = (
+            Path(self._outdir)
+            / Path(self._prefix + "_clusters")
+            / Path("clustering")
+            / Path("final_clusters.tsv")
+        )
+        fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
+            isonclust3_out, fastq_path, keeptmp=False, min_clust_size=5
+        )
+        # Combine segment2sample and cluster2seq
+        self._cluster2sample = {}
+        for cluster, seqs in cluster2seq.items():
+            samples = defaultdict(list)
+            for seq in seqs:
+                if seq in self._segment2sample:
+                    samples[self._segment2sample[seq]].append(seq)
+                else:
+                    logger.warning(
+                        "Sequence %s not found in segment2sample mapping", seq
+                    )
+            self._cluster2sample[cluster] = samples
