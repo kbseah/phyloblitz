@@ -119,31 +119,30 @@ def main() -> None:
     is_flag=True,
 )
 @click.option("--log", help="Write logging messages to this file", type=click.Path())
-def download(
-    list_versions, which_db, db_version, outdir, dryrun, overwrite, debug, log
-) -> None:
+@click.pass_context
+def download(ctx, **kwargs) -> None:
     """Command line interface to download reference databases from Zenodo."""
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    loglevel = logging.DEBUG if debug else logging.INFO
+    loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    if log:
-        logfile_handler = logging.FileHandler(log)
+    if ctx.params["log"]:
+        logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
     versions, latest = downloads.list_versions()
     logger.debug("Latest version is %s", latest)
-    if list_versions:
+    if ctx.params["list_versions"]:
         for v, meta in versions.items():
             report = f"Version: {v}, DOI: {meta['doi']}, Created: {meta['created']}"
             if v == str(latest):
@@ -155,33 +154,41 @@ def download(
                     f"    Marker: {marker}, Filename: {filedata['filename']}, Size: {filedata['size']} bytes, Checksum: {filedata['checksum']}"
                 )
         sys.exit(0)
-    if db_version == "latest":
+    if ctx.params["db_version"] == "latest":
         logger.info("Using latest version %s of database", str(latest))
         db_version = str(latest)
 
-    logger.info("Creating output folder %s", outdir)
+    logger.info("Creating output folder %s", ctx.params["outdir"])
     try:
-        check_outdir(outdir, resume=True)
+        check_outdir(ctx.params["outdir"], resume=True)
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
 
     try:
         filepath = downloads.get_file(
-            versions, which_db, db_version, outdir, dryrun, overwrite
+            versions,
+            ctx.params["which_db"],
+            db_version,
+            ctx.params["outdir"],
+            ctx.params["dryrun"],
+            ctx.params["overwrite"],
         )
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
 
-    if dryrun:
+    if ctx.params["dryrun"]:
         logger.info("Dry run complete, no file downloaded")
     else:
         logger.info("Database file downloaded to %s", filepath)
 
     try:
         checksum_ok = downloads.check_md5sum_file(
-            versions, which_db, db_version, filepath
+            versions,
+            ctx.params["which_db"],
+            db_version,
+            filepath,
         )
     except Exception as e:
         logger.error(str(e))
@@ -193,7 +200,7 @@ def download(
         logger.error("MD5 checksum does not match expected value!")
         sys.exit(1)
 
-    if log:
+    if ctx.params["log"]:
         logfile_handler.close()
 
 
@@ -352,111 +359,29 @@ def download(
     default=False,
     is_flag=True,
 )
-def run(
-    db,
-    dbindex,
-    reads,
-    num_reads,
-    platform,
-    prefix,
-    outdir,
-    report,
-    keeptmp,
-    log,
-    write_cluster_alns,
-    threads,
-    cluster_tool,
-    align_minlen,
-    summary_taxlevel,
-    min_clust_size,
-    max_clust_size,
-    resume,
-    debug,
-    dv_max,
-    dv_max_auto,
-    inflation,
-    flanking,
-    no_supplementary,
-):
+@click.pass_context
+def run(ctx, **kwargs):
     """Command line interface to run phyloblitz pipeline."""
     logging.basicConfig(level=logging.DEBUG)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    args = dict(
-        zip(
-            [
-                "db",
-                "dbindex",
-                "reads",
-                "num_reads",
-                "platform",
-                "prefix",
-                "outdir",
-                "report",
-                "keeptmp",
-                "log",
-                "write_cluster_alns",
-                "threads",
-                "cluster_tool",
-                "align_minlen",
-                "summary_taxlevel",
-                "min_clust_size",
-                "max_clust_size",
-                "resume",
-                "debug",
-                "dv_max",
-                "dv_max_auto",
-                "inflation",
-                "flanking",
-                "no_supplementary",
-            ],
-            [
-                db,
-                dbindex,
-                reads,
-                num_reads,
-                platform,
-                prefix,
-                outdir,
-                report,
-                keeptmp,
-                log,
-                write_cluster_alns,
-                threads,
-                cluster_tool,
-                align_minlen,
-                summary_taxlevel,
-                min_clust_size,
-                max_clust_size,
-                resume,
-                debug,
-                dv_max,
-                dv_max_auto,
-                inflation,
-                flanking,
-                no_supplementary,
-            ],
-            strict=False,
-        ),
-    )
-
-    loglevel = logging.DEBUG if debug else logging.INFO
+    loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    if log:
-        logfile_handler = logging.FileHandler(log)
+    if ctx.params["log"]:
+        logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
     logger.debug("Arguments:")
-    for arg, val in args.items():
+    for arg, val in ctx.params.items():
         logger.debug(" %s : %s", str(arg), str(val))
 
     logger.debug("Dependencies:")
@@ -466,72 +391,81 @@ def run(
 
     logger.info("Starting phyloblitz run ... ")
 
-    logger.info("Creating output folder %s", outdir)
+    logger.info("Creating output folder %s", ctx.params["outdir"])
     try:
-        check_outdir(outdir, resume=resume)
+        check_outdir(ctx.params["outdir"], resume=ctx.params["resume"])
     # catch any exceptions and log them, then exit with error code 1
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
 
-    p = pipeline.Pipeline(args)
-    p.run_minimap(threads=threads, mode=platform, sample=num_reads, keeptmp=keeptmp)
+    p = pipeline.Pipeline(ctx.params)
+    p.run_minimap(
+        threads=ctx.params["threads"],
+        mode=ctx.params["platform"],
+        sample=ctx.params["num_reads"],
+        keeptmp=ctx.params["keeptmp"],
+    )
 
     # Extract reads for clustering
     p.extract_reads_for_ava(
-        align_minlen=align_minlen,
-        no_supp=no_supplementary,
-        flanking=flanking,
+        align_minlen=ctx.params["align_minlen"],
+        no_supp=ctx.params["no_supplementary"],
+        flanking=ctx.params["flanking"],
     )
 
     # All-vs-all mapping
-    p.ava_map(mode=platform, threads=threads)
+    p.ava_map(mode=ctx.params["platform"], threads=ctx.params["threads"])
     p.paf_file_filter_overhangs(max_overhang_frac=0.05)
     p.paf_get_dvs()
 
     # Clustering
-    if cluster_tool == "mcl":
-        p.pymcl_cluster(dv_max=dv_max, dv_max_auto=dv_max_auto, inflation=inflation)
-    elif cluster_tool == "isonclust3":
+    if ctx.params["cluster_tool"] == "mcl":
+        p.pymcl_cluster(
+            dv_max=ctx.params["dv_max"],
+            dv_max_auto=ctx.params["dv_max_auto"],
+            inflation=ctx.params["inflation"],
+        )
+    elif ctx.params["cluster_tool"] == "isonclust3":
         p.isonclust3_cluster()
     p.assemble_clusters(
-        cluster_tool=cluster_tool,
-        threads=threads,
-        keeptmp=keeptmp,
-        min_clust_size=min_clust_size,
-        max_clust_size=max_clust_size,
+        cluster_tool=ctx.params["cluster_tool"],
+        threads=ctx.params["threads"],
+        keeptmp=ctx.params["keeptmp"],
+        min_clust_size=ctx.params["min_clust_size"],
+        max_clust_size=ctx.params["max_clust_size"],
     )
 
     # Cluster flanking sequences
-    if flanking < MIN_FLANKING:
+    if ctx.params["flanking"] < MIN_FLANKING:
         logger.info("Flanking sequence length must be >=500 bp; setting to 500 bp")
-        flanking = MIN_FLANKING
+        ctx.params["flanking"] = MIN_FLANKING
     p.cluster_flanking_isonclust3()
     p.cluster_flanking_kmercount(k=11, minlen=500)
-    p.cluster_flanking_kmercount_plot(min_clust_size=min_clust_size)
+    p.cluster_flanking_kmercount_plot(min_clust_size=ctx.params["min_clust_size"])
 
     # Taxonomy summary
     p.db_taxonomy()
     p.summarize_initial_mapping_taxonomy(
-        minlen=align_minlen,
-        taxlevel=summary_taxlevel,
+        minlen=ctx.params["align_minlen"],
+        taxlevel=ctx.params["summary_taxlevel"],
     )
-    p.cluster_asm_tophits(threads=threads)
+    p.cluster_asm_tophits(threads=ctx.params["threads"])
     p.summarize_tophit_paf()
 
     # Write reports
     p.write_report_json()
-    if write_cluster_alns:
+    if ctx.params["write_cluster_alns"]:
         p.write_cluster_alns()
 
-    if report:
+    if ctx.params["report"]:
         p.write_report_histogram()
         p.write_report_markdown()
         p.write_report_html()
 
     logger.info("-------------- phyloblitz run complete --------------")
 
-    if log:
+    if ctx.params["log"]:
         logfile_handler.close()
 
 
@@ -548,10 +482,17 @@ def run(
     required=True,
 )
 @click.option(
+    "--dbindex",
+    help="Path to minimap2 index of database file (optional)",
+    type=click.Path(exists=True),
+    default=None,
+)
+@click.option(
     "--input_table",
     help="Path to table of sample names and report JSON file paths to compare, in TSV format with columns 'sample' and 'report'",
     type=click.Path(exists=True),
     default=None,
+    required=True,
 )
 @click.option(
     "--outdir",
@@ -584,7 +525,12 @@ def run(
     default=False,
     is_flag=True,
 )
-def compare(db, input_table, outdir, prefix, ignore_db_mismatch, log, debug) -> None:
+@click.pass_context
+def compare(
+    ctx,
+    **kwargs,
+    # db, dbindex, input_table, outdir, prefix, ignore_db_mismatch, log, debug
+) -> None:
     """Compare phyloblitz runs.
 
     Takes JSON results files from phyloblitz runs. Runs should be produced by
@@ -598,31 +544,31 @@ def compare(db, input_table, outdir, prefix, ignore_db_mismatch, log, debug) -> 
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
-    loglevel = logging.DEBUG if debug else logging.INFO
+    loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
     formatter = logging.Formatter(
         "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    if log:
-        logfile_handler = logging.FileHandler(log)
+    if ctx.params["log"]:
+        logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
         logfile_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(logfile_handler)
 
-    c = Compare(db=db, infile=input_table, outdir=outdir, prefix=prefix)
+    c = Compare(args=ctx.params)
 
-    logger.info("Creating output folder %s", outdir)
+    logger.info("Creating output folder %s", ctx.params["outdir"])
     try:
-        check_outdir(outdir, resume=True)
+        check_outdir(ctx.params["outdir"], resume=True)
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
 
     # Check for various potential issues
     if not c.check_database_checksums():
-        if ignore_db_mismatch:
+        if ctx.params["ignore_db_mismatch"]:
             logger.info(
                 "Continuing because --ignore_db_mismatch specified. I assume you know what you are doing..."
             )

@@ -28,18 +28,17 @@ def read_tsv(filepath: str | Path) -> dict[list]:
 
 
 class Compare:
-    def __init__(
-        self, db: str | Path, infile: str | Path, outdir: str | Path, prefix: str
-    ) -> None:
-        df = read_tsv(infile)
+    def __init__(self, args: dict) -> None:
+        df = read_tsv(args["input_table"])
         samples = df["sample"]
         reports = df["report"]
-        self._ref = db
-        self._ref_md5 = run_md5(db)
+        self._ref = args["db"]
+        self._refindex = args["dbindex"]
+        self._ref_md5 = run_md5(args["db"])
         self._reports = {}
         self._segment2sample = {}
-        self._outdir = outdir
-        self._prefix = prefix
+        self._outdir = args["outdir"]
+        self._prefix = args["prefix"]
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
             for sample, report in zip(samples, reports, strict=True):
@@ -174,7 +173,7 @@ class Compare:
             / Path("clustering")
             / Path("final_clusters.tsv")
         )
-        fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
+        _fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
             isonclust3_out, fastq_path, keeptmp=False, min_clust_size=5
         )
         # Combine segment2sample and cluster2seq
