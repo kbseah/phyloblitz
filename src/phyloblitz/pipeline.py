@@ -26,6 +26,8 @@ from phyloblitz.report import (
 )
 from phyloblitz.utils import (
     CIGAROPS,
+    cluster_seqs_from_isonclust3,
+    cluster_seqs_from_mcl,
     filter_paf_overhang,
     lists_common_prefix,
     parse_cigar_ops,
@@ -673,94 +675,6 @@ class Pipeline:
         reads = self.pathto("mapped_segments")
         return run_isonclust3(reads=reads, mode=mode, outfolder=outfolder)
 
-    def _cluster_seqs_from_mcl(
-        self, mcl_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
-    ) -> tuple:
-        """Extract sequences from each MCL cluster to Fastq files.
-
-        :param mcl_out: Path MCL output file
-        :param reads: Path to reads from extract_reads_for_ava step
-        :param keeptmp: Keep temporary files?
-        :param min_clust_size: Minimum cluster size to return Fastq file
-        :returns: Dict of file handles to each Fastq file keyed by cluster ID
-        :returns: Dict of sequence IDs keyed by cluster ID
-        """
-        counter = 0
-        fastq_handles = {}
-        seq2cluster = {}
-        with Path.open(mcl_out) as fh:
-            for line in fh:
-                seqs = line.rstrip().split("\t")
-                logger.info("Cluster %d comprises %d sequences", counter, len(seqs))
-                for seq in seqs:
-                    seq2cluster[seq] = counter  # assume each seq in only one cluster
-                if len(seqs) >= min_clust_size:
-                    fastq_handles[counter] = NamedTemporaryFile(
-                        suffix=".fastq",
-                        mode="w",
-                        delete=(not keeptmp),
-                        delete_on_close=False,
-                    )
-                else:
-                    logger.debug("Cluster %d below size cutoff", counter)
-                counter += 1
-        for name, seq, qual in pyfastx.Fastx(reads):
-            if name in seq2cluster and seq2cluster[name] in fastq_handles:
-                fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
-                fastq_handles[seq2cluster[name]].write(fastq_rec)
-        cluster2seq = defaultdict(list)
-        for seq, cluster in seq2cluster.items():
-            cluster2seq[cluster].append(seq)
-        for handle in fastq_handles.values():
-            handle.close()
-        return fastq_handles, cluster2seq
-
-    def _cluster_seqs_from_isonclust3(
-        self, isonclust3_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
-    ) -> tuple:
-        """Extract sequences from each isONclust3 cluster to Fastq files.
-
-        The numbering of clusters by isONclust3 itself is not consistent
-        between the final_clusters.tsv file and the output fastq files; best to
-        extract the sequences ourselves.
-
-        :param isonclust3_out: Path to isONclust3 output file
-        :param reads: Path to reads from extract_reads_for_ava step
-        :param keeptmp: Keep temporary files?
-        :param min_clust_size: Minimum cluster size to return Fastq file
-        :returns: Dict of file handles to each Fastq file keyed by cluster ID
-        :returns: Dict of sequence IDs keyed by cluster ID
-        """
-        fastq_handles = {}
-        seq2cluster = {}
-        with Path.open(isonclust3_out) as fh:
-            for line in fh:
-                clust, seqname = line.rstrip().split("\t")
-                seq2cluster[seqname] = clust
-        cluster2seq = defaultdict(list)
-        for seqname in seq2cluster:
-            cluster2seq[seq2cluster[seqname]].append(seqname)
-        for cluster in cluster2seq:
-            logger.info(
-                "Cluster %s comprises %d sequences", cluster, len(cluster2seq[cluster])
-            )
-            if len(cluster2seq[cluster]) >= min_clust_size:
-                fastq_handles[cluster] = NamedTemporaryFile(
-                    suffix=".fastq",
-                    mode="w",
-                    delete=(not keeptmp),
-                    delete_on_close=False,
-                )
-            else:
-                logger.debug("Cluster %s below size cutoff", cluster)
-        for seqname, seq, qual in pyfastx.Fastx(reads):
-            if seqname in seq2cluster and seq2cluster[seqname] in fastq_handles:
-                fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
-                fastq_handles[seq2cluster[seqname]].write(fastq_rec)
-        for handle in fastq_handles.values():
-            handle.close()
-        return fastq_handles, cluster2seq
-
     @check_stage_file(
         stage="cluster_asm",
         message="Extract cluster sequences and assemble with spoa",
@@ -799,14 +713,14 @@ class Pipeline:
         :param max_clust_size: Downsample reads for clusters above this size.
         """
         if cluster_tool == "mcl":
-            fastq_handles, cluster2seq = self._cluster_seqs_from_mcl(
+            fastq_handles, cluster2seq = cluster_seqs_from_mcl(
                 self.pathto("mcl_cluster"),
                 self.pathto("mapped_segments"),
                 keeptmp=keeptmp,
                 min_clust_size=min_clust_size,
             )
         elif cluster_tool == "isonclust3":
-            fastq_handles, cluster2seq = self._cluster_seqs_from_isonclust3(
+            fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
                 self.pathto("isonclust3_cluster"),
                 self.pathto("mapped_segments"),
                 keeptmp=keeptmp,
