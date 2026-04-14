@@ -410,7 +410,7 @@ def run(ctx, **kwargs):
         logger.error(str(e))
         sys.exit(1)
 
-    p = pipeline.Pipeline(ctx.params)
+    p = pipeline.Run(ctx.params)
     p.run_minimap(
         threads=ctx.params["threads"],
         mode=ctx.params["platform"],

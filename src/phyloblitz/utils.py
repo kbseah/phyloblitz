@@ -2,7 +2,9 @@
 
 import logging
 import re
+import sys
 from collections import defaultdict
+from functools import wraps
 from hashlib import md5
 from os import W_OK, access
 from pathlib import Path
@@ -441,3 +443,68 @@ def count_spoa_aln_persite_vars(seqs: dict) -> dict:
         counts_norm = counts / counts.sum()
         var[i] = -(counts_norm * np.log(counts_norm) / np.log(2)).sum()
     return var
+
+
+def check_stage_file(stage: str, message: str):
+    """Check whether outputs for each stage of Pipeline already exist.
+
+    Output files are checked by their expected filenames. If the expected
+    outputs already exist, the stage is skipped entirely. Use this function
+    as a decorator for individual stage methods. Enables resuming the
+    pipeline from partial output.
+
+    :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+    :param message: Logging message to emit on starting each stage
+    """
+
+    # TODO specify more than one output file; check required input files
+    def check_stage_decorator(func):
+        @wraps(func)
+        def wrapped_function(self, *args, **kwargs):
+            if self.check_run_file(stage):
+                if self._resume:
+                    logger.info(
+                        "Stage %s file output already present, skipping",
+                        stage,
+                    )
+                    return None
+                logger.error(
+                    "Stage %s file output already present and option --resume not used, exiting",
+                    stage,
+                )
+                sys.exit()
+            else:
+                logger.info(message)
+                return func(self, *args, **kwargs)
+
+        return wrapped_function
+
+    return check_stage_decorator
+
+
+class Pipeline:
+
+    def check_run_file(self, stage: str) -> bool:
+        """Check if intermediate output file has been created.
+
+        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+        :returns: True if file already exists at expected path
+        :rtype: bool
+        """
+        return Path.is_file(self.pathto(stage))
+
+    def pathto(self, stage: str, basename_only: bool = False) -> Path:
+        """Combine output directory prefix and filenames to intermediate file path.
+
+        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
+        :param basename_only: Only report the base filename if True
+        :returns: Expected path to intermediate output file
+        :rtype: Path
+        """
+        try:
+            if basename_only:
+                return Path(Path(self._prefix + self.OUTFILE_SUFFIX[stage]).name)
+            return Path(self._outdir) / Path(self._prefix + self.OUTFILE_SUFFIX[stage])
+        except KeyError as e:
+            e.add_not(f"Unknown intermediate file {stage}")
+            raise

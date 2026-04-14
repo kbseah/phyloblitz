@@ -9,6 +9,7 @@ from pathlib import Path
 
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import (
+    Pipeline,
     cluster_seqs_from_isonclust3,
     count_spoa_aln_persite_vars,
     count_spoa_aln_vars,
@@ -38,7 +39,7 @@ def read_tsv(filepath: str | Path) -> dict[list]:
     return out
 
 
-class Compare:
+class Compare(Pipeline):
     def __init__(self, args: dict) -> None:
         df = read_tsv(args["input_table"])
         samples = df["sample"]
@@ -47,7 +48,6 @@ class Compare:
         self._refindex = args["dbindex"]
         self._ref_md5 = run_md5(args["db"])
         self._reports = {}
-        self._segment2sample = {}
         self._outdir = args["outdir"]
         self._prefix = args["prefix"]
         self._stats = {
@@ -55,6 +55,9 @@ class Compare:
             "args": args,
             "runstats": {},
             "starttime": str(datetime.now()),
+            "cluster2seq": {},
+            "segment2sample": {},
+            "cluster2sample": {},
         }
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
@@ -65,6 +68,16 @@ class Compare:
         except ValueError as e:
             e.add_note("Number of sample names and report files do not agree")
             raise
+
+    OUTFILE_SUFFIX = {
+        "pooled_segments": "_segments.fastq",
+        "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
+        "cluster_asm": "_final.fasta",
+        "cluster_tophits": "_final_tophits.paf",
+        "report_json": "_report.json",
+        "report_md": "_report.md",
+        "report_html": "_report.html",
+    }
 
     def check_database_checksums(self) -> bool:
         """Check whether the same database was used for runs to be compared.
@@ -144,15 +157,15 @@ class Compare:
         returned = True
         for sample, report in self._reports.items():
             for segment in report["segments"]:
-                if segment in self._segment2sample:
+                if segment in self._stats["segment2sample"]:
                     logger.debug("Segment %s seen more than once", segment)
                     returned = False
-                self._segment2sample[segment] = sample
+                self._stats["segment2sample"][segment] = sample
         return returned
 
     def write_segments_to_fastq(self) -> None:
         """Write read segments to Fastq file for clustering."""
-        fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
+        fastq_path = self.pathto("pooled_segments")
         # If file already exists, remove it to avoid appending to an old file
         if fastq_path.exists():
             logger.warning(
@@ -180,9 +193,11 @@ class Compare:
             mode = "ont"
         elif self._platform in ["map-hifi", "map-pb"]:
             mode = "pacbio"
-        fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
-        outfolder = Path(self._outdir) / Path(self._prefix + "_clusters")
-        return run_isonclust3(fastq_path, mode, outfolder)
+        return run_isonclust3(
+            self.pathto("pooled_segments"),
+            mode,
+            self.pathto("isonclust3_cluster").parent.parent,
+        )
 
     def assemble_clusters(
         self,
@@ -202,16 +217,9 @@ class Compare:
             number of reads.
         :param max_clust_size: Downsample reads for clusters above this size.
         """
-        fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
-        isonclust3_out = (
-            Path(self._outdir)
-            / Path(self._prefix + "_clusters")
-            / Path("clustering")
-            / Path("final_clusters.tsv")
-        )
-        fastq_handles, self._cluster2seq = cluster_seqs_from_isonclust3(
-            isonclust3_out,
-            fastq_path,
+        fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
+            self.pathto("isonclust3_cluster"),
+            self.pathto("pooled_segments"),
             keeptmp=False,
             min_clust_size=min_clust_size,
             max_clust_size=max_clust_size,
@@ -219,15 +227,16 @@ class Compare:
         )
         self._stats["runstats"].update(
             {
-                "number of clusters": len(self._cluster2seq),
+                "number of clusters": len(cluster2seq),
                 "number of clusters > 5 reads": len(
-                    [i for i in self._cluster2seq if len(self._cluster2seq[i]) > 5],
+                    [i for i in cluster2seq if len(cluster2seq[i]) > 5],
                 ),
                 "total reads in clusters": sum(
-                    [len(self._cluster2seq[c]) for c in self._cluster2seq],
+                    [len(cluster2seq[c]) for c in cluster2seq],
                 ),
             },
         )
+        self._stats["cluster2seq"] = cluster2seq
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(
@@ -255,28 +264,26 @@ class Compare:
                 "cluster cons parsed": cluster_cons_parsed,
             },
         )
-        cluster_asm_path = Path(self._outdir) / Path(self._prefix + "_final.fasta")
-        with Path.open(cluster_asm_path, "w") as fh:
+        with Path.open(self.pathto("cluster_asm"), "w") as fh:
             fh.writelines(
                 f">cluster_{c!s} Consensus\n"
                 + cluster_cons_parsed[c]["Consensus"].replace("-", "")
                 + "\n"
                 for c in cluster_cons_parsed
             )
-            logger.info("Assembled sequences written to %s", cluster_asm_path)
+            logger.info("Assembled sequences written to %s", self.pathto("cluster_asm"))
 
     def cluster_memberships(self) -> None:
         """Map cluster memberships to samples."""
-        self._cluster2sample = {}
-        # Combine segment2sample and self._cluster2seq
-        for cluster, seqs in self._cluster2seq.items():
+        # Combine segment2sample and cluster2seq
+        for cluster, seqs in self._stats["cluster2seq"].items():
             samples = defaultdict(list)
             for seq in seqs:
-                if seq in self._segment2sample:
-                    samples[self._segment2sample[seq]].append(seq)
+                if seq in self._stats["segment2sample"]:
+                    samples[self._stats["segment2sample"][seq]].append(seq)
                 else:
                     logger.warning(
                         "Sequence %s not found in segment2sample mapping",
                         seq,
                     )
-            self._cluster2sample[cluster] = samples
+            self._stats["cluster2sample"][cluster] = samples

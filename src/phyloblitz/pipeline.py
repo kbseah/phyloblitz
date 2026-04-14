@@ -4,7 +4,6 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
-from functools import wraps
 from multiprocessing import Pool
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -23,6 +22,8 @@ from phyloblitz.report import (
     generate_report_md,
 )
 from phyloblitz.utils import (
+    Pipeline,
+    check_stage_file,
     CIGAROPS,
     cluster_seqs_from_isonclust3,
     cluster_seqs_from_mcl,
@@ -133,11 +134,11 @@ def sam_seq_generator(
         )
 
 
-class Pipeline:
-    """phyloblitz pipeline run object."""
+class Run(Pipeline):
+    """phyloblitz run pipeline object."""
 
     def __init__(self, args: dict) -> None:
-        """Construct Pipeline object.
+        """Construct Run object.
 
         Attributes:
         * _ref : Path to reference database Fasta file
@@ -188,67 +189,6 @@ class Pipeline:
         "report_dvs_hist": "_report_dvs_hist.png",
         "report_kmercount_plot": "_report_kmercount_plot.png",
     }
-
-    def check_run_file(self, stage: str) -> bool:
-        """Check if intermediate output file has been created.
-
-        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
-        :returns: True if file already exists at expected path
-        :rtype: bool
-        """
-        return Path.is_file(self.pathto(stage))
-
-    def pathto(self, stage: str, basename_only: bool = False) -> Path:
-        """Combine output directory prefix and filenames to intermediate file path.
-
-        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
-        :param basename_only: Only report the base filename if True
-        :returns: Expected path to intermediate output file
-        :rtype: Path
-        """
-        try:
-            if basename_only:
-                return Path(Path(self._prefix + self.OUTFILE_SUFFIX[stage]).name)
-            return Path(self._outdir) / Path(self._prefix + self.OUTFILE_SUFFIX[stage])
-        except KeyError as e:
-            e.add_not(f"Unknown intermediate file {stage}")
-            raise
-
-    def check_stage_file(stage: str, message: str):
-        """Check whether outputs for each stage of Pipeline already exist.
-
-        Output files are checked by their expected filenames. If the expected
-        outputs already exist, the stage is skipped entirely. Use this function
-        as a decorator for individual stage methods. Enables resuming the
-        pipeline from partial output.
-
-        :param stage: Name of run stage, must be a key of self.OUTFILE_SUFFIX
-        :param message: Logging message to emit on starting each stage
-        """
-
-        # TODO specify more than one output file; check required input files
-        def check_stage_decorator(func):
-            @wraps(func)
-            def wrapped_function(self, *args, **kwargs):
-                if self.check_run_file(stage):
-                    if self._resume:
-                        logger.info(
-                            "Stage %s file output already present, skipping",
-                            stage,
-                        )
-                        return None
-                    logger.error(
-                        "Stage %s file output already present and option --resume not used, exiting",
-                        stage,
-                    )
-                    sys.exit()
-                else:
-                    logger.info(message)
-                    return func(self, *args, **kwargs)
-
-            return wrapped_function
-
-        return check_stage_decorator
 
     @check_stage_file(
         stage="initial_map",
@@ -350,7 +290,7 @@ class Pipeline:
 
         Segments aligning to marker database are extracted in Fastq format to a
         new file, for the next clustering steps. Flanking sequences are also
-        extracted, not to the Fastq file but Pipeline._stats["segments"], so
+        extracted, not to the Fastq file but Run._stats["segments"], so
         they do not influence the marker clustering and assembly.
 
         :param align_minlen: Minimum alignment length in bp
@@ -481,7 +421,7 @@ class Pipeline:
         Minimap2 reports per-base divergence for each PAF alignment in the dv:
         tag. We analyze the distribution of dv values from all-vs-all mappings
         as a reference-free measure of sequence error, and also use it to set
-        the cutoffs for clustering with the mcl method. Updates Pipeline._stats
+        the cutoffs for clustering with the mcl method. Updates Run._stats
         with a dict of dv values per read ("dvs"), and a list of minimum dv
         value for each read ("min_dvs") to plot dv distribution.
         """
@@ -600,11 +540,11 @@ class Pipeline:
         each cluster to separate Fastq files, and assemble consensus sequence
         for each with Spoa. Assembly step is embarrassingly parallelized.
 
-        Updates Pipeline._stats["cluster2seq"] with lists of read names keyed
+        Updates Run._stats["cluster2seq"] with lists of read names keyed
         by cluster id. Some summary stats on clusters are written to
-        Pipeline._stats["runstats"].
+        Run._stats["runstats"].
 
-        Other per-cluster summaries in Pipeline._stats: "cluster variant
+        Other per-cluster summaries in Run._stats: "cluster variant
         counts" -- number of variant sites by type for each read vs. its
         cluster consensus; "cluster persite variant counts" -- per-site entropy
         vs. consensus [WIP]; "cluster cons parsed" -- cluster alignment
@@ -693,7 +633,7 @@ class Pipeline:
         the same cluster. As a measure of the potential diversity in each
         cluster, sequence flanking the conserved markers is also extracted and
         clustered, and the resulting number of clusters is reported. Stored in
-        Pipeline._stats["cluster flanking numclust"]
+        Run._stats["cluster flanking numclust"]
         """
         logger.info("Clustering flanking sequences with isonclust3")
         if self._platform in ["lr:hq", "map-ont"]:
@@ -753,7 +693,7 @@ class Pipeline:
 
         As an alternative to clustering flanking sequences, report the k-mer
         multiplicity to be visualized with cluster_flanking_kmercount_plot().
-        Stored in Pipeline._stats["flanking_kmer_histo"]
+        Stored in Run._stats["flanking_kmer_histo"]
 
         :param k: K-mer length, in bp
         :param minlen: Only count k-mers for flanking sequence at least this length
@@ -826,7 +766,7 @@ class Pipeline:
         """Get taxonomy string from SILVA headers in database Fasta file.
 
         Parse SILVA-style headers to get dict of taxonomy strings keyed by
-        accession, stored in the Pipeline._acc2tax attribute.
+        accession, stored in the Run._acc2tax attribute.
         """
         logger.info("Reading taxonomy from SILVA database file")
         self._acc2tax = {}
@@ -867,7 +807,7 @@ class Pipeline:
     ) -> None:
         """Summarize taxonomy at a specified taxonomy level from initial mapping.
 
-        Updates Pipeline._stats["initial_taxonomy"] with a Counter of the
+        Updates Run._stats["initial_taxonomy"] with a Counter of the
         observed taxonomy strings at the requested taxon level.
 
         :param minlen: Only consider alignments where query_alignment_length is
@@ -925,7 +865,7 @@ class Pipeline:
     def summarize_tophit_paf(self) -> None:
         """Summarize top hits of assembled seqs mapped to SILVA database by minimap2.
 
-        Update Pipeline._stats with a dict of summary stats "cluster_tophits"
+        Update Run._stats with a dict of summary stats "cluster_tophits"
         for each hit, keyed by query sequence name.
         """
         out = {}
@@ -1010,7 +950,7 @@ class Pipeline:
     def write_report_json(self) -> None:
         """Dump run stats file in JSON format.
 
-        Dump the Pipeline._stats attribute to a JSON file for troubleshooting
+        Dump the Run._stats attribute to a JSON file for troubleshooting
         and comparison of different phyloblitz runs.
         """
         self._stats.update({"endtime": str(datetime.now())})
