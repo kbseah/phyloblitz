@@ -543,7 +543,7 @@ class Pipeline:
         stage="ava_filter",
         message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
     )
-    def paf_file_filter_overhangs(self, max_overhang_frac:float=0.05) -> None:
+    def paf_file_filter_overhangs(self, max_overhang_frac: float = 0.05) -> None:
         """Remove all-vs-all alignments with incompatible overhangs.
 
         All-vs-all alignments of extracted marker read segments will be
@@ -901,22 +901,22 @@ class Pipeline:
         }
         max_kmer_cov = max([max([j[0] for j in histos[i]]) for i in histos])
         fig_height = len(cluster_ids) * 0.6
-        # TODO: if only one cluster, axs is not subscriptable
         fig, axs = plt.subplots(
             len(histos),
             sharex=True,
             sharey=False,
+            squeeze=False,  # account for len(histos)==1
             figsize=(4, fig_height),
             layout="constrained",
         )
         for idx, (cid, histo) in enumerate(histos.items()):
-            axs[idx].bar(
+            axs[idx, 0].bar(
                 x=[i[0] for i in histo],
                 height=[np.log1p(i[1]) for i in histo],
                 width=1,
             )
-            axs[idx].set_title(cid, y=1.0, pad=-15, loc="right")
-            axs[idx].set_xlim(-2, max_kmer_cov + 2)
+            axs[idx, 0].set_title(cid, y=1.0, pad=-15, loc="right")
+            axs[idx, 0].set_xlim(-2, max_kmer_cov + 2)
         fig.savefig(self.pathto("report_kmercount_plot"))
 
     def db_taxonomy(self) -> None:

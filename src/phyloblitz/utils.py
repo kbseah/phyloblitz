@@ -34,7 +34,7 @@ CIGAROPS = {
 }
 
 
-def parse_cigar_ops(cigar:str)->dict:
+def parse_cigar_ops(cigar: str) -> dict:
     """Summarize operations in a CIGAR string."""
     summary = defaultdict(int)
     cigar = re.findall(r"(\d+)(\D)", cigar)
@@ -43,7 +43,7 @@ def parse_cigar_ops(cigar:str)->dict:
     return summary
 
 
-def lists_common_prefix(lol:list[list])->list:
+def lists_common_prefix(lol: list[list]) -> list:
     """Get common prefix in a list of lists.
 
     :param lol: list of lists of strings
@@ -60,7 +60,7 @@ def lists_common_prefix(lol:list[list])->list:
     return out
 
 
-def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05)->str|None:
+def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05) -> str | None:
     """Filter out PAF alignments with incompatible overhangs.
 
     If two aligned reads have overhangs that do not align, and the overhangs
@@ -129,7 +129,7 @@ def check_dependencies() -> dict:
     return vers
 
 
-def check_outdir(outdir:str|Path, resume:bool=True)->None:
+def check_outdir(outdir: str | Path, resume: bool = True) -> None:
     """Check if output directory exists, and create it if it doesn't.
 
     Raise exceptions if output path exists but is not a directory, or if it is
