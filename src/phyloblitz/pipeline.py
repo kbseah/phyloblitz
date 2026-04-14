@@ -159,11 +159,11 @@ class Pipeline:
         self._platform = args["platform"]
         self._resume = args["resume"]
         self._stats = {
-            "version" : __version__,
-            "args" : args,
-            "runstats" : {},
-            "starttime" : str(datetime.now()),
-            "db_md5" : run_md5(args["db"]),
+            "version": __version__,
+            "args": args,
+            "runstats": {},
+            "starttime": str(datetime.now()),
+            "db_md5": run_md5(args["db"]),
         }
         logger.debug(
             "Database file %s has MD5 checksum %s",

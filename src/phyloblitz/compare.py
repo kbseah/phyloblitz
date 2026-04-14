@@ -10,12 +10,12 @@ from pathlib import Path
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import (
     cluster_seqs_from_isonclust3,
+    count_spoa_aln_persite_vars,
+    count_spoa_aln_vars,
+    parse_spoa_r2,
     run_isonclust3,
     run_md5,
-    parse_spoa_r2,
     spoa_assemble_fasta,
-    count_spoa_aln_vars,
-    count_spoa_aln_persite_vars,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,10 +51,10 @@ class Compare:
         self._outdir = args["outdir"]
         self._prefix = args["prefix"]
         self._stats = {
-            "version" : __version__,
-            "args" : args,
-            "runstats" : {},
-            "starttime" : str(datetime.now()),
+            "version": __version__,
+            "args": args,
+            "runstats": {},
+            "starttime": str(datetime.now()),
         }
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
