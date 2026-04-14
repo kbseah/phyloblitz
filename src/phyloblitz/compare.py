@@ -3,9 +3,18 @@
 import json
 import logging
 from collections import defaultdict
+from multiprocessing import Pool
 from pathlib import Path
 
-from phyloblitz.utils import cluster_seqs_from_isonclust3, run_isonclust3, run_md5
+from phyloblitz.utils import (
+    cluster_seqs_from_isonclust3,
+    run_isonclust3,
+    run_md5,
+    parse_spoa_r2,
+    spoa_assemble_fasta,
+    count_spoa_aln_vars,
+    count_spoa_aln_persite_vars,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +176,24 @@ class Compare:
         outfolder = Path(self._outdir) / Path(self._prefix + "_clusters")
         return run_isonclust3(fastq_path, mode, outfolder)
 
-    def cluster_memberships(self) -> None:
-        """Map cluster memberships to samples."""
+    def assemble_clusters(
+        self,
+        threads: int = 12,
+        rseed: int = 12345,
+        keeptmp: bool = False,
+        min_clust_size: int = 5,
+        max_clust_size: int = 500,
+    ) -> None:
+        """Extract cluster sequences and assemble with spoa.
+
+        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3".
+        :param threads: Number of parallel assembly jobs to run.
+        :param rseed: Random seed for downsampling reads in large clusters.
+        :param keeptmp: If True, do not delete Fastq files with extracted reads.
+        :param min_clust_size: Only assemble clusters containing at least this
+            number of reads.
+        :param max_clust_size: Downsample reads for clusters above this size.
+        """
         fastq_path = Path(self._outdir) / Path(self._prefix + "_segments.fastq")
         isonclust3_out = (
             Path(self._outdir)
@@ -176,15 +201,67 @@ class Compare:
             / Path("clustering")
             / Path("final_clusters.tsv")
         )
-        _fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
+        fastq_handles, self._cluster2seq = cluster_seqs_from_isonclust3(
             isonclust3_out,
             fastq_path,
             keeptmp=False,
-            min_clust_size=5,
+            min_clust_size=min_clust_size,
+            max_clust_size=max_clust_size,
+            rseed=rseed,
         )
-        # Combine segment2sample and cluster2seq
+        # self._stats["runstats"].update(
+        #     {
+        #         "number of clusters": len(self._cluster2seq),
+        #         "number of clusters > 5 reads": len(
+        #             [i for i in self._cluster2seq if len(self._cluster2seq[i]) > 5],
+        #         ),
+        #         "total reads in clusters": sum(
+        #             [len(self._cluster2seq[c]) for c in self._cluster2seq],
+        #         ),
+        #     },
+        # )
+        logger.info("Assemble consensus from clustered sequences with spoa")
+        with Pool(threads) as pool:
+            cluster_cons_tuples = pool.map(
+                spoa_assemble_fasta,
+                [(c, handle.name) for c, handle in fastq_handles.items()],
+            )
+        # Close NamedTemporaryFile handles
+        for handle in fastq_handles.values():
+            handle.close()
+
+        cluster_cons = dict(cluster_cons_tuples)
+
+        cluster_cons_parsed = {i: parse_spoa_r2(cluster_cons[i]) for i in cluster_cons}
+        cluster_variant_counts = {
+            i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
+        }
+        # cluster_persite_variant_counts = {  # TODO WIP
+        #     i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
+        #     for i in cluster_cons_parsed
+        # }
+        # self._stats.update(
+        #     {
+        #         "cluster variant counts": cluster_variant_counts,
+        #         "cluster persite variant counts": cluster_persite_variant_counts,  # TODO WIP
+        #         "cluster cons parsed": cluster_cons_parsed,
+        #     },
+        # )
+        cluster_asm_path = Path(self._outdir) / Path(self._prefix + "_final.fasta")
+        with Path.open(cluster_asm_path, "w") as fh:
+            fh.writelines(
+                f">cluster_{c!s} Consensus\n"
+                + cluster_cons_parsed[c]["Consensus"].replace("-", "")
+                + "\n"
+                for c in cluster_cons_parsed
+            )
+            logger.info("Assembled sequences written to %s", cluster_asm_path)
+
+    def cluster_memberships(self) -> None:
+        """Map cluster memberships to samples."""
         self._cluster2sample = {}
-        for cluster, seqs in cluster2seq.items():
+        # Combine segment2sample and self._cluster2seq
+        for cluster, seqs in self._cluster2seq.items():
             samples = defaultdict(list)
             for seq in seqs:
                 if seq in self._segment2sample:

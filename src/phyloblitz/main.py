@@ -526,6 +526,34 @@ def run(ctx, **kwargs):
     is_flag=True,
 )
 @click.option(
+    "--threads",
+    help="Number of parallel threads",
+    default=12,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--min_clust_size",
+    help="Minimum cluster size to assemble a consensus sequence",
+    default=5,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--max_clust_size",
+    help="Clusters above this size will be downsampled for consensus assembly",
+    default=500,
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--rseed",
+    help="Random seed for subsampling reads and downsampling clusters",
+    default=12345,
+    type=int,
+    show_default=True,
+)
+@click.option(
     "--log",
     help="Path to write log file",
     type=click.Path(exists=True),
@@ -594,6 +622,14 @@ def compare(ctx, **kwargs) -> None:
 
     logger.info("Run isonclust3 clustering of pooled segments ...")
     c.cluster_segments()
+
+    logger.info("Assemble cluster consensus sequences ...")
+    c.assemble_clusters(
+        threads=ctx.params["threads"],
+        rseed=ctx.params["rseed"],
+        min_clust_size=ctx.params["min_clust_size"],
+        max_clust_size=ctx.params["max_clust_size"],
+    )
 
     logger.info("Map cluster memberships to samples ...")
     c.cluster_memberships()
