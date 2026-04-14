@@ -10,6 +10,7 @@ from pathlib import Path
 from phyloblitz.__about__ import __version__
 from phyloblitz.utils import (
     Pipeline,
+    check_stage_file,
     cluster_seqs_from_isonclust3,
     count_spoa_aln_persite_vars,
     count_spoa_aln_vars,
@@ -163,6 +164,10 @@ class Compare(Pipeline):
                 self._stats["segment2sample"][segment] = sample
         return returned
 
+    @check_stage_file(
+        stage="pooled_segments",
+        message="Pool read segments from all samples for clustering",
+    )
     def write_segments_to_fastq(self) -> None:
         """Write read segments to Fastq file for clustering."""
         fastq_path = self.pathto("pooled_segments")
@@ -187,6 +192,10 @@ class Compare(Pipeline):
                     )
                     fh.write(fastq_rec)
 
+    @check_stage_file(
+        stage="isonclust3_cluster",
+        message="Clustering with isonclust3",
+    )
     def cluster_segments(self) -> int:
         """Cluster read segments with isONclust3."""
         if self._platform in ["lr:hq", "map-ont"]:
@@ -199,6 +208,10 @@ class Compare(Pipeline):
             self.pathto("isonclust3_cluster").parent.parent,
         )
 
+    @check_stage_file(
+        stage="cluster_asm",
+        message="Extract cluster sequences and assemble with spoa",
+    )
     def assemble_clusters(
         self,
         threads: int = 12,

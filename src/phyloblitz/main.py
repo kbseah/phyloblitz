@@ -51,7 +51,20 @@ click.rich_click.OPTION_GROUPS = {
             "options": ["dv_max", "dv_max_auto", "inflation"],
         },
     ],
-    "phyloblitz compare": [],
+    "phyloblitz compare": [
+        {
+            "name" : "Input",
+            "options": [ "db", "dbindex", "input_table"],
+        },
+        {
+            "name": "Output",
+            "options": [ "outdir", "prefix", "log"],
+        },
+        {
+            "name": "Run parameters",
+            "options": [ "threads", "ignore_db_mismatch", "min_clust_size", "max_clust_size", "rseed", "debug"],
+        },
+    ],
 }
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -480,7 +493,6 @@ def run(ctx, **kwargs):
     if ctx.params["log"]:
         logfile_handler.close()
 
-
 @main.command(
     context_settings=CONTEXT_SETTINGS,
     help="Compare phyloblitz runs.",
@@ -620,10 +632,8 @@ def compare(ctx, **kwargs) -> None:
 
     c.write_segments_to_fastq()
 
-    logger.info("Run isonclust3 clustering of pooled segments ...")
     c.cluster_segments()
 
-    logger.info("Assemble cluster consensus sequences ...")
     c.assemble_clusters(
         threads=ctx.params["threads"],
         rseed=ctx.params["rseed"],
