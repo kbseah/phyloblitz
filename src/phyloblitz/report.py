@@ -116,7 +116,7 @@ def dod2markdowntable(
 
 def generate_histogram(
     vals,
-    vline: int | float,
+    vline: float,
     title: str,
     outfile: str | Path,
     figsize: tuple[int, int] = (3, 2),
@@ -129,7 +129,6 @@ def generate_histogram(
     :param outfile: Path to write output file
     :param figsize: Dimensions of figure
     """
-
     fig, axs = plt.subplots(1, figsize=figsize)
     axs.hist(vals, bins="auto", density=True)
     if vline is not None:
@@ -140,7 +139,9 @@ def generate_histogram(
 
 
 def generate_report_md(
-    stats: dict, histogram_file_path: str | Path, kmercount_plot_path: str | Path
+    stats: dict,
+    histogram_file_path: str | Path,
+    kmercount_plot_path: str | Path,
 ) -> str:
     """Generate markdown report from stats collected during phyloblitz run.
 

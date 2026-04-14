@@ -13,7 +13,6 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 import matplotlib.pyplot as plt
 import numpy as np
 import oxli
-import pyfastx
 import pymarkovclustering as pymcl
 import pysam
 
@@ -264,7 +263,9 @@ class Pipeline:
         self._stats["starttime"] = str(datetime.now())
         self._stats["db_md5"] = run_md5(args["db"])
         logger.debug(
-            "Database file %s has MD5 checksum %s", self._ref, self._stats["db_md5"]
+            "Database file %s has MD5 checksum %s",
+            self._ref,
+            self._stats["db_md5"],
         )
 
     OUTFILE_SUFFIX = {
@@ -542,7 +543,7 @@ class Pipeline:
         stage="ava_filter",
         message="Filtering overlapping incompatible overhangs from all-vs-all mappings",
     )
-    def paf_file_filter_overhangs(self, max_overhang_frac=0.05) -> None:
+    def paf_file_filter_overhangs(self, max_overhang_frac:float=0.05) -> None:
         """Remove all-vs-all alignments with incompatible overhangs.
 
         All-vs-all alignments of extracted marker read segments will be
@@ -589,7 +590,7 @@ class Pipeline:
                 query = spl[0]
                 dv = re.findall(r"dv:f:([\d\.]+)", line)
                 if len(dv) != 1:
-                    msg = f"Problem in PAF file {str(self.pathto('ava_filter'))}: more than one dv tag in entry"
+                    msg = f"Problem in PAF file {self.pathto('ava_filter')!s}: more than one dv tag in entry"
                     raise ValueError(msg)
                 dvs[query].append(float(dv[0]))
         self._stats.update({"dvs": dvs})
@@ -608,7 +609,10 @@ class Pipeline:
         message="Clustering with mcl",
     )
     def pymcl_cluster(
-        self, dv_max: float = 0.03, dv_max_auto: bool = False, inflation: float = 2
+        self,
+        dv_max: float = 0.03,
+        dv_max_auto: bool = False,
+        inflation: float = 2,
     ) -> None:
         """Cluster marker read segments with MCL algorithm.
 
@@ -734,7 +738,7 @@ class Pipeline:
             {
                 "number of clusters": len(cluster2seq),
                 "number of clusters > 5 reads": len(
-                    [i for i in cluster2seq if len(cluster2seq[i]) > 5]
+                    [i for i in cluster2seq if len(cluster2seq[i]) > 5],
                 ),
                 "total reads in clusters": sum(
                     [len(cluster2seq[c]) for c in cluster2seq],
@@ -933,7 +937,9 @@ class Pipeline:
         logger.debug(" Accessions read: %d", len(self._acc2tax))
 
     def _per_read_consensus_taxonomy(
-        self, sam_file: str | Path, minlen: int = 1200
+        self,
+        sam_file: str | Path,
+        minlen: int = 1200,
     ) -> dict:
         """Consensus taxonomy of a single read from initial mapping with minimap2.
 
@@ -952,7 +958,9 @@ class Pipeline:
         return {acc: lists_common_prefix(all_taxstrings[acc]) for acc in all_taxstrings}
 
     def summarize_initial_mapping_taxonomy(
-        self, minlen: int, taxlevel: int = 4
+        self,
+        minlen: int,
+        taxlevel: int = 4,
     ) -> None:
         """Summarize taxonomy at a specified taxonomy level from initial mapping.
 

@@ -1,22 +1,23 @@
 """Shared utility functions for phyloblitz."""
 
 import logging
-import pyfastx
 import re
 from collections import defaultdict
 from hashlib import md5
 from os import W_OK, access
 from pathlib import Path
+from random import sample, seed
 from subprocess import PIPE, STDOUT, Popen
 from sys import version as python_version
+from tempfile import NamedTemporaryFile
+
+import pyfastx
 from matplotlib import __version__ as matplotlib_version
 from mistune import __version__ as mistune_version
 from numpy import __version__ as numpy_version
 from pyfastx import __version__ as pyfastx_version
 from pymarkovclustering import __version__ as pymcl_version
 from pysam import __version__ as pysam_version
-from random import sample, seed
-from tempfile import NamedTemporaryFile
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ CIGAROPS = {
 }
 
 
-def parse_cigar_ops(cigar):
+def parse_cigar_ops(cigar:str)->dict:
     """Summarize operations in a CIGAR string."""
     summary = defaultdict(int)
     cigar = re.findall(r"(\d+)(\D)", cigar)
@@ -42,7 +43,7 @@ def parse_cigar_ops(cigar):
     return summary
 
 
-def lists_common_prefix(lol):
+def lists_common_prefix(lol:list[list])->list:
     """Get common prefix in a list of lists.
 
     :param lol: list of lists of strings
@@ -59,7 +60,7 @@ def lists_common_prefix(lol):
     return out
 
 
-def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05):
+def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05)->str|None:
     """Filter out PAF alignments with incompatible overhangs.
 
     If two aligned reads have overhangs that do not align, and the overhangs
@@ -118,6 +119,7 @@ def check_dependencies() -> dict:
                 matplotlib_version,
                 pymcl_version,
             ],
+            strict=True,
         ),
     )
     for tool in ["minimap2", "spoa", "isONclust3"]:
@@ -127,8 +129,8 @@ def check_dependencies() -> dict:
     return vers
 
 
-def check_outdir(outdir, resume=True):
-    """Check if output directory exists, and create it if it doesn't
+def check_outdir(outdir:str|Path, resume:bool=True)->None:
+    """Check if output directory exists, and create it if it doesn't.
 
     Raise exceptions if output path exists but is not a directory, or if it is
     not writable. If output directory already exists and resume is False, raise
@@ -157,6 +159,12 @@ def check_outdir(outdir, resume=True):
 
 
 def run_md5(file: str | Path) -> str:
+    """Calculate MD5 hash for a file.
+
+    :param file: Path to file.
+    :returns: MD5 hash hex digest.
+    :rtype: str
+    """
     md5_hash = md5()
     with Path.open(file, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
@@ -217,6 +225,7 @@ def cluster_seqs_from_isonclust3(
         max_clust_size are downsampled to max_clust_size.
     :returns: Dict of sequence IDs keyed by cluster ID; includes all sequences
         regardless of cluster size.
+    :rtype: tuple
     """
     fastq_handles = {}
     seq2cluster = {}
@@ -283,7 +292,7 @@ def cluster_seqs_from_mcl(
         max_clust_size are downsampled to max_clust_size.
     :returns: Dict of sequence IDs keyed by cluster ID; includes all sequences
         regardless of cluster size.
-
+    :rtype: tuple
     """
     fastq_handles = {}
     seq2cluster = {}

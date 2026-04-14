@@ -2,10 +2,10 @@
 
 import hashlib
 import logging
-import requests
-
-from packaging.version import Version
 from pathlib import Path
+
+import requests
+from packaging.version import Version
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,10 @@ def get_file(
 
 
 def check_md5sum_file(
-    versions: dict, which_db: str, db_version: str, outpath: Path
+    versions: dict,
+    which_db: str,
+    db_version: str,
+    outpath: Path,
 ) -> bool:
     """Check MD5 checksum of downloaded file.
 

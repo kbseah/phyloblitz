@@ -7,8 +7,8 @@ import rich_click as click
 from rich.logging import RichHandler
 
 from phyloblitz import downloads, pipeline
-from phyloblitz.compare import Compare
 from phyloblitz.__about__ import __version__
+from phyloblitz.compare import Compare
 from phyloblitz.utils import check_dependencies, check_outdir
 
 click.rich_click.OPTION_GROUPS = {
@@ -152,7 +152,7 @@ def download(ctx, **kwargs) -> None:
                 print("  " + report)
             for marker, filedata in meta["files"].items():
                 print(
-                    f"    Marker: {marker}, Filename: {filedata['filename']}, Size: {filedata['size']} bytes, Checksum: {filedata['checksum']}"
+                    f"    Marker: {marker}, Filename: {filedata['filename']}, Size: {filedata['size']} bytes, Checksum: {filedata['checksum']}",
                 )
         sys.exit(0)
     if ctx.params["db_version"] == "latest":
@@ -359,7 +359,10 @@ def download(ctx, **kwargs) -> None:
     show_default=True,
 )
 @click.option(
-    "--inflation", help="Inflation parameter for MCL", default=2, show_default=True
+    "--inflation",
+    help="Inflation parameter for MCL",
+    default=2,
+    show_default=True,
 )
 @click.option(
     "--no_supplementary",
@@ -575,7 +578,7 @@ def compare(ctx, **kwargs) -> None:
     if not c.check_database_checksums():
         if ctx.params["ignore_db_mismatch"]:
             logger.info(
-                "Continuing because --ignore_db_mismatch specified. I assume you know what you are doing..."
+                "Continuing because --ignore_db_mismatch specified. I assume you know what you are doing...",
             )
         else:
             sys.exit(1)

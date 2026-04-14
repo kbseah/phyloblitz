@@ -5,7 +5,7 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
-from phyloblitz.utils import run_isonclust3, run_md5, cluster_seqs_from_isonclust3
+from phyloblitz.utils import cluster_seqs_from_isonclust3, run_isonclust3, run_md5
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,9 @@ class Compare:
                 logger.error("Mismatched sequencing platforms found")
                 for s in self._reports:
                     logger.debug(
-                        "Sample %s platform %s", s, self._reports[s]["args"]["platform"]
+                        "Sample %s platform %s",
+                        s,
+                        self._reports[s]["args"]["platform"],
                     )
                 return False
             self._platform = next(iter(platforms))
@@ -137,7 +139,8 @@ class Compare:
         # If file already exists, remove it to avoid appending to an old file
         if fastq_path.exists():
             logger.warning(
-                "Fastq file %s already exists, it will be overwritten", fastq_path
+                "Fastq file %s already exists, it will be overwritten",
+                fastq_path,
             )
             fastq_path.unlink()
         with Path.open(fastq_path, "a") as fh:
@@ -174,7 +177,10 @@ class Compare:
             / Path("final_clusters.tsv")
         )
         _fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
-            isonclust3_out, fastq_path, keeptmp=False, min_clust_size=5
+            isonclust3_out,
+            fastq_path,
+            keeptmp=False,
+            min_clust_size=5,
         )
         # Combine segment2sample and cluster2seq
         self._cluster2sample = {}
@@ -185,6 +191,7 @@ class Compare:
                     samples[self._segment2sample[seq]].append(seq)
                 else:
                     logger.warning(
-                        "Sequence %s not found in segment2sample mapping", seq
+                        "Sequence %s not found in segment2sample mapping",
+                        seq,
                     )
             self._cluster2sample[cluster] = samples
