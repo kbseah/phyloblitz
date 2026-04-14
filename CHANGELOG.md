@@ -38,9 +38,10 @@
  - [x] Parse supplementary alignments by default
  - [x] Skip duplicate segments extracted from overlapping alignments
  - [x] Downsample clusters with too many reads for assembly (~500 should be ok)
+ - [ ] Multisample comparison and co-assembly
+ - [ ] Gzip JSON output file
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
- - [ ] Multisample comparison and co-assembly
  - [ ] Detailed documentation
 
 
