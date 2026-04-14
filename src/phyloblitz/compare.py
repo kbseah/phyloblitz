@@ -310,5 +310,3 @@ class Compare(Pipeline):
         self._stats.update({"endtime": str(datetime.now())})
         with Path.open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
-
-

@@ -11,6 +11,13 @@ from phyloblitz.__about__ import __version__
 from phyloblitz.compare import Compare
 from phyloblitz.utils import check_dependencies, check_outdir
 
+logging.basicConfig(level=logging.DEBUG)
+root_logger = logging.getLogger()
+formatter = logging.Formatter(
+    "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
 click.rich_click.OPTION_GROUPS = {
     "phyloblitz download": [],
     "phyloblitz run": [
@@ -143,18 +150,12 @@ def main() -> None:
 @click.pass_context
 def download(ctx, **kwargs) -> None:
     """Command line interface to download reference databases from Zenodo."""
-    logging.basicConfig(level=logging.DEBUG)
-    root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
     loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
-    formatter = logging.Formatter(
-        "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
     if ctx.params["log"]:
         logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
@@ -393,18 +394,12 @@ def download(ctx, **kwargs) -> None:
 @click.pass_context
 def run(ctx, **kwargs):
     """Command line interface to run phyloblitz pipeline."""
-    logging.basicConfig(level=logging.DEBUG)
-    root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
     loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
-    formatter = logging.Formatter(
-        "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
     if ctx.params["log"]:
         logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
@@ -595,18 +590,12 @@ def compare(ctx, **kwargs) -> None:
     the pooled reads and comparing which samples are represented in each
     cluster.
     """
-    logging.basicConfig(level=logging.DEBUG)
-    root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate handlers
     logger = logging.getLogger(__name__)  # Logger for this module
 
     loglevel = logging.DEBUG if ctx.params["debug"] else logging.INFO
     root_logger.addHandler(RichHandler(level=loglevel))
 
-    formatter = logging.Formatter(
-        "%(levelname)s : %(module)s : %(asctime)s : %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
     if ctx.params["log"]:
         logfile_handler = logging.FileHandler(ctx.params["log"])
         logfile_handler.setFormatter(formatter)
