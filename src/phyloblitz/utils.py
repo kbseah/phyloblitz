@@ -10,15 +10,12 @@ from os import W_OK, access
 from pathlib import Path
 from random import sample, seed
 from subprocess import PIPE, STDOUT, Popen
-from sys import version as python_version
 from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pyfastx
 from matplotlib import __version__ as matplotlib_version
 from mistune import __version__ as mistune_version
-from numpy import __version__ as numpy_version
-from pyfastx import __version__ as pyfastx_version
 from pymarkovclustering import __version__ as pymcl_version
 from pysam import __version__ as pysam_version
 
@@ -88,9 +85,8 @@ def filter_paf_overhang(line: str, max_overhang_frac: float = 0.05) -> str | Non
         t_q > max_overhang_frac and t_t > max_overhang_frac
     ):
         # incompatible overlap
-        pass
-    else:
-        return line
+        return None
+    return line
 
 
 def check_dependencies() -> dict:
@@ -114,11 +110,11 @@ def check_dependencies() -> dict:
                 "pymarkovclustering",
             ],
             [
-                python_version,
+                sys.version,
                 pysam_version,
-                pyfastx_version,
+                pyfastx.__version__,
                 mistune_version,
-                numpy_version,
+                np.__version__,
                 matplotlib_version,
                 pymcl_version,
             ],

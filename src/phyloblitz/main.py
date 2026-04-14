@@ -6,9 +6,10 @@ import sys
 import rich_click as click
 from rich.logging import RichHandler
 
-from phyloblitz import downloads, pipeline
+from phyloblitz import downloads
 from phyloblitz.__about__ import __version__
 from phyloblitz.compare import Compare
+from phyloblitz.pipeline import Run
 from phyloblitz.utils import check_dependencies, check_outdir
 
 logging.basicConfig(level=logging.DEBUG)
@@ -425,7 +426,7 @@ def run(ctx, **kwargs):
         logger.error(str(e))
         sys.exit(1)
 
-    p = pipeline.Run(ctx.params)
+    p = Run(ctx.params)
     p.run_minimap(
         threads=ctx.params["threads"],
         mode=ctx.params["platform"],
