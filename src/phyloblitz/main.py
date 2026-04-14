@@ -643,4 +643,4 @@ def compare(ctx, **kwargs) -> None:
     c.cluster_memberships()
 
     c.write_report_json()
-    c.write_report_md()
+    c.write_reports()

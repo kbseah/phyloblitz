@@ -7,8 +7,15 @@ from datetime import datetime
 from multiprocessing import Pool
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+from mistune import create_markdown, html
+from mistune.renderers.markdown import MarkdownRenderer
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import pdist
+
 from phyloblitz.__about__ import __version__
-from phyloblitz.report import dict2markdowntable, dod2markdowntable
+from phyloblitz.report import HTML_TEMPLATE, dict2markdowntable, dod2markdowntable
 from phyloblitz.utils import (
     Pipeline,
     check_stage_file,
@@ -39,6 +46,152 @@ def read_tsv(filepath: str | Path) -> dict[list]:
             for key, val in zip(header, line.rstrip().split("\t"), strict=True):
                 out[key].append(val)
     return out
+
+
+# TODO: User specify clustering and distance methods
+def clustermap_rows_cols(
+    X,
+    *,
+    row_labels: list | None,
+    col_labels: list | None,
+    row_metric: str = "euclidean",
+    col_metric: str = "euclidean",
+    row_method: str = "ward",
+    col_method: str = "ward",
+    cmap: str = "viridis",
+    figsize: tuple = (10, 10),
+    xtick_rotation: float = 90,
+    xtick_fontsize: float = 8,
+    ytick_fontsize: float = 8,
+) -> tuple:
+    """Plot heatmap and dendrograms of 2-d array.
+
+    Hierarchical clustering of rows and columns of X, then plot heatmap with
+    row/col dendrograms (scipy + matplotlib only), with row/col labels.
+
+    :param X: (nrow, ncol) array-like
+    :param row_labels: Labels for rows (length nrow). If None, uses 0..nrow-1.
+    :param col_labels: Labels for cols (length ncol). If None, uses 0..ncol-1.
+    :param row_metric: Distance metric for clustering rows (passed to scipy.pdist).
+    :param col_metric: Distance metric for clustering columns (passed to scipy.pdist).
+    :param row_method: Linkage method for clustering rows (passed to scipy.linkage).
+    :param col_method: Linkage method for clustering columns (passed to scipy.linkage).
+    :param cmap: Colormap for heatmap (passed to matplotlib.pyplot.imshow).
+    :param figsize: Figure size (passed to matplotlib.pyplot.figure).
+    :param xtick_rotation: Rotation angle for x-axis tick labels (column labels).
+    :param xtick_fontsize: Font size for x-axis tick labels (column labels).
+    :param ytick_fontsize: Font size for y-axis tick labels (row labels).
+    :returns: Figure and dict with data.
+    """
+    X = np.asarray(X)
+    nrow, ncol = X.shape
+
+    if row_labels is None:
+        row_labels = [str(i) for i in range(nrow)]
+    if col_labels is None:
+        col_labels = [str(j) for j in range(ncol)]
+    if len(row_labels) != nrow:
+        raise ValueError(f"row_labels must have length {nrow}, got {len(row_labels)}")
+    if len(col_labels) != ncol:
+        raise ValueError(f"col_labels must have length {ncol}, got {len(col_labels)}")
+
+    # cluster rows
+    row_dist = pdist(X, metric=row_metric)
+    row_link = linkage(row_dist, method=row_method)
+    row_den = dendrogram(row_link, no_plot=True)
+    row_order = row_den["leaves"]
+
+    # cluster columns (cluster the transpose)
+    col_dist = pdist(X.T, metric=col_metric)
+    col_link = linkage(col_dist, method=col_method)
+    col_den = dendrogram(col_link, no_plot=True)
+    col_order = col_den["leaves"]
+
+    # reorder matrix and labels
+    Xo = X[np.ix_(row_order, col_order)]
+    row_labels_o = [row_labels[i] for i in row_order]
+    col_labels_o = [col_labels[j] for j in col_order]
+
+    # layout: row dendrogram (left), col dendrogram (top), heatmap (center), colorbar (right)
+    fig = plt.figure(figsize=figsize)
+    gs = fig.add_gridspec(
+        nrows=2,
+        ncols=3,
+        width_ratios=(1.2, 6.0, 0.3),
+        height_ratios=(1.2, 6.0),
+        wspace=0.05,
+        hspace=0.05,
+    )
+
+    ax_col = fig.add_subplot(gs[0, 1])
+    ax_row = fig.add_subplot(gs[1, 0])
+    ax_hm = fig.add_subplot(gs[1, 1])
+    ax_cb = fig.add_subplot(gs[1, 2])
+
+    # Column dendrogram (top)
+    dendrogram(
+        col_link,
+        ax=ax_col,
+        orientation="top",
+        no_labels=True,
+        color_threshold=0,
+        above_threshold_color="black",
+    )
+    ax_col.set_xticks([])
+    ax_col.set_yticks([])
+    for sp in ax_col.spines.values():
+        sp.set_visible(False)
+
+    # Row dendrogram (left)
+    dendrogram(
+        row_link,
+        ax=ax_row,
+        orientation="left",
+        no_labels=True,
+        color_threshold=0,
+        above_threshold_color="black",
+    )
+    ax_row.set_xticks([])
+    ax_row.set_yticks([])
+    for sp in ax_row.spines.values():
+        sp.set_visible(False)
+
+    # Heatmap
+    im = ax_hm.imshow(
+        Xo, aspect="auto", interpolation="nearest", cmap=cmap, origin="upper",
+    )
+
+    # Set ticks at cell centers
+    ax_hm.set_xticks(np.arange(ncol))
+    ax_hm.set_yticks(np.arange(nrow))
+
+    ax_hm.set_xticklabels(
+        col_labels_o, rotation=xtick_rotation, ha="right", fontsize=xtick_fontsize,
+    )
+    ax_hm.set_yticklabels(row_labels_o, fontsize=ytick_fontsize)
+
+    # Put x labels at bottom only
+    ax_hm.tick_params(top=False, bottom=True, labeltop=False, labelbottom=True)
+
+    # Optional: small tick marks off for a cleaner heatmap
+    ax_hm.tick_params(axis="both", which="both", length=0)
+
+    # Clean spines
+    for sp in ax_hm.spines.values():
+        sp.set_visible(False)
+
+    # Colorbar
+    fig.colorbar(im, cax=ax_cb)
+
+    return fig, {
+        "row_linkage": row_link,
+        "col_linkage": col_link,
+        "row_order": row_order,
+        "col_order": col_order,
+        "X_reordered": Xo,
+        "row_labels_reordered": row_labels_o,
+        "col_labels_reordered": col_labels_o,
+    }
 
 
 class Compare(Pipeline):
@@ -80,6 +233,7 @@ class Compare(Pipeline):
         "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
         "cluster_asm": "_final.fasta",
         "cluster_tophits": "_final_tophits.paf",
+        "cluster_membership_heatmap": "_cluster_membership_heatmap.png",
         "report_json": "_report.json",
         "report_md": "_report.md",
         "report_html": "_report.html",
@@ -319,8 +473,8 @@ class Compare(Pipeline):
         stage="report_md",
         message="Writing report in Markdown format",
     )
-    def write_report_md(self) -> None:
-        """Write report stats in markdown format."""
+    def write_reports(self) -> None:
+        """Write report in Markdown and HTML formats."""
         cluster2sample_counts = {
             c: {
                 s: len(self._stats["cluster2sample"][c][s])
@@ -336,6 +490,24 @@ class Compare(Pipeline):
             col1="Cluster",
             fill_empty="0",
         )
+        # TODO: Use percentages instead of counts for visualization
+        # Generate dendrogram and heatmap of cluster memberships across samples
+        cluster2sample_array = np.array(
+            [
+                [cluster2sample_counts[c].get(s, 0) for s in self._samples]
+                for c in cluster2sample_counts
+            ],
+        )
+        fig, out = clustermap_rows_cols(
+            cluster2sample_array,
+            row_labels=[f"Cluster {c}" for c in cluster2sample_counts],
+            col_labels=self._samples,
+            row_method="ward",
+            col_method="ward",
+            cmap="viridis",
+            figsize=(10, max(6, len(cluster2sample_counts) * 0.5)),
+        )
+        fig.savefig(self.pathto("cluster_membership_heatmap"), bbox_inches="tight")
         # TODO: Embed input sample table
         raw = f"""# phyloblitz compare report
 
@@ -361,6 +533,17 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 {counts_md}
 
+
+<figure>
+
+![]({self.pathto("cluster_membership_heatmap", basename_only=True)!s})
+
+<figcaption>Cluster membership heatmap. Rows are clusters, columns are samples,
+and values are number of read segments from each sample in each cluster.
+Clusters and samples are ordered by hierarchical clustering with average
+linkage and Euclidean distance.</figcaption>
+</figure>
+
 ---
 
 <details>
@@ -385,8 +568,17 @@ repository URL and software version.
 
 </details>
 """
-        with Path.open(self.pathto("report_md"), "w") as fh:
-            fh.write(raw)
 
-    # TODO: write_report_html() method to generate HTML report from Markdown report
-    # TODO: heatmap and dendrogram of cluster memberships across samples
+        format_md = create_markdown(renderer=MarkdownRenderer())
+        out_md = format_md(raw)
+
+        with Path.open(self.pathto("report_md"), "w") as fh:
+            fh.write(out_md)
+
+        out_html = HTML_TEMPLATE.replace(
+            "{{markdown_report}}",
+            html(out_md),
+        ).replace("{{title}}", "phyloblitz compare report")
+
+        with Path.open(self.pathto("report_html"), "w") as fh:
+            fh.write(out_html)
