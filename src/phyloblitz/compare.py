@@ -3,9 +3,11 @@
 import json
 import logging
 from collections import defaultdict
+from datetime import datetime
 from multiprocessing import Pool
 from pathlib import Path
 
+from phyloblitz.__about__ import __version__
 from phyloblitz.utils import (
     cluster_seqs_from_isonclust3,
     run_isonclust3,
@@ -48,6 +50,12 @@ class Compare:
         self._segment2sample = {}
         self._outdir = args["outdir"]
         self._prefix = args["prefix"]
+        self._stats = {
+            "version" : __version__,
+            "args" : args,
+            "runstats" : {},
+            "starttime" : str(datetime.now()),
+        }
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
             for sample, report in zip(samples, reports, strict=True):
@@ -209,17 +217,17 @@ class Compare:
             max_clust_size=max_clust_size,
             rseed=rseed,
         )
-        # self._stats["runstats"].update(
-        #     {
-        #         "number of clusters": len(self._cluster2seq),
-        #         "number of clusters > 5 reads": len(
-        #             [i for i in self._cluster2seq if len(self._cluster2seq[i]) > 5],
-        #         ),
-        #         "total reads in clusters": sum(
-        #             [len(self._cluster2seq[c]) for c in self._cluster2seq],
-        #         ),
-        #     },
-        # )
+        self._stats["runstats"].update(
+            {
+                "number of clusters": len(self._cluster2seq),
+                "number of clusters > 5 reads": len(
+                    [i for i in self._cluster2seq if len(self._cluster2seq[i]) > 5],
+                ),
+                "total reads in clusters": sum(
+                    [len(self._cluster2seq[c]) for c in self._cluster2seq],
+                ),
+            },
+        )
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(
@@ -236,17 +244,17 @@ class Compare:
         cluster_variant_counts = {
             i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
         }
-        # cluster_persite_variant_counts = {  # TODO WIP
-        #     i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
-        #     for i in cluster_cons_parsed
-        # }
-        # self._stats.update(
-        #     {
-        #         "cluster variant counts": cluster_variant_counts,
-        #         "cluster persite variant counts": cluster_persite_variant_counts,  # TODO WIP
-        #         "cluster cons parsed": cluster_cons_parsed,
-        #     },
-        # )
+        cluster_persite_variant_counts = {  # WIP
+            i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
+            for i in cluster_cons_parsed
+        }
+        self._stats.update(
+            {
+                "cluster variant counts": cluster_variant_counts,
+                "cluster persite variant counts": cluster_persite_variant_counts,  # WIP
+                "cluster cons parsed": cluster_cons_parsed,
+            },
+        )
         cluster_asm_path = Path(self._outdir) / Path(self._prefix + "_final.fasta")
         with Path.open(cluster_asm_path, "w") as fh:
             fh.writelines(
