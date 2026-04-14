@@ -7,7 +7,6 @@ from datetime import datetime
 from functools import wraps
 from multiprocessing import Pool
 from pathlib import Path
-from random import sample, seed
 from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 

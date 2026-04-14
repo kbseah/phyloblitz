@@ -38,6 +38,7 @@ click.rich_click.OPTION_GROUPS = {
                 "summary_taxlevel",
                 "min_clust_size",
                 "max_clust_size",
+                "rseed",
                 "flanking",
                 "no_supplementary",
                 "resume",
@@ -317,6 +318,13 @@ def download(ctx, **kwargs) -> None:
     show_default=True,
 )
 @click.option(
+    "--rseed",
+    help="Random seed for subsampling reads and downsampling clusters",
+    default=12345,
+    type=int,
+    show_default=True,
+)
+@click.option(
     "--flanking",
     help="Sequence flanking the mapped hits on query reads to extract",
     default=1000,
@@ -434,6 +442,7 @@ def run(ctx, **kwargs):
         keeptmp=ctx.params["keeptmp"],
         min_clust_size=ctx.params["min_clust_size"],
         max_clust_size=ctx.params["max_clust_size"],
+        rseed=ctx.params["rseed"],
     )
 
     # Cluster flanking sequences
