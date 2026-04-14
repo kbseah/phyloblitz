@@ -335,7 +335,7 @@ class Run(Pipeline):
                         continue
                 counter += 1
                 fq_fh.write(
-                    "@" + name + "\n" + rec["seq"] + "\n+\n" + rec["quals"] + "\n",
+                    f"@{name!s}\n{rec['seq']!s}\n+\n{rec['quals']!s}\n",
                 )
                 self._stats["segments"][name] = rec
         self._stats["runstats"].update({"mapped pass filter": counter})
@@ -364,18 +364,14 @@ class Run(Pipeline):
             "map-hifi": ["-x", "map-hifi", "-Xw5", "-e0", "-m100"],
         }
         with Path.open(self.pathto("ava_map"), "w") as paf_fh:
-            cmd = (
-                [
-                    "minimap2",
-                ]
-                + presets[mode]
-                + [
-                    "-t",
-                    str(threads),
-                    self.pathto("mapped_segments"),
-                    self.pathto("mapped_segments"),
-                ]
-            )
+            cmd = [
+                "minimap2",
+                *presets[mode],
+                "-t",
+                str(threads),
+                self.pathto("mapped_segments"),
+                self.pathto("mapped_segments"),
+            ]
             logger.debug("minimap command: %s", " ".join([str(i) for i in cmd]))
             proc = Popen(cmd, stdout=paf_fh, stderr=PIPE)
             for l in proc.stderr:
@@ -655,7 +651,7 @@ class Run(Pipeline):
                         + "@@@@@@@@@@"
                         + self._stats["segments"][seqid]["post_quals"]
                     )
-                    fq.write("@" + seqid + "\n" + seq + "\n+\n" + quals + "\n")
+                    fq.write(f"@{seqid!s}\n{seq!s}\n+\n{quals!s}\n")
                 with TemporaryDirectory() as tmpdir:
                     cmd = [
                         "isONclust3",
@@ -916,11 +912,7 @@ class Run(Pipeline):
                 # from ENA accessions. May not work with other databases e.g.
                 # Greengenes
                 rec["tophit"] = (
-                    "["
-                    + rec["tname"]
-                    + "](https://www.ebi.ac.uk/ena/browser/view/"
-                    + rec["tname"].split(".")[0]
-                    + ")"
+                    f"[{rec['tname']!s}](https://www.ebi.ac.uk/ena/browser/view/{rec['tname'].split('.')[0]!s})"
                 )
                 rec["tophit taxonomy"] = ";".join(self._acc2tax[rec["tname"]])
                 rec["tophit species"] = self._acc2tax[rec["tname"]][-1]
@@ -967,11 +959,11 @@ class Run(Pipeline):
             for c in self._stats["cluster cons parsed"]:
                 with Path.open(
                     Path(self._outdir)
-                    / Path(self._prefix + "_aln_cluster_" + str(c) + ".fasta"),
+                    / Path(f"{self._prefix!s}_aln_cluster_{c!s}.fasta"),
                     "w",
                 ) as fh:
                     for hdr, seq in self._stats["cluster cons parsed"][c].items():
-                        fh.write(">" + hdr + "\n" + seq + "\n")
+                        fh.write(f">{hdr!s}\n{seq!s}\n")
         except KeyError as e:
             e.add_note("Key `cluster cons parsed` not found, has spoa been run?")
             raise

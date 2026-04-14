@@ -41,7 +41,10 @@ def read_tsv(filepath: str | Path) -> dict[list]:
 
 
 class Compare(Pipeline):
+    """phyloblitz compare pipeline object."""
+
     def __init__(self, args: dict) -> None:
+        """Construct Run object."""
         df = read_tsv(args["input_table"])
         samples = df["sample"]
         reports = df["report"]
@@ -181,16 +184,9 @@ class Compare(Pipeline):
         with Path.open(fastq_path, "a") as fh:
             for report in self._reports.values():
                 for seg_name, seg_dict in report["segments"].items():
-                    fastq_rec = (
-                        "@"
-                        + seg_name
-                        + "\n"
-                        + seg_dict["seq"]
-                        + "\n+\n"
-                        + seg_dict["quals"]
-                        + "\n"
+                    fh.write(
+                        f"@{seg_name!s}\n{seg_dict['seq']!s}\n+\n{seg_dict['quals']!s}\n"
                     )
-                    fh.write(fastq_rec)
 
     @check_stage_file(
         stage="isonclust3_cluster",

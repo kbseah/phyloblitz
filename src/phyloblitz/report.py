@@ -292,13 +292,13 @@ def per_cluster_summarize(stats: dict) -> dict:
     for c in stats["cluster2seq"]:
         # unique reads from which mapped segments are derived
         reads = {":".join(i.split(":")[0:-2]) for i in stats["cluster2seq"][c]}
-        out["cluster_" + str(c)]["numreads"] = len(reads)
-        out["cluster_" + str(c)]["numseq"] = len(stats["cluster2seq"][c])
+        out[f"cluster_{c!s}"]["numreads"] = len(reads)
+        out[f"cluster_{c!s}"]["numseq"] = len(stats["cluster2seq"][c])
     for c in stats["cluster_tophits"]:
         out[c].update(stats["cluster_tophits"][c])
     if "cluster flanking numclust" in stats:
         for c in stats["cluster flanking numclust"]:
-            out["cluster_" + str(c)]["flanking seq clusters"] = stats[
+            out[f"cluster_{c!s}"]["flanking seq clusters"] = stats[
                 "cluster flanking numclust"
             ][c]
     return out

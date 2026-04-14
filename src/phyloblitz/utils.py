@@ -269,7 +269,7 @@ def cluster_seqs_from_isonclust3(
     # downsampled if above max_clust_size
     for seqname, seq, qual in pyfastx.Fastx(reads):
         if seqname in selectedseqs and seq2cluster[seqname] in fastq_handles:
-            fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
+            fastq_rec = f"@{seqname!s}\n{seq!s}\n+\n{qual!s}\n"
             fastq_handles[seq2cluster[seqname]].write(fastq_rec)
     for handle in fastq_handles.values():
         handle.close()
@@ -332,7 +332,7 @@ def cluster_seqs_from_mcl(
     # downsampled if above max_clust_size
     for seqname, seq, qual in pyfastx.Fastx(reads):
         if seqname in selectedseqs and seq2cluster[seqname] in fastq_handles:
-            fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
+            fastq_rec = f"@{seqname!s}\n{seq!s}\n+\n{qual!s}\n"
             fastq_handles[seq2cluster[seqname]].write(fastq_rec)
     # Cluster memberships for all read segments regardless of cluster size
     cluster2seq = defaultdict(list)
@@ -483,6 +483,12 @@ def check_stage_file(stage: str, message: str):
 
 
 class Pipeline:
+    """Generic pipeline class to manage intermediate file paths.
+
+    The Pipeline class is intended to be subclassed by specific pipelines,
+    which will define run stages and expected output files in a dict
+    self.OUTFILE_SUFFIX.
+    """
 
     def check_run_file(self, stage: str) -> bool:
         """Check if intermediate output file has been created.

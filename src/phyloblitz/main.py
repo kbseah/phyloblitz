@@ -53,16 +53,23 @@ click.rich_click.OPTION_GROUPS = {
     ],
     "phyloblitz compare": [
         {
-            "name" : "Input",
-            "options": [ "db", "dbindex", "input_table"],
+            "name": "Input",
+            "options": ["db", "dbindex", "input_table"],
         },
         {
             "name": "Output",
-            "options": [ "outdir", "prefix", "log"],
+            "options": ["outdir", "prefix", "log"],
         },
         {
             "name": "Run parameters",
-            "options": [ "threads", "ignore_db_mismatch", "min_clust_size", "max_clust_size", "rseed", "debug"],
+            "options": [
+                "threads",
+                "ignore_db_mismatch",
+                "min_clust_size",
+                "max_clust_size",
+                "rseed",
+                "debug",
+            ],
         },
     ],
 }
@@ -492,6 +499,7 @@ def run(ctx, **kwargs):
 
     if ctx.params["log"]:
         logfile_handler.close()
+
 
 @main.command(
     context_settings=CONTEXT_SETTINGS,
