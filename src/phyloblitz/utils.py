@@ -15,6 +15,7 @@ from numpy import __version__ as numpy_version
 from pyfastx import __version__ as pyfastx_version
 from pymarkovclustering import __version__ as pymcl_version
 from pysam import __version__ as pysam_version
+from random import sample, seed
 from tempfile import NamedTemporaryFile
 
 logger = logging.getLogger(__name__)
@@ -192,20 +193,30 @@ def run_isonclust3(reads: str | Path, mode: str, outfolder: str | Path) -> int:
 
 
 def cluster_seqs_from_isonclust3(
-    isonclust3_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
+    isonclust3_out: Path,
+    reads: Path,
+    keeptmp: bool,
+    min_clust_size: int = 5,
+    max_clust_size: int = 1000,
+    rseed: int = 12345,
 ) -> tuple:
     """Extract sequences from each isONclust3 cluster to Fastq files.
 
     The numbering of clusters by isONclust3 itself is not consistent
-    between the final_clusters.tsv file and the output fastq files; best to
+    between the final_clusters.tsv file and the output fastq files, so we
     extract the sequences ourselves.
 
     :param isonclust3_out: Path to isONclust3 output file
     :param reads: Path to reads from extract_reads_for_ava step
     :param keeptmp: Keep temporary files?
     :param min_clust_size: Minimum cluster size to return Fastq file
-    :returns: Dict of file handles to each Fastq file keyed by cluster ID
-    :returns: Dict of sequence IDs keyed by cluster ID
+    :param max_clust_size: Downsample clusters if above this cluster size
+    :param rseed: Random seed for downsampling clusters above max_clust_size
+    :returns: Dict of file handles to each Fastq file keyed by cluster ID;
+        excludes clusters below min_clust_size, and reads for clusters above
+        max_clust_size are downsampled to max_clust_size.
+    :returns: Dict of sequence IDs keyed by cluster ID; includes all sequences
+        regardless of cluster size.
     """
     fastq_handles = {}
     seq2cluster = {}
@@ -213,24 +224,39 @@ def cluster_seqs_from_isonclust3(
         for line in fh:
             clust, seqname = line.rstrip().split("\t")
             seq2cluster[seqname] = clust
+    # Cluster memberships for all read segments regardless of cluster size
     cluster2seq = defaultdict(list)
     for seqname in seq2cluster:
         cluster2seq[seq2cluster[seqname]].append(seqname)
-    for cluster in cluster2seq:
-        logger.info(
-            "Cluster %s comprises %d sequences", cluster, len(cluster2seq[cluster])
-        )
-        if len(cluster2seq[cluster]) >= min_clust_size:
-            fastq_handles[cluster] = NamedTemporaryFile(
-                suffix=".fastq",
-                mode="w",
-                delete=(not keeptmp),
-                delete_on_close=False,
-            )
-        else:
+    selectedseqs = []
+    for cluster, seqnames in cluster2seq.items():
+        logger.info("Cluster %s comprises %d sequences", cluster, len(seqnames))
+        if len(seqnames) < min_clust_size:
             logger.debug("Cluster %s below size cutoff", cluster)
+            continue
+        if len(seqnames) > max_clust_size:
+            logger.debug(
+                "Cluster %s has %d reads, downsampling with random seed %d...",
+                cluster,
+                len(seqnames),
+                rseed,
+            )
+            seed(rseed)
+            selected_idx = sorted(sample(range(len(seqnames)), k=max_clust_size))
+            selectedseqs.extend([seqnames[i] for i in selected_idx])
+        else:
+            selectedseqs.extend(seqnames)
+        # Do not use a context manager here because we need file later
+        fastq_handles[cluster] = NamedTemporaryFile(
+            suffix=".fastq",
+            mode="w",
+            delete=(not keeptmp),
+            delete_on_close=False,
+        )
+    # Write fastq only for clusters that are above min_clust_size and
+    # downsampled if above max_clust_size
     for seqname, seq, qual in pyfastx.Fastx(reads):
-        if seqname in seq2cluster and seq2cluster[seqname] in fastq_handles:
+        if seqname in selectedseqs and seq2cluster[seqname] in fastq_handles:
             fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
             fastq_handles[seq2cluster[seqname]].write(fastq_rec)
     for handle in fastq_handles.values():
@@ -239,7 +265,12 @@ def cluster_seqs_from_isonclust3(
 
 
 def cluster_seqs_from_mcl(
-    mcl_out: Path, reads: Path, keeptmp: bool, min_clust_size: int = 5
+    mcl_out: Path,
+    reads: Path,
+    keeptmp: bool,
+    min_clust_size: int = 5,
+    max_clust_size: int = 1000,
+    rseed: int = 12345,
 ) -> tuple:
     """Extract sequences from each MCL cluster to Fastq files.
 
@@ -247,35 +278,54 @@ def cluster_seqs_from_mcl(
     :param reads: Path to reads from extract_reads_for_ava step
     :param keeptmp: Keep temporary files?
     :param min_clust_size: Minimum cluster size to return Fastq file
-    :returns: Dict of file handles to each Fastq file keyed by cluster ID
-    :returns: Dict of sequence IDs keyed by cluster ID
+    :returns: Dict of file handles to each Fastq file keyed by cluster ID;
+        excludes clusters below min_clust_size, and reads for clusters above
+        max_clust_size are downsampled to max_clust_size.
+    :returns: Dict of sequence IDs keyed by cluster ID; includes all sequences
+        regardless of cluster size.
+
     """
-    counter = 0
     fastq_handles = {}
     seq2cluster = {}
+    selectedseqs = []
     with Path.open(mcl_out) as fh:
-        for line in fh:
-            seqs = line.rstrip().split("\t")
-            logger.info("Cluster %d comprises %d sequences", counter, len(seqs))
-            for seq in seqs:
-                seq2cluster[seq] = counter  # assume each seq in only one cluster
-            if len(seqs) >= min_clust_size:
-                fastq_handles[counter] = NamedTemporaryFile(
-                    suffix=".fastq",
-                    mode="w",
-                    delete=(not keeptmp),
-                    delete_on_close=False,
-                )
-            else:
+        for counter, line in enumerate(fh):
+            seqnames = line.rstrip().split("\t")
+            logger.info("Cluster %d comprises %d sequences", counter, len(seqnames))
+            for seqname in seqnames:
+                seq2cluster[seqname] = counter  # assume each seq in only one cluster
+            if len(seqnames) < min_clust_size:
                 logger.debug("Cluster %d below size cutoff", counter)
-            counter += 1
-    for name, seq, qual in pyfastx.Fastx(reads):
-        if name in seq2cluster and seq2cluster[name] in fastq_handles:
-            fastq_rec = "@" + name + "\n" + seq + "\n+\n" + qual + "\n"
-            fastq_handles[seq2cluster[name]].write(fastq_rec)
+                continue
+            if len(seqnames) > max_clust_size:
+                logger.debug(
+                    "Cluster %d has %d reads, downsampling with random seed %d...",
+                    counter,
+                    len(seqnames),
+                    rseed,
+                )
+                seed(rseed)
+                selected_idx = sorted(sample(range(len(seqnames)), k=max_clust_size))
+                selectedseqs.extend([seqnames[i] for i in selected_idx])
+            else:
+                selectedseqs.extend(seqnames)
+            # Don't use context manager here because we need file later
+            fastq_handles[counter] = NamedTemporaryFile(
+                suffix=".fastq",
+                mode="w",
+                delete=(not keeptmp),
+                delete_on_close=False,
+            )
+    # Write fastq only for clusters that are above min_clust_size and
+    # downsampled if above max_clust_size
+    for seqname, seq, qual in pyfastx.Fastx(reads):
+        if seqname in selectedseqs and seq2cluster[seqname] in fastq_handles:
+            fastq_rec = "@" + seqname + "\n" + seq + "\n+\n" + qual + "\n"
+            fastq_handles[seq2cluster[seqname]].write(fastq_rec)
+    # Cluster memberships for all read segments regardless of cluster size
     cluster2seq = defaultdict(list)
-    for seq, cluster in seq2cluster.items():
-        cluster2seq[cluster].append(seq)
+    for seqname, cluster in seq2cluster.items():
+        cluster2seq[cluster].append(seqname)
     for handle in fastq_handles.values():
         handle.close()
     return fastq_handles, cluster2seq

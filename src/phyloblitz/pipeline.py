@@ -718,6 +718,8 @@ class Pipeline:
                 self.pathto("mapped_segments"),
                 keeptmp=keeptmp,
                 min_clust_size=min_clust_size,
+                max_clust_size=max_clust_size,
+                rseed=rseed,
             )
         elif cluster_tool == "isonclust3":
             fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
@@ -725,6 +727,8 @@ class Pipeline:
                 self.pathto("mapped_segments"),
                 keeptmp=keeptmp,
                 min_clust_size=min_clust_size,
+                max_clust_size=max_clust_size,
+                rseed=rseed,
             )
         self._stats.update({"cluster2seq": cluster2seq})
         self._stats["runstats"].update(
@@ -738,36 +742,14 @@ class Pipeline:
                 ),
             },
         )
-        # Downsample if >500 sequences in cluster
-        logger.debug("Random seed %d", rseed)
-        seed(rseed)
-        for c, seqs in cluster2seq.items():
-            if len(seqs) > max_clust_size:
-                logger.debug("Cluster %s has %d reads, downsampling ...", c, len(seqs))
-                logger.debug("Downsampling from file %s", fastq_handles[c].name)
-                fq = pyfastx.Fastq(fastq_handles[c].name)
-                logger.debug("Opened file handle %s", str(fq))
-                selected_idx = sorted(sample(range(len(fq)), k=max_clust_size))
-                # Do not use a context manager here because we need file later
-                newhandle = NamedTemporaryFile(
-                    suffix=".fastq",
-                    mode="w",
-                    delete=(not keeptmp),
-                    delete_on_close=False,
-                )
-                logger.debug("Created new temporary file %s", str(newhandle.name))
-                for idx in selected_idx:
-                    newhandle.write(fq[idx].raw)
-                fastq_handles[c] = newhandle
-                newhandle.close()
         logger.info("Assemble consensus from clustered sequences with spoa")
         with Pool(threads) as pool:
             cluster_cons_tuples = pool.map(
                 spoa_assemble_fasta,
                 [(c, handle.name) for c, handle in fastq_handles.items()],
             )
-
-        for handle in fastq_handles.values():  # close NamedTemporaryFile handles
+        # Close NamedTemporaryFile handles
+        for handle in fastq_handles.values():
             handle.close()
 
         cluster_cons = dict(cluster_cons_tuples)

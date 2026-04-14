@@ -526,11 +526,7 @@ def run(ctx, **kwargs):
     is_flag=True,
 )
 @click.pass_context
-def compare(
-    ctx,
-    **kwargs,
-    # db, dbindex, input_table, outdir, prefix, ignore_db_mismatch, log, debug
-) -> None:
+def compare(ctx, **kwargs) -> None:
     """Compare phyloblitz runs.
 
     Takes JSON results files from phyloblitz runs. Runs should be produced by
