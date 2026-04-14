@@ -296,3 +296,19 @@ class Compare(Pipeline):
                         seq,
                     )
             self._stats["cluster2sample"][cluster] = samples
+
+    @check_stage_file(
+        stage="report_json",
+        message="Writing report stats in JSON format",
+    )
+    def write_report_json(self) -> None:
+        """Dump run stats file in JSON format.
+
+        Dump the Run._stats attribute to a JSON file for troubleshooting
+        and comparison of different phyloblitz runs.
+        """
+        self._stats.update({"endtime": str(datetime.now())})
+        with Path.open(self.pathto("report_json"), "w") as fh:
+            json.dump(self._stats, fh, indent=4)
+
+

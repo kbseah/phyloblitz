@@ -651,3 +651,5 @@ def compare(ctx, **kwargs) -> None:
 
     logger.info("Map cluster memberships to samples ...")
     c.cluster_memberships()
+
+    c.write_report_json()
