@@ -158,12 +158,13 @@ class Pipeline:
         self._prefix = args["prefix"]
         self._platform = args["platform"]
         self._resume = args["resume"]
-        self._stats = {}
-        self._stats["version"] = __version__
-        self._stats["args"] = args
-        self._stats["runstats"] = {}
-        self._stats["starttime"] = str(datetime.now())
-        self._stats["db_md5"] = run_md5(args["db"])
+        self._stats = {
+            "version" : __version__,
+            "args" : args,
+            "runstats" : {},
+            "starttime" : str(datetime.now()),
+            "db_md5" : run_md5(args["db"]),
+        }
         logger.debug(
             "Database file %s has MD5 checksum %s",
             self._ref,
@@ -663,14 +664,14 @@ class Pipeline:
         cluster_variant_counts = {
             i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
         }
-        cluster_persite_variant_counts = {  # TODO WIP
+        cluster_persite_variant_counts = {  # WIP
             i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
             for i in cluster_cons_parsed
         }
         self._stats.update(
             {
                 "cluster variant counts": cluster_variant_counts,
-                "cluster persite variant counts": cluster_persite_variant_counts,  # TODO WIP
+                "cluster persite variant counts": cluster_persite_variant_counts,  # WIP
                 "cluster cons parsed": cluster_cons_parsed,
             },
         )
