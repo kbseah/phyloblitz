@@ -145,14 +145,15 @@ from SRR17913200) with `pixi run run`. The output will be in `runtest/run`.
 
 ### Reference database
 
-Download the database files from https://doi.org/10.5281/zenodo.18627380
+Download the database files with the `phyloblitz download` command, or via your
+web browser from https://doi.org/10.5281/zenodo.18627380
 
-These are derived from SILVA database files, with some additional filtering and
-trimming of contaminant sequences and masking of low-complexity repeats to
+These are derived from SILVA database files, with additional filtering,
+trimming of contaminant sequences, and masking of low-complexity repeats to
 avoid excessive false-positive matches. Use the appropriate file for either SSU
 or LSU rRNA genes. Refer to the [database processing
-pipeline](https://github.com/kbseah/phyloblitz-db) for the actual commands
-used to prepare the database.
+pipeline](https://github.com/kbseah/phyloblitz-db) for the actual commands used
+to prepare the database.
 
 If you build your own database, low complexity regions should be masked (e.g.
 with `bbmask.sh`) otherwise mapping will be slow. Refer to the original
@@ -162,11 +163,22 @@ phyloFlash paper ([Gruber-Vodicka, Seah & Pruesse,
 
 ## Usage
 
-Refer to the help message for details on the phyloblitz run parameters:
+`phyloblitz` has three subcommands:
+ * `download` downloads the preformatted reference database
+ * `run` applies the pipeline to a single read library
+ * `compare` compares the run results between different libraries
+
+Refer to the help messages for details on the phyloblitz run parameters:
 
 ```bash
 phyloblitz --help
+phyloblitz run --help
 ```
+
+Specify the output folder and file name prefix for each run. A human-readable
+report is written in HTML and Markdown formats, along with a JSON file
+containing run data that can be parsed by the `phyloblitz compare` subcommand
+to compare composition of different samples.
 
 
 ### Test datasets
@@ -185,6 +197,9 @@ sufficient for a quick overview.
 
 ## Pipeline overview
 
+
+### Run pipeline
+
  * Map reads to SILVA with minimap2 and retain only mapped reads
  * Summarize taxonomy across mapped reads, using consensus taxonomy of each read
  * Extract aligned portion of mapped reads, including supplementary alignments
@@ -194,6 +209,15 @@ sufficient for a quick overview.
  * Assemble a consensus sequence per read cluster with spoa
  * Generate metrics per cluster for diagnostics: expect similar error rate per
      read vs. consensus, identify clusters with too few reads (TODO)
+
+
+### Compare pipeline
+
+ * Pool read segments containing marker of interest that were extracted from
+   individual phyloblitz runs.
+ * Cluster and assemble each cluster as above.
+ * Report closest taxon hits for each assembled marker sequence, and the number
+   of reads per sample represented in that cluster.
 
 
 ## Citations

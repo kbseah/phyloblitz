@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from multiprocessing import Pool
@@ -22,9 +21,9 @@ from phyloblitz.report import (
     generate_report_md,
 )
 from phyloblitz.utils import (
+    CIGAROPS,
     Pipeline,
     check_stage_file,
-    CIGAROPS,
     cluster_seqs_from_isonclust3,
     cluster_seqs_from_mcl,
     count_spoa_aln_persite_vars,

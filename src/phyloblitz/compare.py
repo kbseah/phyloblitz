@@ -8,7 +8,7 @@ from multiprocessing import Pool
 from pathlib import Path
 
 from phyloblitz.__about__ import __version__
-from phyloblitz.report import dod2markdowntable, dict2markdowntable
+from phyloblitz.report import dict2markdowntable, dod2markdowntable
 from phyloblitz.utils import (
     Pipeline,
     check_stage_file,
