@@ -157,6 +157,10 @@ sequence composition with an EM-based method.
 MetaPhlAn https://github.com/biobakery/MetaPhlAn for shotgun metagenomes,
 appears to be limited to short reads
 
+Virasign https://github.com/DaanJansen94/virasign maps Nanopore reads to viral
+sequences from published databases; reports detected species in an interactive
+HTML file and provides mappings for downstream processing.
+
 K-mer hashing tools, such as sendsketch.sh from BBtools (see its [user
 guide](https://bbmap.org/docs/guides/BBSketchGuide.md)): Much quicker lookup
 compared to conventional read mapping, powerful tools for searching large
