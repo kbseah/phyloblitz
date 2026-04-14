@@ -11,6 +11,7 @@ from subprocess import PIPE, STDOUT, Popen
 from sys import version as python_version
 from tempfile import NamedTemporaryFile
 
+import numpy as np
 import pyfastx
 from matplotlib import __version__ as matplotlib_version
 from mistune import __version__ as mistune_version
@@ -338,3 +339,105 @@ def cluster_seqs_from_mcl(
     for handle in fastq_handles.values():
         handle.close()
     return fastq_handles, cluster2seq
+
+
+def spoa_assemble_fasta(label_fastq: tuple) -> tuple[str, str]:
+    """Run spoa assembly on a Fastq input file.
+
+    :param label_fastq: Tuple of input label (str) and path to Fastq file with
+        reads to assemble
+    :returns: Tuple of input label and alignment of consensus and input
+        sequences in Fasta format (stdout from spoa -r 2)
+    :rtype: tuple
+    """
+    label, fastq = label_fastq
+    cmd = ["spoa", "-r", "2", fastq]
+    logger.debug("spoa command: %s", " ".join([str(i) for i in cmd]))
+    proc = Popen(cmd, stdout=PIPE, text=True)
+    # TODO directing stderr to PIPE and logger prevents mp.Pool from closing?
+    # ignoring stderr from spoa for now
+    out = proc.communicate()[0]
+    logger.info("Assembly complete for cluster %s", str(label))
+    return label, out
+
+
+def parse_spoa_r2(fasta: str) -> dict:
+    """Parse spoa gapped alignment + consensus in Fasta format (-r 2 output).
+
+    :param fasta: Assembly from spoa as list of strings
+    :returns: dict of sequences (multiple lines concatenated) keyed by headers.
+        The conensus sequence assembled by spoa must have key "Consensus".
+    :rtype: dict
+    """
+    seqs = {}
+    prev_hdr = ""
+    prev_seq = ""
+    for line in fasta.split("\n"):
+        if line.startswith(">"):
+            if len(prev_hdr) == 0 and len(prev_seq) == 0:
+                prev_hdr = line.rstrip()[1:]
+            elif len(prev_hdr) > 0 and len(prev_seq) > 0:
+                seqs[prev_hdr] = prev_seq
+                prev_seq = ""
+                prev_hdr = line.rstrip()[1:]
+        else:
+            prev_seq += line.rstrip()
+    # catch last
+    if len(prev_hdr) > 0 and len(prev_seq) > 0:
+        seqs[prev_hdr] = prev_seq
+    return seqs
+
+
+def count_spoa_aln_vars(seqs: dict) -> dict:
+    """Count mismatches and gaps vs consensus for each sequence in a cluster.
+
+    :param seqs: Dict of sequences parsed by parse_spoa_r2; the consensus
+        sequence must have key "Consensus"
+    :returns: Count of base matches and mismatches, gaps relative to query and
+        consensus, leading and trailing query gaps, for each sequence in the
+        dict relative to consensus
+    :rtype: dict
+    """
+    var = defaultdict(lambda: defaultdict(int))
+    cons = seqs["Consensus"]
+    for hdr, seq in seqs.items():
+        if hdr == "Consensus":
+            continue
+        # get coordinates without trailing and leading gaps
+        span = re.search(r"^-*([^-].*[^-])-*$", seq).span(1)
+        var[hdr]["query_lead_gap"] = span[0]
+        var[hdr]["query_trail_gap"] = len(seq) - span[1]
+        for i in range(span[0], span[1]):
+            if seq[i] == cons[i] and seq[i] != "-":
+                # Matching base but not common gap
+                var[hdr]["match"] += 1
+            elif seq[i] == "-" and cons[i] != "-":
+                var[hdr]["query_gap"] += 1
+            elif seq[i] != "-" and cons[i] == "-":
+                var[hdr]["cons_gap"] += 1
+            elif seq[i] != "-" and cons[i] != "-" and seq[i] != cons[i]:
+                var[hdr]["mismatch"] += 1
+    return var
+
+
+def count_spoa_aln_persite_vars(seqs: dict) -> dict:
+    """[WIP] Calculate entropy per alignment position for clustered sequences vs consensus.
+
+    If mismatches/gaps between sequences and the consensus are solely due to
+    technical sequencing error, rather than erroneous clustering of divergent
+    underlying reads, we expect fraction of variants per site to be roughly the
+    sequencing error. If for example two sequences are misclustered, then we
+    should see a secondary peak of ~50% variant coverage.
+
+    :param seqs: Dict of aligned sequences parsed by parse_spoa_r2; the
+        consensus sequence must have key "Consensus"
+    :returns: dict keyed by alignment position, value is the sequence entropy
+        per site in bits.
+    """
+    var = {}
+    for i in range(len(seqs["Consensus"])):
+        column = [seqs[hdr][i] for hdr in seqs if hdr != "Consensus"]
+        _values, counts = np.unique(column, return_counts=True)
+        counts_norm = counts / counts.sum()
+        var[i] = -(counts_norm * np.log(counts_norm) / np.log(2)).sum()
+    return var
