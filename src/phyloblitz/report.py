@@ -27,6 +27,8 @@ HTML_TEMPLATE = """
 </head>
 <body style="max-width:1200px">
 {{markdown_report}}
+
+<p>HTML styling with <a href="https://simplecss.org/">Simple.css</a></p>
 </body>
 </html>
 """
@@ -40,11 +42,12 @@ def dict2markdowntable(
     order_by_value: bool = False,
     order_descending: bool = True,
 ) -> str:
-    """Convert dict to a markdown table
+    """Convert dict to a markdown table.
 
-    Key will be cast as row names
+    Key will be cast as row names; single column comprising single values for
+    each key.
 
-    :param d: Dict to convert to table
+    :param d: Dict to convert to table, comprising simple key-value pairs.
     :param keys: Keys to include in table; if None, all keys will be used
     :param col1: Column header for first column
     :param col2: Column header for second column
@@ -80,6 +83,7 @@ def dod2markdowntable(
     order_descending: bool = True,
     order_by: str = "numseq",
     col1: str = "Name",
+    fill_empty: str = "-",
 ) -> str:
     """Convert dict of dicts to a markdown table.
 
@@ -91,6 +95,7 @@ def dod2markdowntable(
     :param order_by_value: Order rows by dict values
     :param order_descending: Descending order if true
     :param order_by: Second-order key to use for ordering (i.e. which column)
+    :param fill_empty: Fill missing values with this string.
     :returns: Text table in markdown format
     :rtype: str
     """
@@ -103,12 +108,12 @@ def dod2markdowntable(
     dd = (
         sorted(d.items(), key=lambda cv: sign * cv[1][order_by])
         if order_by_value
-        else d
+        else d.items()
     )
     for c, v in dd:
         out.append(
             f"| {c!s} | "
-            + " | ".join([str(v[k]) if k in v else "-" for k in keys])
+            + " | ".join([str(v[k]) if k in v else fill_empty for k in keys])
             + " |",
         )
     return "\n".join(out)
@@ -183,7 +188,7 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 ## Input parameters
 
-phyloblitz was called with the following parameters:
+`phyloblitz run` was called with the following parameters:
 
 {dict2markdowntable(stats["args"])}
 
@@ -254,8 +259,6 @@ If you use `phyloblitz` in published research, please cite the GitHub
 repository URL and software version.
 
 </details>
-
-HTML styling with [Simple.css](https://simplecss.org/)
 """
 
     format_md = create_markdown(renderer=MarkdownRenderer())

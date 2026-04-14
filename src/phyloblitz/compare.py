@@ -8,6 +8,7 @@ from multiprocessing import Pool
 from pathlib import Path
 
 from phyloblitz.__about__ import __version__
+from phyloblitz.report import dod2markdowntable, dict2markdowntable
 from phyloblitz.utils import (
     Pipeline,
     check_stage_file,
@@ -46,7 +47,7 @@ class Compare(Pipeline):
     def __init__(self, args: dict) -> None:
         """Construct Run object."""
         df = read_tsv(args["input_table"])
-        samples = df["sample"]
+        self._samples = df["sample"]
         reports = df["report"]
         self._ref = args["db"]
         self._refindex = args["dbindex"]
@@ -65,10 +66,11 @@ class Compare(Pipeline):
         }
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
-            for sample, report in zip(samples, reports, strict=True):
+            for sample, report in zip(self._samples, reports, strict=True):
                 with Path.open(report, "r") as fh:
                     self._reports[sample] = json.load(fh)
-            logger.info("%d reports read", len(samples))
+            logger.info("%d reports read", len(self._samples))
+            self._stats["runstats"]["number of samples compared"] = len(self._samples)
         except ValueError as e:
             e.add_note("Number of sample names and report files do not agree")
             raise
@@ -185,7 +187,7 @@ class Compare(Pipeline):
             for report in self._reports.values():
                 for seg_name, seg_dict in report["segments"].items():
                     fh.write(
-                        f"@{seg_name!s}\n{seg_dict['seq']!s}\n+\n{seg_dict['quals']!s}\n"
+                        f"@{seg_name!s}\n{seg_dict['seq']!s}\n+\n{seg_dict['quals']!s}\n",
                     )
 
     @check_stage_file(
@@ -282,6 +284,8 @@ class Compare(Pipeline):
             )
             logger.info("Assembled sequences written to %s", self.pathto("cluster_asm"))
 
+    # TODO: Classify assembled cluster sequences against reference database
+
     def cluster_memberships(self) -> None:
         """Map cluster memberships to samples."""
         # Combine segment2sample and cluster2seq
@@ -310,3 +314,79 @@ class Compare(Pipeline):
         self._stats.update({"endtime": str(datetime.now())})
         with Path.open(self.pathto("report_json"), "w") as fh:
             json.dump(self._stats, fh, indent=4)
+
+    @check_stage_file(
+        stage="report_md",
+        message="Writing report in Markdown format",
+    )
+    def write_report_md(self) -> None:
+        """Write report stats in markdown format."""
+        cluster2sample_counts = {
+            c: {
+                s: len(self._stats["cluster2sample"][c][s])
+                for s in self._stats["cluster2sample"][c]
+            }
+            for c in self._stats["cluster2sample"]
+        }
+        counts_md = dod2markdowntable(
+            cluster2sample_counts,
+            keys=self._samples,
+            order_by=self._samples[0],
+            order_by_value=False,
+            col1="Cluster",
+            fill_empty="0",
+        )
+        # TODO: Embed input sample table
+        raw = f"""# phyloblitz compare report
+
+* Compare started: {self._stats["starttime"]!s}
+* phyloblitz version: {__version__}
+
+phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
+
+
+## Input parameters
+
+`phyloblitz compare` was called with the following parameters:
+
+{dict2markdowntable(self._stats["args"])}
+
+
+## Run statistics
+
+{dict2markdowntable(self._stats["runstats"])}
+
+
+## Co-assembled marker sequence clusters
+
+{counts_md}
+
+---
+
+<details>
+<summary>Citations ...</summary>
+
+phyloblitz depends on the following tools; please cite them:
+[`minimap2`](https://github.com/lh3/minimap2) ([Li, 2018](https://doi.org/10.1093/bioinformatics/bty191)),
+[`isONclust3`](https://github.com/aljpetri/isONclust3) ([Petri & Sahlin, 2025](https://doi.org/10.1093/bioinformatics/btaf207)),
+[`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
+[`mcl`](https://micans.org/mcl/) ([van Dongen, 2008](http://link.aip.org/link/?SJMAEL/30/121/1)),
+[`pyfastx`](https://pyfastx.readthedocs.io/) ([Du, et al., 2020](https://doi.org/10.1093/bib/bbaa368)),
+[`samtools`](https://www.htslib.org/) ([Li, Handsaker, et al., 2009](https://doi.org/10.1093/bioinformatics/btp352); [Bonfield, Marshall, Danecek, et al., 2021](https://doi.org/10.1093/gigascience/giab007)),
+[`pysam`](https://github.com/pysam-developers/pysam),
+[`spoa`](https://github.com/rvaser/spoa).
+
+Please cite the [SILVA](https://www.arb-silva.de/) reference database
+([Chuvochina, Gerken, et al., 2026](https://doi.org/10.1093/nar/gkaf1247)) if
+you use it.
+
+If you use `phyloblitz` in published research, please cite the GitHub
+repository URL and software version.
+
+</details>
+"""
+        with Path.open(self.pathto("report_md"), "w") as fh:
+            fh.write(raw)
+
+    # TODO: write_report_html() method to generate HTML report from Markdown report
+    # TODO: heatmap and dendrogram of cluster memberships across samples
