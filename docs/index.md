@@ -30,6 +30,15 @@ for Illumina reads in the software tool
 references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
 
 
+## Pages
+
+ * [Installation](install.md)
+ * [Reference database](ref.md)
+ * [Development](dev.md)
+ * Run pipeline usage
+ * Compare pipeline usage
+
+
 ## Quick start
 
 
