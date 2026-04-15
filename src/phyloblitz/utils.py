@@ -558,8 +558,8 @@ class Pipeline:
         for each with Spoa. Assembly step is embarrassingly parallelized.
 
         Updates Pipeline._stats["cluster2seq"] with lists of read names keyed
-        by cluster id. Some summary stats on clusters are written to
-        Pipeline._stats["runstats"].
+        by cluster id (number prefixed with `cluster_`). Some summary stats on
+        clusters are written to Pipeline._stats["runstats"].
 
         Other per-cluster summaries in Pipeline._stats:
           * "cluster variant counts" -- number of variant sites by type for

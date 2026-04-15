@@ -38,7 +38,7 @@
  - [x] Parse supplementary alignments by default
  - [x] Skip duplicate segments extracted from overlapping alignments
  - [x] Downsample clusters with too many reads for assembly (~500 should be ok)
- - [ ] Multisample comparison and co-assembly
+ - [x] Multisample comparison and co-assembly
  - [ ] Gzip JSON output file
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
@@ -47,6 +47,8 @@
 
 ## Future plans/ideas
 
+ - [ ] Interactive graphics
+ - [ ] Phylogenetic tree of assembled sequences
  - [ ] MultiQC integration
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the

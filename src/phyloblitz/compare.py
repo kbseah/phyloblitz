@@ -408,12 +408,46 @@ class Compare(Pipeline):
             for c in self._stats["cluster2sample"]
         }
 
+    def _per_cluster_summarize(self) -> tuple[dict, list]:
+        """Combine alignment stats, taxonomy and per-sample read counts for each cluster.
+
+        :returns: Dict of summary stats keyed by cluster ID (numbered, prefixed
+            with "cluster_"), and list of fields for report.
+        :rtype: tuple[dict, list]
+        """
+        fields = (
+            ["total numseqs"]
+            + [f"numseqs {sample!s}" for sample in self._samples]
+            + [
+                "qlen",
+                "tophit",
+                "higher taxonomy",
+                "tophit species",
+                "align %id",
+                "alnlen",
+                "query %aln",
+                "target %aln",
+                "seq match",
+                "seq mismatch",
+                "insertion",
+                "deletion",
+            ]
+        )
+        out = defaultdict(lambda: defaultdict(dict))
+        for c, counts in self._stats["cluster2sample_counts"].items():
+            for sample, count in counts.items():
+                out[f"cluster_{c!s}"][f"numseqs {sample!s}"] = count
+            out[f"cluster_{c!s}"]["total numseqs"] = sum(counts.values())
+        for c, stats in self._stats["cluster_tophits"].items():
+            out[c].update(stats)
+        return out, fields
+
     @check_stage_file(
         stage="cluster_membership_heatmap",
         message="Cluster samples by assembled sequence coverage",
     )
     def cluster_membership_heatmap(
-        self, cluster_method: str = "ward", cluster_metric: str = "euclidean"
+        self, cluster_method: str = "ward", cluster_metric: str = "euclidean",
     ):
         """Cluster sequences and samples by cluster membership and plot heatmap.
 
@@ -433,7 +467,7 @@ class Compare(Pipeline):
                 for c in self._stats["cluster2sample_counts"]
             ],
         )
-        row_labels = [f"Cluster {c}" for c in self._stats["cluster2sample_counts"]]
+        row_labels = [f"cluster_{c}" for c in self._stats["cluster2sample_counts"]]
         # Normalize by column (sample) sums to get relative abundances
         cluster2sample_norm = cluster2sample_array / cluster2sample_array.sum(
             axis=0,
@@ -479,13 +513,14 @@ class Compare(Pipeline):
             col2="Report file",
         )
 
+        cd, keys = self._per_cluster_summarize()
         counts_md = dod2markdowntable(
-            self._stats["cluster2sample_counts"],
-            keys=self._samples,
-            order_by=self._samples[0],
-            order_by_value=False,
+            cd,
+            keys=keys,
+            order_by="total numseqs",
+            order_by_value=True,
             col1="Cluster",
-            fill_empty="0",
+            fill_empty="-",
         )
 
         raw = f"""# phyloblitz compare report
@@ -521,9 +556,8 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 <figcaption>Cluster membership heatmap. Rows are clusters, columns are samples,
 and values are relative read abundance from each sample per sequence cluster.
-Clusters and samples are ordered by hierarchical clustering with Ward's
-linkage and Euclidean distance. Clusters below minimum cluster size for
-assembly are not shown.</figcaption>
+Clusters and samples are ordered by hierarchical linkage clustering. Clusters
+below minimum cluster size for assembly are not shown.</figcaption>
 </figure>
 
 
