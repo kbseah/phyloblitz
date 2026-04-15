@@ -607,7 +607,7 @@ def compare(ctx, **kwargs) -> None:
 
     logger.info("Creating output folder %s", ctx.params["outdir"])
     try:
-        check_outdir(ctx.params["outdir"], resume=True)
+        check_outdir(ctx.params["outdir"], resume=False)
     except Exception as e:
         logger.error(str(e))
         sys.exit(1)
