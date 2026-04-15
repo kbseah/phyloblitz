@@ -28,6 +28,26 @@ HTML_TEMPLATE = """
 <body style="max-width:1200px">
 {{markdown_report}}
 
+<hr />
+<details>
+<summary>Citations ...</summary>
+
+<p>phyloblitz depends on the following tools; please cite them:
+<a href="https://github.com/lh3/minimap2"><code>minimap2</code></a> (<a href="https://doi.org/10.1093/bioinformatics/bty191">Li, 2018</a>),
+<a href="https://github.com/aljpetri/isONclust3"><code>isONclust3</code></a> (<a href="https://doi.org/10.1093/bioinformatics/btaf207">Petri &amp; Sahlin, 2025</a>),
+<a href="https://github.com/moshi4/pyMarkovClustering"><code>pymarkovclustering</code></a>,
+<a href="https://micans.org/mcl/"><code>mcl</code></a> (<a href="http://link.aip.org/link/?SJMAEL/30/121/1">van Dongen, 2008</a>),
+<a href="https://pyfastx.readthedocs.io/"><code>pyfastx</code></a> (<a href="https://doi.org/10.1093/bib/bbaa368">Du, et al., 2020</a>),
+<a href="https://www.htslib.org/"><code>samtools</code></a> (<a href="https://doi.org/10.1093/bioinformatics/btp352">Li, Handsaker, et al., 2009</a>; <a href="https://doi.org/10.1093/gigascience/giab007">Bonfield, Marshall, Danecek, et al., 2021</a>),
+<a href="https://github.com/pysam-developers/pysam"><code>pysam</code></a>,
+<a href="https://github.com/rvaser/spoa"><code>spoa</code></a>.</p>
+<p>Please cite the <a href="https://www.arb-silva.de/">SILVA</a> reference database
+(<a href="https://doi.org/10.1093/nar/gkaf1247">Chuvochina, Gerken, et al., 2026</a>) if
+you use it.</p>
+<p>If you use <code>phyloblitz</code> in published research, please cite the GitHub
+repository URL and software version.</p>
+</details>
+
 <p>HTML styling with <a href="https://simplecss.org/">Simple.css</a></p>
 </body>
 </html>
@@ -234,31 +254,6 @@ checked for sequence chimerism or misassembly.
 
 <figcaption>K-mer multiplicity plots for flanking sequences of each marker sequence cluster.</figcaption>
 </figure>
-
-
----
-
-<details>
-<summary>Citations ...</summary>
-
-phyloblitz depends on the following tools; please cite them:
-[`minimap2`](https://github.com/lh3/minimap2) ([Li, 2018](https://doi.org/10.1093/bioinformatics/bty191)),
-[`isONclust3`](https://github.com/aljpetri/isONclust3) ([Petri & Sahlin, 2025](https://doi.org/10.1093/bioinformatics/btaf207)),
-[`pymarkovclustering`](https://github.com/moshi4/pyMarkovClustering),
-[`mcl`](https://micans.org/mcl/) ([van Dongen, 2008](http://link.aip.org/link/?SJMAEL/30/121/1)),
-[`pyfastx`](https://pyfastx.readthedocs.io/) ([Du, et al., 2020](https://doi.org/10.1093/bib/bbaa368)),
-[`samtools`](https://www.htslib.org/) ([Li, Handsaker, et al., 2009](https://doi.org/10.1093/bioinformatics/btp352); [Bonfield, Marshall, Danecek, et al., 2021](https://doi.org/10.1093/gigascience/giab007)),
-[`pysam`](https://github.com/pysam-developers/pysam),
-[`spoa`](https://github.com/rvaser/spoa).
-
-Please cite the [SILVA](https://www.arb-silva.de/) reference database
-([Chuvochina, Gerken, et al., 2026](https://doi.org/10.1093/nar/gkaf1247)) if
-you use it.
-
-If you use `phyloblitz` in published research, please cite the GitHub
-repository URL and software version.
-
-</details>
 """
 
     format_md = create_markdown(renderer=MarkdownRenderer())
