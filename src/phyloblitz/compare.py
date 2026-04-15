@@ -492,12 +492,15 @@ class Compare(Pipeline):
         )
         # TODO: Use percentages instead of counts for visualization
         # Generate dendrogram and heatmap of cluster memberships across samples
+        # Rows: Clusters, Columns: Samples
         cluster2sample_array = np.array(
             [
                 [cluster2sample_counts[c].get(s, 0) for s in self._samples]
                 for c in cluster2sample_counts
             ],
         )
+        # Normalize by column (sample) sums to get relative abundances
+        cluster2sample_array = cluster2sample_array / cluster2sample_array.sum(axis=0, keepdims=True)
         fig, out = clustermap_rows_cols(
             cluster2sample_array,
             row_labels=[f"Cluster {c}" for c in cluster2sample_counts],
@@ -519,9 +522,13 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 ## Input parameters
 
+<details>
+
 `phyloblitz compare` was called with the following parameters:
 
 {dict2markdowntable(self._stats["args"])}
+
+</details>
 
 
 ## Run statistics
@@ -531,18 +538,20 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 ## Co-assembled marker sequence clusters
 
-{counts_md}
-
-
 <figure>
 
 ![]({self.pathto("cluster_membership_heatmap", basename_only=True)!s})
 
 <figcaption>Cluster membership heatmap. Rows are clusters, columns are samples,
-and values are number of read segments from each sample in each cluster.
-Clusters and samples are ordered by hierarchical clustering with average
+and values are relative read abundance from each sample per sequence cluster.
+Clusters and samples are ordered by hierarchical clustering with Ward's
 linkage and Euclidean distance.</figcaption>
 </figure>
+
+
+### Read counts per sequence cluster per sample
+
+{counts_md}
 
 ---
 
