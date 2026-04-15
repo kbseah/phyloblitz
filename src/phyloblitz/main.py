@@ -570,6 +570,20 @@ def run(ctx, **kwargs):
     show_default=True,
 )
 @click.option(
+    "--cluster_method",
+    help="Method to use for comparing clusters between samples, passed to scipy.cluster.hierarchy.linkage method parameter; note that 'ward' can only be used with euclidean distance",
+    type=click.Choice(["ward", "single","complete","average","weighted","centroid","median"]),
+    default="ward",
+    show_default=True,
+)
+@click.option(
+    "--cluster_metric",
+    help="Distance metric to use for comparing clusters between samples",
+    type=click.Choice(["euclidean", "minkowski", "cityblock", "cosine", "jaccard"]),
+    default="euclidean",
+    show_default=True,
+)
+@click.option(
     "--log",
     help="Path to write log file",
     type=click.Path(exists=True),

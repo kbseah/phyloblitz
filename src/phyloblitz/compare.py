@@ -37,7 +37,6 @@ def read_tsv(filepath: str | Path) -> dict[list]:
     return out
 
 
-# TODO: User specify clustering and distance methods
 def clustermap_rows_cols(
     X,
     *,
@@ -404,23 +403,14 @@ class Compare(Pipeline):
                     )
             self._stats["cluster2sample"][cluster] = samples
 
-    @check_stage_file(
-        stage="report_json",
-        message="Writing report stats in JSON format",
-    )
+    @check_stage_file(stage="report_json", message="Writing report stats as JSON")
     def write_report_json(self) -> None:
         """Dump run stats file in JSON format."""
         return super().write_report_json(out=self.pathto("report_json"))
 
-    @check_stage_file(
-        stage="report_md",
-        message="Writing report in Markdown format",
-    )
-    @check_stage_file(
-        stage="report_html",
-        message="Writing report in HTML format",
-    )
-    def write_reports(self) -> None:
+    @check_stage_file(stage="report_md", message="Writing report as Markdown")
+    @check_stage_file(stage="report_html", message="Writing report as HTML")
+    def write_reports(self, cluster_method:str="ward", cluster_metric:str="euclidean") -> None:
         """Write report in Markdown and HTML formats."""
         # Input table of sample and report file paths
         input_table_md = dict2markdowntable(
@@ -445,7 +435,7 @@ class Compare(Pipeline):
             col1="Cluster",
             fill_empty="0",
         )
-        # TODO: Use percentages instead of counts for visualization
+
         # Generate dendrogram and heatmap of cluster memberships across samples
         # Rows: Clusters, Columns: Samples
         cluster2sample_array = np.array(
@@ -454,14 +444,31 @@ class Compare(Pipeline):
                 for c in cluster2sample_counts
             ],
         )
+        row_labels = [f"Cluster {c}" for c in cluster2sample_counts]
         # Normalize by column (sample) sums to get relative abundances
-        cluster2sample_array = cluster2sample_array / cluster2sample_array.sum(axis=0, keepdims=True)
-        fig, out = clustermap_rows_cols(
-            cluster2sample_array,
-            row_labels=[f"Cluster {c}" for c in cluster2sample_counts],
+        cluster2sample_norm = cluster2sample_array / cluster2sample_array.sum(
+            axis=0,
+            keepdims=True,
+        )
+        # Drop rows which sum to < min_clust_size
+        row_sums = cluster2sample_array.sum(axis=1)
+        keep_rows = row_sums >= self._stats["args"]["min_clust_size"]
+        if not keep_rows.all():
+            logger.info(
+                "%d clusters with total read counts < %d will be dropped from heatmap",
+                (~keep_rows).sum(),
+                self._stats["args"]["min_clust_size"],
+            )
+            cluster2sample_norm = cluster2sample_norm[keep_rows]
+            row_labels = [l for l, keep in zip(row_labels, keep_rows) if keep]
+        fig, _out = clustermap_rows_cols(
+            cluster2sample_norm,
+            row_labels=row_labels,
             col_labels=self._samples,
-            row_method="ward",
-            col_method="ward",
+            row_method=cluster_method,
+            col_method=cluster_method,
+            row_metric=cluster_metric,
+            col_metric=cluster_metric,
             cmap="viridis",
             figsize=(10, max(6, len(cluster2sample_counts) * 0.5)),
         )
