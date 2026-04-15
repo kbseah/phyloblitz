@@ -8,8 +8,8 @@ from collections import defaultdict
 from datetime import datetime
 from functools import wraps
 from hashlib import md5
-from os import W_OK, access
 from multiprocessing import Pool
+from os import W_OK, access
 from pathlib import Path
 from random import sample, seed
 from subprocess import PIPE, STDOUT, Popen
@@ -428,7 +428,7 @@ def check_stage_file(stage: str, message: str):
     :param message: Logging message to emit on starting each stage
     """
 
-    # TODO specify more than one output file; check required input files
+    # TODO: check required input files
     def check_stage_decorator(func):
         @wraps(func)
         def wrapped_function(self, *args, **kwargs):
@@ -650,7 +650,10 @@ class Pipeline:
             logger.info("Assembled sequences written to %s", cluster_asm)
 
     def cluster_asm_tophits(
-        self, tophits: str | Path, asm: str | Path, threads: int = 12
+        self,
+        tophits: str | Path,
+        asm: str | Path,
+        threads: int = 12,
     ) -> int:
         """Map sequences to reference database with minimap2 and get top hits.
 
@@ -684,6 +687,85 @@ class Pipeline:
         for l in proc.stderr:
             logger.debug("  minimap log: %s", l.decode().rstrip())
         return proc.wait()
+
+    def summarize_tophit_paf(self, tophits: str | Path) -> None:
+        """Summarize top hits of sequences mapped to SILVA database by minimap2.
+
+        Update Pipeline._stats with a dict of summary stats "cluster_tophits"
+        for each hit, keyed by query sequence name.
+
+        :param tophits: Path to minimap2 alignment output in PAF format
+        """
+        out = {}
+
+        with Path.open(tophits) as fh:
+            for line in fh:
+                spl = line.rstrip().split("\t")
+                hits = dict(
+                    zip(
+                        [
+                            "qname",
+                            "qlen",
+                            "qstart",
+                            "qend",
+                            "strand",
+                            "tname",
+                            "tlen",
+                            "tstart",
+                            "tend",
+                            "alnmatch",
+                            "alnlen",
+                        ],
+                        spl[0:11],
+                        strict=False,
+                    ),
+                )
+                cigar = next(i for i in spl if i.startswith("cg:Z:"))
+                # Calculate derived metrics from PAF fields
+                cigar_summary = parse_cigar_ops(cigar[5:])
+                hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
+                # remove redundant % sign for display
+                hits["align %id"] = "{:.2%}".format(
+                    int(hits["alnmatch"]) / int(hits["alnlen"]),
+                ).rstrip("%")
+                hits["query %aln"] = "{:.2%}".format(
+                    (int(hits["qend"]) - int(hits["qstart"])) / int(hits["qlen"]),
+                ).rstrip("%")
+                hits["target %aln"] = "{:.2%}".format(
+                    (int(hits["tend"]) - int(hits["tstart"])) / int(hits["tlen"]),
+                ).rstrip("%")
+                out[spl[0]] = hits
+
+        # Taxonomy of hit targets
+        for rec in out.values():
+            try:
+                # hyperlink to ENA record
+                # TODO: This only works for SILVA where accessions are derived
+                # from ENA accessions. May not work with other databases e.g.
+                # Greengenes
+                rec["tophit"] = (
+                    f"[{rec['tname']!s}](https://www.ebi.ac.uk/ena/browser/view/{rec['tname'].split('.')[0]!s})"
+                )
+                rec["tophit taxonomy"] = ";".join(self._acc2tax[rec["tname"]])
+                rec["tophit species"] = self._acc2tax[rec["tname"]][-1]
+                # Higher taxonomy to class level, except for chloroplast and mitochondria
+                # Assumes SILVA taxonomy is in use
+                if rec["tophit taxonomy"].startswith(
+                    "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast",
+                ):
+                    rec["higher taxonomy"] = "[Eukaryotic organelle Chloroplast]"
+                elif rec["tophit taxonomy"].startswith(
+                    "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria",
+                ):
+                    rec["higher taxonomy"] = "[Eukaryotic organelle Mitochondria]"
+                else:
+                    rec["higher taxonomy"] = "; ".join(
+                        self._acc2tax[rec["tname"]][0:-1],
+                    )
+            except KeyError as e:
+                e.add_note(f"Accession {rec['tname']} not found in database?")
+                raise
+        self._stats.update({"cluster_tophits": out})
 
     def write_report_json(self, out: str | Path) -> None:
         """Dump run stats file in JSON format.

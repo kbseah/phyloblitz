@@ -196,6 +196,7 @@ class Compare(Pipeline):
     def __init__(self, args: dict) -> None:
         """Construct Run object."""
         df = read_tsv(args["input_table"])
+        self._acc2tax = {}
         self._samples = df["sample"]
         self._report_files = df["report"]
         self._ref = args["db"]
@@ -377,7 +378,16 @@ class Compare(Pipeline):
             max_clust_size=max_clust_size,
         )
 
-    # TODO: Classify assembled cluster sequences against reference database
+    def cluster_asm_tophits(self, threads: int = 12):
+        """Classify assembled cluster sequences against reference database."""
+        return super().cluster_asm_tophits(
+            tophits=self.pathto("cluster_tophits"),
+            asm=self.pathto("cluster_asm"),
+            threads=threads,
+        )
+
+    def summarize_tophit_paf(self) -> None:
+        return super().summarize_tophit_paf(tophits=self.pathto("cluster_tophits"))
 
     def cluster_memberships(self) -> None:
         """Map cluster memberships to samples."""

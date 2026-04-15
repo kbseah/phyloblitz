@@ -639,6 +639,11 @@ def compare(ctx, **kwargs) -> None:
         max_clust_size=ctx.params["max_clust_size"],
     )
 
+    c.db_taxonomy()
+
+    c.cluster_asm_tophits(threads=12)
+    c.summarize_tophit_paf()
+
     logger.info("Map cluster memberships to samples ...")
     c.cluster_memberships()
 

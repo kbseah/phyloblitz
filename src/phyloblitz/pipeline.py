@@ -21,12 +21,10 @@ from phyloblitz.report import (
     generate_report_md,
 )
 from phyloblitz.utils import (
-    CIGAROPS,
     Pipeline,
     check_stage_file,
     filter_paf_overhang,
     lists_common_prefix,
-    parse_cigar_ops,
     run_md5,
 )
 
@@ -717,85 +715,14 @@ class Run(Pipeline):
     def cluster_asm_tophits(self, threads: int = 12) -> int:
         """Map assembled cluster consensus sequences to reference database with minimap2."""
         return super().cluster_asm_tophits(
-            self.pathto("cluster_tophits"), self.pathto("cluster_asm"), threads=threads
+            self.pathto("cluster_tophits"),
+            self.pathto("cluster_asm"),
+            threads=threads,
         )
 
     def summarize_tophit_paf(self) -> None:
-        """Summarize top hits of assembled seqs mapped to SILVA database by minimap2.
-
-        Update Run._stats with a dict of summary stats "cluster_tophits"
-        for each hit, keyed by query sequence name.
-        """
-        out = {}
-
-        with Path.open(self.pathto("cluster_tophits")) as fh:
-            for line in fh:
-                spl = line.rstrip().split("\t")
-                hits = dict(
-                    zip(
-                        [
-                            "qname",
-                            "qlen",
-                            "qstart",
-                            "qend",
-                            "strand",
-                            "tname",
-                            "tlen",
-                            "tstart",
-                            "tend",
-                            "alnmatch",
-                            "alnlen",
-                        ],
-                        spl[0:11],
-                        strict=False,
-                    ),
-                )
-                cigar = next(i for i in spl if i.startswith("cg:Z:"))
-                # Calculate derived metrics from PAF fields
-                cigar_summary = parse_cigar_ops(cigar[5:])
-                hits.update({CIGAROPS[c]: cigar_summary[c] for c in cigar_summary})
-                # remove redundant % sign for display
-                hits["align %id"] = "{:.2%}".format(
-                    int(hits["alnmatch"]) / int(hits["alnlen"]),
-                ).rstrip("%")
-                hits["query %aln"] = "{:.2%}".format(
-                    (int(hits["qend"]) - int(hits["qstart"])) / int(hits["qlen"]),
-                ).rstrip("%")
-                hits["target %aln"] = "{:.2%}".format(
-                    (int(hits["tend"]) - int(hits["tstart"])) / int(hits["tlen"]),
-                ).rstrip("%")
-                out[spl[0]] = hits
-
-        # Taxonomy of hit targets
-        for rec in out.values():
-            try:
-                # hyperlink to ENA record
-                # TODO: This only works for SILVA where accessions are derived
-                # from ENA accessions. May not work with other databases e.g.
-                # Greengenes
-                rec["tophit"] = (
-                    f"[{rec['tname']!s}](https://www.ebi.ac.uk/ena/browser/view/{rec['tname'].split('.')[0]!s})"
-                )
-                rec["tophit taxonomy"] = ";".join(self._acc2tax[rec["tname"]])
-                rec["tophit species"] = self._acc2tax[rec["tname"]][-1]
-                # Higher taxonomy to class level, except for chloroplast and mitochondria
-                # Assumes SILVA taxonomy is in use
-                if rec["tophit taxonomy"].startswith(
-                    "Bacteria;Cyanobacteria;Cyanobacteriia;Chloroplast",
-                ):
-                    rec["higher taxonomy"] = "[Eukaryotic organelle Chloroplast]"
-                elif rec["tophit taxonomy"].startswith(
-                    "Bacteria;Proteobacteria;Alphaproteobacteria;Rickettsiales;Mitochondria",
-                ):
-                    rec["higher taxonomy"] = "[Eukaryotic organelle Mitochondria]"
-                else:
-                    rec["higher taxonomy"] = "; ".join(
-                        self._acc2tax[rec["tname"]][0:-1],
-                    )
-            except KeyError as e:
-                e.add_note(f"Accession {rec['tname']} not found in database?")
-                raise
-        self._stats.update({"cluster_tophits": out})
+        """Summarize top hits of assembled seqs mapped to SILVA database by minimap2."""
+        return super().summarize_tophit_paf(tophits=self.pathto("cluster_tophits"))
 
     @check_stage_file(
         stage="report_json",
