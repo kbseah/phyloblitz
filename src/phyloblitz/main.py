@@ -572,7 +572,9 @@ def run(ctx, **kwargs):
 @click.option(
     "--cluster_method",
     help="Method to use for comparing clusters between samples, passed to scipy.cluster.hierarchy.linkage method parameter; note that 'ward' can only be used with euclidean distance",
-    type=click.Choice(["ward", "single","complete","average","weighted","centroid","median"]),
+    type=click.Choice(
+        ["ward", "single", "complete", "average", "weighted", "centroid", "median"]
+    ),
     default="ward",
     show_default=True,
 )
@@ -660,6 +662,10 @@ def compare(ctx, **kwargs) -> None:
 
     logger.info("Map cluster memberships to samples ...")
     c.cluster_memberships()
+    c.cluster_membership_heatmap(
+        cluster_method=ctx.params["cluster_method"],
+        cluster_metric=ctx.params["cluster_metric"],
+    )
 
     c.write_report_json()
     c.write_reports()

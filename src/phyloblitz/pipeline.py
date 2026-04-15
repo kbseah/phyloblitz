@@ -433,10 +433,7 @@ class Run(Pipeline):
             },
         )
 
-    @check_stage_file(
-        stage="mcl_cluster",
-        message="Clustering with mcl",
-    )
+    @check_stage_file(stage="mcl_cluster", message="Clustering with mcl")
     def pymcl_cluster(
         self,
         dv_max: float = 0.03,
@@ -481,10 +478,7 @@ class Run(Pipeline):
         with Path.open(self.pathto("mcl_cluster"), "w") as fh:
             fh.writelines("\t".join(c) + "\n" for c in clusters)
 
-    @check_stage_file(
-        stage="isonclust3_cluster",
-        message="Clustering with isonclust3",
-    )
+    @check_stage_file(stage="isonclust3_cluster", message="Clustering with isonclust3")
     def isonclust3_cluster(self) -> int:
         """Cluster marker read segments with isonclust3."""
         # isonclust3 takes output folder path as argument, automatically
@@ -724,10 +718,7 @@ class Run(Pipeline):
         """Summarize top hits of assembled seqs mapped to SILVA database by minimap2."""
         return super().summarize_tophit_paf(tophits=self.pathto("cluster_tophits"))
 
-    @check_stage_file(
-        stage="report_json",
-        message="Writing report stats in JSON format",
-    )
+    @check_stage_file(stage="report_json", message="Writing report stats as JSON")
     def write_report_json(self) -> None:
         """Dump run stats file in JSON format."""
         return super().write_report_json(out=self.pathto("report_json"))
@@ -751,10 +742,7 @@ class Run(Pipeline):
             e.add_note("Key `cluster cons parsed` not found, has spoa been run?")
             raise
 
-    @check_stage_file(
-        stage="report_dvs_hist",
-        message="Generating plots for report",
-    )
+    @check_stage_file(stage="report_dvs_hist", message="Generating plots for report")
     def write_report_histogram(self) -> None:
         """Write histogram graphic required for report."""
         if "dv_max_applied" in self._stats["runstats"]:
@@ -769,10 +757,7 @@ class Run(Pipeline):
             figsize=(3, 2),
         )
 
-    @check_stage_file(
-        stage="report_md",
-        message="Writing report markdown",
-    )
+    @check_stage_file(stage="report_md", message="Writing report as Markdown")
     def write_report_markdown(self) -> None:
         """Write final report in markdown format."""
         with Path.open(self.pathto("report_md"), "w") as fh:
@@ -784,10 +769,7 @@ class Run(Pipeline):
                 ),
             )
 
-    @check_stage_file(
-        stage="report_html",
-        message="Writing report HTML",
-    )
+    @check_stage_file(stage="report_html", message="Writing report as HTML")
     def write_report_html(self) -> None:
         """Write final report in HTML format."""
         with Path.open(self.pathto("report_html"), "w") as fh:

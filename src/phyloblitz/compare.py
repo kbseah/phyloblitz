@@ -340,10 +340,7 @@ class Compare(Pipeline):
                         f"@{seg_name!s}\n{seg_dict['seq']!s}\n+\n{seg_dict['quals']!s}\n",
                     )
 
-    @check_stage_file(
-        stage="isonclust3_cluster",
-        message="Clustering with isonclust3",
-    )
+    @check_stage_file(stage="isonclust3_cluster", message="Clustering with isonclust3")
     def cluster_segments(self) -> int:
         """Cluster pooled marker read segments with isonclust3."""
         # isonclust3 takes output folder path as argument, automatically
@@ -402,49 +399,41 @@ class Compare(Pipeline):
                         seq,
                     )
             self._stats["cluster2sample"][cluster] = samples
-
-    @check_stage_file(stage="report_json", message="Writing report stats as JSON")
-    def write_report_json(self) -> None:
-        """Dump run stats file in JSON format."""
-        return super().write_report_json(out=self.pathto("report_json"))
-
-    @check_stage_file(stage="report_md", message="Writing report as Markdown")
-    @check_stage_file(stage="report_html", message="Writing report as HTML")
-    def write_reports(self, cluster_method:str="ward", cluster_metric:str="euclidean") -> None:
-        """Write report in Markdown and HTML formats."""
-        # Input table of sample and report file paths
-        input_table_md = dict2markdowntable(
-            dict(zip(self._samples, self._report_files, strict=True)),
-            col1="Sample",
-            col2="Report file",
-        )
-
         # Count reads per cluster per sample
-        cluster2sample_counts = {
+        self._stats["cluster2sample_counts"] = {
             c: {
                 s: len(self._stats["cluster2sample"][c][s])
                 for s in self._stats["cluster2sample"][c]
             }
             for c in self._stats["cluster2sample"]
         }
-        counts_md = dod2markdowntable(
-            cluster2sample_counts,
-            keys=self._samples,
-            order_by=self._samples[0],
-            order_by_value=False,
-            col1="Cluster",
-            fill_empty="0",
-        )
 
+    @check_stage_file(
+        stage="cluster_membership_heatmap",
+        message="Cluster samples by assembled sequence coverage",
+    )
+    def cluster_membership_heatmap(
+        self, cluster_method: str = "ward", cluster_metric: str = "euclidean"
+    ):
+        """Cluster sequences and samples by cluster membership and plot heatmap.
+
+        :param cluster_method: Linkage method for hierarchical clustering of
+            rows and columns (passed to scipy.cluster.hierarchy.linkage).
+        :param cluster_metric: Distance metric for hierarchical clustering of
+            rows and columns (passed to scipy.cluster.hierarchy.linkage).
+        """
         # Generate dendrogram and heatmap of cluster memberships across samples
         # Rows: Clusters, Columns: Samples
         cluster2sample_array = np.array(
             [
-                [cluster2sample_counts[c].get(s, 0) for s in self._samples]
-                for c in cluster2sample_counts
+                [
+                    self._stats["cluster2sample_counts"][c].get(s, 0)
+                    for s in self._samples
+                ]
+                for c in self._stats["cluster2sample_counts"]
             ],
         )
-        row_labels = [f"Cluster {c}" for c in cluster2sample_counts]
+        row_labels = [f"Cluster {c}" for c in self._stats["cluster2sample_counts"]]
         # Normalize by column (sample) sums to get relative abundances
         cluster2sample_norm = cluster2sample_array / cluster2sample_array.sum(
             axis=0,
@@ -470,9 +459,34 @@ class Compare(Pipeline):
             row_metric=cluster_metric,
             col_metric=cluster_metric,
             cmap="viridis",
-            figsize=(10, max(6, len(cluster2sample_counts) * 0.5)),
+            figsize=(10, max(6, len(self._stats["cluster2sample_counts"]) * 0.5)),
         )
         fig.savefig(self.pathto("cluster_membership_heatmap"), bbox_inches="tight")
+
+    @check_stage_file(stage="report_json", message="Writing report stats as JSON")
+    def write_report_json(self) -> None:
+        """Dump run stats file in JSON format."""
+        return super().write_report_json(out=self.pathto("report_json"))
+
+    @check_stage_file(stage="report_md", message="Writing report as Markdown")
+    @check_stage_file(stage="report_html", message="Writing report as HTML")
+    def write_reports(self) -> None:
+        """Write report in Markdown and HTML formats."""
+        # Input table of sample and report file paths
+        input_table_md = dict2markdowntable(
+            dict(zip(self._samples, self._report_files, strict=True)),
+            col1="Sample",
+            col2="Report file",
+        )
+
+        counts_md = dod2markdowntable(
+            self._stats["cluster2sample_counts"],
+            keys=self._samples,
+            order_by=self._samples[0],
+            order_by_value=False,
+            col1="Cluster",
+            fill_empty="0",
+        )
 
         raw = f"""# phyloblitz compare report
 
