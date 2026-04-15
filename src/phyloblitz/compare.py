@@ -158,7 +158,11 @@ def clustermap_rows_cols(
 
     # Heatmap
     im = ax_hm.imshow(
-        Xo, aspect="auto", interpolation="nearest", cmap=cmap, origin="upper",
+        Xo,
+        aspect="auto",
+        interpolation="nearest",
+        cmap=cmap,
+        origin="upper",
     )
 
     # Set ticks at cell centers
@@ -166,7 +170,10 @@ def clustermap_rows_cols(
     ax_hm.set_yticks(np.arange(nrow))
 
     ax_hm.set_xticklabels(
-        col_labels_o, rotation=xtick_rotation, ha="right", fontsize=xtick_fontsize,
+        col_labels_o,
+        rotation=xtick_rotation,
+        ha="right",
+        fontsize=xtick_fontsize,
     )
     ax_hm.set_yticklabels(row_labels_o, fontsize=ytick_fontsize)
 
@@ -201,7 +208,7 @@ class Compare(Pipeline):
         """Construct Run object."""
         df = read_tsv(args["input_table"])
         self._samples = df["sample"]
-        reports = df["report"]
+        self._report_files = df["report"]
         self._ref = args["db"]
         self._refindex = args["dbindex"]
         self._ref_md5 = run_md5(args["db"])
@@ -219,7 +226,7 @@ class Compare(Pipeline):
         }
         logger.debug("Database checksum: %s", self._ref_md5)
         try:
-            for sample, report in zip(self._samples, reports, strict=True):
+            for sample, report in zip(self._samples, self._report_files, strict=True):
                 with Path.open(report, "r") as fh:
                     self._reports[sample] = json.load(fh)
             logger.info("%d reports read", len(self._samples))
@@ -475,6 +482,14 @@ class Compare(Pipeline):
     )
     def write_reports(self) -> None:
         """Write report in Markdown and HTML formats."""
+        # Input table of sample and report file paths
+        input_table_md = dict2markdowntable(
+            dict(zip(self._samples, self._report_files, strict=True)),
+            col1="Sample",
+            col2="Report file",
+        )
+
+        # Count reads per cluster per sample
         cluster2sample_counts = {
             c: {
                 s: len(self._stats["cluster2sample"][c][s])
@@ -511,7 +526,7 @@ class Compare(Pipeline):
             figsize=(10, max(6, len(cluster2sample_counts) * 0.5)),
         )
         fig.savefig(self.pathto("cluster_membership_heatmap"), bbox_inches="tight")
-        # TODO: Embed input sample table
+
         raw = f"""# phyloblitz compare report
 
 * Compare started: {self._stats["starttime"]!s}
@@ -522,13 +537,14 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 ## Input parameters
 
-<details>
-
 `phyloblitz compare` was called with the following parameters:
 
 {dict2markdowntable(self._stats["args"])}
 
-</details>
+
+### Input files
+
+{input_table_md}
 
 
 ## Run statistics
