@@ -1,12 +1,15 @@
 """Shared utility functions for phyloblitz."""
 
+import json
 import logging
 import re
 import sys
 from collections import defaultdict
+from datetime import datetime
 from functools import wraps
 from hashlib import md5
 from os import W_OK, access
+from multiprocessing import Pool
 from pathlib import Path
 from random import sample, seed
 from subprocess import PIPE, STDOUT, Popen
@@ -169,34 +172,6 @@ def run_md5(file: str | Path) -> str:
         for byte_block in iter(lambda: f.read(4096), b""):
             md5_hash.update(byte_block)
     return md5_hash.hexdigest()
-
-
-def run_isonclust3(reads: str | Path, mode: str, outfolder: str | Path) -> int:
-    """Run isONclust3.
-
-    :param reads: Path to reads in Fastq format
-    :param mode: Either "ont" or "pacbio"
-    :param outfolder: Path to folder to write results
-    :returns: Return code of the isONclust3 process.
-    :rtype: int
-    """
-    cmd = [
-        "isONclust3",
-        "--no-fastq",
-        "--fastq",
-        reads,
-        "--mode",
-        mode,
-        "--outfolder",
-        outfolder,
-    ]
-    if mode == "ont":
-        cmd.append("--post-cluster")
-    logger.debug("isonclust3 command: %s", " ".join([str(i) for i in cmd]))
-    proc = Popen(cmd, stdout=PIPE)
-    for l in proc.stdout:
-        logger.debug("  isonclust3 log: %s", l.decode().rstrip())
-    return proc.wait()
 
 
 def cluster_seqs_from_isonclust3(
@@ -510,3 +485,214 @@ class Pipeline:
         except KeyError as e:
             e.add_not(f"Unknown intermediate file {stage}")
             raise
+
+    def db_taxonomy(self) -> None:
+        """Get taxonomy string from SILVA headers in database Fasta file.
+
+        Parse SILVA-style headers to get dict of taxonomy strings keyed by
+        accession, stored in the Run._acc2tax attribute.
+        """
+        logger.info("Reading taxonomy from SILVA database file")
+        self._acc2tax = {}
+        with Path.open(self._ref) as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    spl = line.lstrip(">").rstrip().split(" ")
+                    acc = spl[0]
+                    taxstring = " ".join(spl[1:]).split(";")
+                    self._acc2tax[acc] = taxstring
+        logger.debug(" Accessions read: %d", len(self._acc2tax))
+
+    def isonclust3_cluster(self, outfolder: str | Path, reads: str | Path) -> int:
+        """Cluster marker read segments with isONclust3.
+
+        isONclust3 was originally designed for long-read transcriptome
+        datasets, and uses minimizers with iterative cluster merging. The
+        default preset for Nanopore, "ont", is applied here for both legacy and
+        Q20+ Nanopore reads, while the "pacbio" preset is used for both PacBio
+        CLR and HiFi. Cluster output is a directory with multiple files.
+
+        :param outfolder: Path to folder to write results
+        :param reads: Path to reads in Fastq format
+        :returns: Return code of the isONclust3 process.
+        :rtype: int
+        """
+        if self._platform in ["lr:hq", "map-ont"]:
+            mode = "ont"
+        elif self._platform in ["map-hifi", "map-pb"]:
+            mode = "pacbio"
+        cmd = [
+            "isONclust3",
+            "--no-fastq",
+            "--fastq",
+            reads,
+            "--mode",
+            mode,
+            "--outfolder",
+            outfolder,
+        ]
+        if mode == "ont":
+            cmd.append("--post-cluster")
+        logger.debug("isonclust3 command: %s", " ".join([str(i) for i in cmd]))
+        proc = Popen(cmd, stdout=PIPE)
+        for l in proc.stdout:
+            logger.debug("  isonclust3 log: %s", l.decode().rstrip())
+        return proc.wait()
+
+    def assemble_clusters(
+        self,
+        cluster_out: str | Path,
+        reads: str | Path,
+        cluster_asm: str | Path,
+        cluster_tool: str = "isonclust3",
+        threads: int = 12,
+        rseed: int = 12345,
+        keeptmp: bool = False,
+        min_clust_size: int = 5,
+        max_clust_size: int = 500,
+    ) -> None:
+        """Extract cluster sequences and assemble with spoa.
+
+        Cluster reads with specified clustering tool, extract read segments for
+        each cluster to separate Fastq files, and assemble consensus sequence
+        for each with Spoa. Assembly step is embarrassingly parallelized.
+
+        Updates Pipeline._stats["cluster2seq"] with lists of read names keyed
+        by cluster id. Some summary stats on clusters are written to
+        Pipeline._stats["runstats"].
+
+        Other per-cluster summaries in Pipeline._stats:
+          * "cluster variant counts" -- number of variant sites by type for
+            each read vs. its cluster consensus.
+          * "cluster persite variant counts" -- per-site entropy vs. consensus
+            [WIP].
+          * "cluster cons parsed" -- cluster alignment including consensus,
+            produced by spoa.
+
+        :param cluster_out: Path to output file from clustering step; expected
+            format depends on cluster_tool
+        :param reads: Path to Fastq file with read segments to be clustered and
+            assembled
+        :param cluster_asm: Path to write assembled cluster consensus sequences
+            in Fasta format
+        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3".
+        :param threads: Number of parallel assembly jobs to run.
+        :param rseed: Random seed for downsampling reads in large clusters.
+        :param keeptmp: If True, do not delete Fastq files with extracted reads.
+        :param min_clust_size: Only assemble clusters containing at least this
+            number of reads.
+        :param max_clust_size: Downsample reads for clusters above this size.
+        """
+        if cluster_tool == "mcl":
+            fastq_handles, cluster2seq = cluster_seqs_from_mcl(
+                cluster_out,
+                reads,
+                keeptmp=keeptmp,
+                min_clust_size=min_clust_size,
+                max_clust_size=max_clust_size,
+                rseed=rseed,
+            )
+        elif cluster_tool == "isonclust3":
+            fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
+                cluster_out,
+                reads,
+                keeptmp=keeptmp,
+                min_clust_size=min_clust_size,
+                max_clust_size=max_clust_size,
+                rseed=rseed,
+            )
+        self._stats.update({"cluster2seq": cluster2seq})
+        self._stats["runstats"].update(
+            {
+                "number of clusters": len(cluster2seq),
+                "number of clusters > 5 reads": len(
+                    [i for i in cluster2seq if len(cluster2seq[i]) > 5],
+                ),
+                "total reads in clusters": sum(
+                    [len(cluster2seq[c]) for c in cluster2seq],
+                ),
+            },
+        )
+        logger.info("Assemble consensus from clustered sequences with spoa")
+        with Pool(threads) as pool:
+            cluster_cons_tuples = pool.map(
+                spoa_assemble_fasta,
+                [(c, handle.name) for c, handle in fastq_handles.items()],
+            )
+        # Close NamedTemporaryFile handles
+        for handle in fastq_handles.values():
+            handle.close()
+
+        cluster_cons = dict(cluster_cons_tuples)
+
+        cluster_cons_parsed = {i: parse_spoa_r2(cluster_cons[i]) for i in cluster_cons}
+        cluster_variant_counts = {
+            i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
+        }
+        cluster_persite_variant_counts = {  # WIP
+            i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
+            for i in cluster_cons_parsed
+        }
+        self._stats.update(
+            {
+                "cluster variant counts": cluster_variant_counts,
+                "cluster persite variant counts": cluster_persite_variant_counts,  # WIP
+                "cluster cons parsed": cluster_cons_parsed,
+            },
+        )
+        with Path.open(cluster_asm, "w") as fh:
+            fh.writelines(
+                f">cluster_{c!s} Consensus\n"
+                + cluster_cons_parsed[c]["Consensus"].replace("-", "")
+                + "\n"
+                for c in cluster_cons_parsed
+            )
+            logger.info("Assembled sequences written to %s", cluster_asm)
+
+    def cluster_asm_tophits(
+        self, tophits: str | Path, asm: str | Path, threads: int = 12
+    ) -> int:
+        """Map sequences to reference database with minimap2 and get top hits.
+
+        Find best reference match for cluster consensus sequences by aligning
+        with minimap2. Alignment is written to file.
+
+        :param tophits: Path to write minimap2 alignment output in PAF format
+        :param asm: Path to assembled cluster consensus sequences in Fasta format
+        :param threads: Number of threads for minimap2 to use
+        :returns: Return code of the minimap2 process
+        """
+        cmd = [
+            "minimap2",
+            "-x",
+            "asm5",
+            "-c",
+            "--eqx",
+            "--secondary=no",
+            "-t",
+            str(threads),
+            "-o",
+            tophits,
+        ]
+        (
+            cmd.extend([self._refindex, asm])
+            if self._refindex is not None
+            else cmd.extend([self._ref, asm])
+        )
+        logger.debug("minimap command: %s", " ".join([str(i) for i in cmd]))
+        proc = Popen(cmd, stderr=PIPE)
+        for l in proc.stderr:
+            logger.debug("  minimap log: %s", l.decode().rstrip())
+        return proc.wait()
+
+    def write_report_json(self, out: str | Path) -> None:
+        """Dump run stats file in JSON format.
+
+        Dump the Pipeline._stats attribute to a JSON file for troubleshooting
+        and comparison of different phyloblitz runs.
+
+        :param out: Path to write JSON file
+        """
+        self._stats.update({"endtime": str(datetime.now())})
+        with Path.open(out, "w") as fh:
+            json.dump(self._stats, fh, indent=4)

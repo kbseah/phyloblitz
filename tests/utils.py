@@ -1,9 +1,35 @@
 import unittest
 
-from phyloblitz.utils import filter_paf_overhang, lists_common_prefix
+from phyloblitz.utils import (
+    count_spoa_aln_vars,
+    filter_paf_overhang,
+    lists_common_prefix,
+    parse_spoa_r2,
+)
 
 
 class TestReportFunctions(unittest.TestCase):
+
+    def test_parse_spoa_r2(self):
+        f = """>S1\nAATAC\n>S2\nAAATC\n>Consensus\nAAAAC"""
+        self.assertEqual(
+            parse_spoa_r2(f),
+            {"S1": "AATAC", "S2": "AAATC", "Consensus": "AAAAC"},
+        )
+
+    def test_count_spoa_aln_vars(self):
+        s = {"S1": "---AT-CG-A--", "Consensus": "ATAA-ACG-TGC"}
+        o = count_spoa_aln_vars(s)
+        self.assertEqual(
+            [
+                o["S1"]["query_lead_gap"],
+                o["S1"]["query_trail_gap"],
+                o["S1"]["match"],
+                o["S1"]["cons_gap"],
+                o["S1"]["query_gap"],
+            ],
+            [3, 2, 3, 1, 1],
+        )
 
     def test_lists_common_prefix(self):
         lol = [

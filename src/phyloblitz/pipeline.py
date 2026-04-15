@@ -1,11 +1,9 @@
-"""phyloblitz run pipeline"""
+"""phyloblitz run pipeline."""
 
-import json
 import logging
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
-from multiprocessing import Pool
 from pathlib import Path
 from subprocess import PIPE, Popen
 from tempfile import NamedTemporaryFile, TemporaryDirectory
@@ -26,17 +24,10 @@ from phyloblitz.utils import (
     CIGAROPS,
     Pipeline,
     check_stage_file,
-    cluster_seqs_from_isonclust3,
-    cluster_seqs_from_mcl,
-    count_spoa_aln_persite_vars,
-    count_spoa_aln_vars,
     filter_paf_overhang,
     lists_common_prefix,
     parse_cigar_ops,
-    parse_spoa_r2,
-    run_isonclust3,
     run_md5,
-    spoa_assemble_fasta,
 )
 
 logger = logging.getLogger(__name__)
@@ -497,26 +488,12 @@ class Run(Pipeline):
         message="Clustering with isonclust3",
     )
     def isonclust3_cluster(self) -> int:
-        """Cluster marker read segments with isONclust3.
-
-        isONclust3 was originally designed for long-read transcriptome
-        datasets, and uses minimizers with iterative cluster merging. The
-        default preset for Nanopore, "ont", is applied here for both legacy and
-        Q20+ Nanopore reads, while the "pacbio" preset is used for both PacBio
-        CLR and HiFi. Cluster output is a directory with multiple files.
-
-        :returns: Return code of the isONclust3 process.
-        :rtype: int
-        """
-        if self._platform in ["lr:hq", "map-ont"]:
-            mode = "ont"
-        elif self._platform in ["map-hifi", "map-pb"]:
-            mode = "pacbio"
+        """Cluster marker read segments with isonclust3."""
         # isonclust3 takes output folder path as argument, automatically
         # creates `clustering` subfolder, so go two levels up
         outfolder = self.pathto("isonclust3_cluster").parent.parent
         reads = self.pathto("mapped_segments")
-        return run_isonclust3(reads=reads, mode=mode, outfolder=outfolder)
+        return super().isonclust3_cluster(outfolder, reads)
 
     @check_stage_file(
         stage="cluster_asm",
@@ -531,95 +508,22 @@ class Run(Pipeline):
         min_clust_size: int = 5,
         max_clust_size: int = 500,
     ) -> None:
-        """Extract cluster sequences and assemble with spoa.
-
-        Cluster reads with specified clustering tool, extract read segments for
-        each cluster to separate Fastq files, and assemble consensus sequence
-        for each with Spoa. Assembly step is embarrassingly parallelized.
-
-        Updates Run._stats["cluster2seq"] with lists of read names keyed
-        by cluster id. Some summary stats on clusters are written to
-        Run._stats["runstats"].
-
-        Other per-cluster summaries in Run._stats: "cluster variant
-        counts" -- number of variant sites by type for each read vs. its
-        cluster consensus; "cluster persite variant counts" -- per-site entropy
-        vs. consensus [WIP]; "cluster cons parsed" -- cluster alignment
-        including consensus, produced by spoa.
-
-        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3".
-        :param threads: Number of parallel assembly jobs to run.
-        :param rseed: Random seed for downsampling reads in large clusters.
-        :param keeptmp: If True, do not delete Fastq files with extracted reads.
-        :param min_clust_size: Only assemble clusters containing at least this
-            number of reads.
-        :param max_clust_size: Downsample reads for clusters above this size.
-        """
+        """Extract cluster sequences and assemble with spoa."""
         if cluster_tool == "mcl":
-            fastq_handles, cluster2seq = cluster_seqs_from_mcl(
-                self.pathto("mcl_cluster"),
-                self.pathto("mapped_segments"),
-                keeptmp=keeptmp,
-                min_clust_size=min_clust_size,
-                max_clust_size=max_clust_size,
-                rseed=rseed,
-            )
+            cluster_out = self.pathto("mcl_cluster")
         elif cluster_tool == "isonclust3":
-            fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
-                self.pathto("isonclust3_cluster"),
-                self.pathto("mapped_segments"),
-                keeptmp=keeptmp,
-                min_clust_size=min_clust_size,
-                max_clust_size=max_clust_size,
-                rseed=rseed,
-            )
-        self._stats.update({"cluster2seq": cluster2seq})
-        self._stats["runstats"].update(
-            {
-                "number of clusters": len(cluster2seq),
-                "number of clusters > 5 reads": len(
-                    [i for i in cluster2seq if len(cluster2seq[i]) > 5],
-                ),
-                "total reads in clusters": sum(
-                    [len(cluster2seq[c]) for c in cluster2seq],
-                ),
-            },
+            cluster_out = self.pathto("isonclust3_cluster")
+        return super().assemble_clusters(
+            cluster_out=cluster_out,
+            reads=self.pathto("mapped_segments"),
+            cluster_asm=self.pathto("cluster_asm"),
+            cluster_tool=cluster_tool,
+            threads=threads,
+            rseed=rseed,
+            keeptmp=keeptmp,
+            min_clust_size=min_clust_size,
+            max_clust_size=max_clust_size,
         )
-        logger.info("Assemble consensus from clustered sequences with spoa")
-        with Pool(threads) as pool:
-            cluster_cons_tuples = pool.map(
-                spoa_assemble_fasta,
-                [(c, handle.name) for c, handle in fastq_handles.items()],
-            )
-        # Close NamedTemporaryFile handles
-        for handle in fastq_handles.values():
-            handle.close()
-
-        cluster_cons = dict(cluster_cons_tuples)
-
-        cluster_cons_parsed = {i: parse_spoa_r2(cluster_cons[i]) for i in cluster_cons}
-        cluster_variant_counts = {
-            i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
-        }
-        cluster_persite_variant_counts = {  # WIP
-            i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
-            for i in cluster_cons_parsed
-        }
-        self._stats.update(
-            {
-                "cluster variant counts": cluster_variant_counts,
-                "cluster persite variant counts": cluster_persite_variant_counts,  # WIP
-                "cluster cons parsed": cluster_cons_parsed,
-            },
-        )
-        with Path.open(self.pathto("cluster_asm"), "w") as fh:
-            fh.writelines(
-                f">cluster_{c!s} Consensus\n"
-                + cluster_cons_parsed[c]["Consensus"].replace("-", "")
-                + "\n"
-                for c in cluster_cons_parsed
-            )
-            logger.info("Assembled sequences written to %s", self.pathto("cluster_asm"))
 
     def cluster_flanking_isonclust3(self) -> None:
         """Cluster flanking sequences with isonclust3 and report number of groups.
@@ -759,23 +663,6 @@ class Run(Pipeline):
             axs[idx, 0].set_xlim(-2, max_kmer_cov + 2)
         fig.savefig(self.pathto("report_kmercount_plot"))
 
-    def db_taxonomy(self) -> None:
-        """Get taxonomy string from SILVA headers in database Fasta file.
-
-        Parse SILVA-style headers to get dict of taxonomy strings keyed by
-        accession, stored in the Run._acc2tax attribute.
-        """
-        logger.info("Reading taxonomy from SILVA database file")
-        self._acc2tax = {}
-        with Path.open(self._ref) as fh:
-            for line in fh:
-                if line.startswith(">"):
-                    spl = line.lstrip(">").rstrip().split(" ")
-                    acc = spl[0]
-                    taxstring = " ".join(spl[1:]).split(";")
-                    self._acc2tax[acc] = taxstring
-        logger.debug(" Accessions read: %d", len(self._acc2tax))
-
     def _per_read_consensus_taxonomy(
         self,
         sam_file: str | Path,
@@ -828,36 +715,10 @@ class Run(Pipeline):
         message="Mapping assembled sequences to reference database with minimap2",
     )
     def cluster_asm_tophits(self, threads: int = 12) -> int:
-        """Map assembled sequences to reference DB and get top hits.
-
-        Find best reference match for cluster consensus sequences by aligning
-        with minimap2. Alignment is written to file.
-
-        :param threads: Number of threads for minimap2 to use
-        :returns: Return code of the minimap2 process
-        """
-        cmd = [
-            "minimap2",
-            "-x",
-            "asm5",
-            "-c",
-            "--eqx",
-            "--secondary=no",
-            "-t",
-            str(threads),
-            "-o",
-            self.pathto("cluster_tophits"),
-        ]
-        (
-            cmd.extend([self._refindex, self.pathto("cluster_asm")])
-            if self._refindex is not None
-            else cmd.extend([self._ref, self.pathto("cluster_asm")])
+        """Map assembled cluster consensus sequences to reference database with minimap2."""
+        return super().cluster_asm_tophits(
+            self.pathto("cluster_tophits"), self.pathto("cluster_asm"), threads=threads
         )
-        logger.debug("minimap command: %s", " ".join([str(i) for i in cmd]))
-        proc = Popen(cmd, stderr=PIPE)
-        for l in proc.stderr:
-            logger.debug("  minimap log: %s", l.decode().rstrip())
-        return proc.wait()
 
     def summarize_tophit_paf(self) -> None:
         """Summarize top hits of assembled seqs mapped to SILVA database by minimap2.
@@ -941,14 +802,8 @@ class Run(Pipeline):
         message="Writing report stats in JSON format",
     )
     def write_report_json(self) -> None:
-        """Dump run stats file in JSON format.
-
-        Dump the Run._stats attribute to a JSON file for troubleshooting
-        and comparison of different phyloblitz runs.
-        """
-        self._stats.update({"endtime": str(datetime.now())})
-        with Path.open(self.pathto("report_json"), "w") as fh:
-            json.dump(self._stats, fh, indent=4)
+        """Dump run stats file in JSON format."""
+        return super().write_report_json(out=self.pathto("report_json"))
 
     def write_cluster_alns(self) -> None:
         """Dump cluster alignments for troubleshooting.

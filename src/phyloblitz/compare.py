@@ -4,7 +4,6 @@ import json
 import logging
 from collections import defaultdict
 from datetime import datetime
-from multiprocessing import Pool
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -16,17 +15,7 @@ from scipy.spatial.distance import pdist
 
 from phyloblitz.__about__ import __version__
 from phyloblitz.report import HTML_TEMPLATE, dict2markdowntable, dod2markdowntable
-from phyloblitz.utils import (
-    Pipeline,
-    check_stage_file,
-    cluster_seqs_from_isonclust3,
-    count_spoa_aln_persite_vars,
-    count_spoa_aln_vars,
-    parse_spoa_r2,
-    run_isonclust3,
-    run_md5,
-    spoa_assemble_fasta,
-)
+from phyloblitz.utils import Pipeline, check_stage_file, run_md5
 
 logger = logging.getLogger(__name__)
 
@@ -356,16 +345,12 @@ class Compare(Pipeline):
         message="Clustering with isonclust3",
     )
     def cluster_segments(self) -> int:
-        """Cluster read segments with isONclust3."""
-        if self._platform in ["lr:hq", "map-ont"]:
-            mode = "ont"
-        elif self._platform in ["map-hifi", "map-pb"]:
-            mode = "pacbio"
-        return run_isonclust3(
-            self.pathto("pooled_segments"),
-            mode,
-            self.pathto("isonclust3_cluster").parent.parent,
-        )
+        """Cluster pooled marker read segments with isonclust3."""
+        # isonclust3 takes output folder path as argument, automatically
+        # creates `clustering` subfolder, so go two levels up
+        outfolder = self.pathto("isonclust3_cluster").parent.parent
+        reads = self.pathto("pooled_segments")
+        return super().isonclust3_cluster(outfolder, reads)
 
     @check_stage_file(
         stage="cluster_asm",
@@ -379,71 +364,18 @@ class Compare(Pipeline):
         min_clust_size: int = 5,
         max_clust_size: int = 500,
     ) -> None:
-        """Extract cluster sequences and assemble with spoa.
-
-        :param cluster_tool: Clustering method used, either "mcl" or "isonclust3".
-        :param threads: Number of parallel assembly jobs to run.
-        :param rseed: Random seed for downsampling reads in large clusters.
-        :param keeptmp: If True, do not delete Fastq files with extracted reads.
-        :param min_clust_size: Only assemble clusters containing at least this
-            number of reads.
-        :param max_clust_size: Downsample reads for clusters above this size.
-        """
-        fastq_handles, cluster2seq = cluster_seqs_from_isonclust3(
-            self.pathto("isonclust3_cluster"),
-            self.pathto("pooled_segments"),
-            keeptmp=False,
+        """Extract cluster sequences and assemble with spoa."""
+        return super().assemble_clusters(
+            cluster_out=self.pathto("isonclust3_cluster"),
+            reads=self.pathto("pooled_segments"),
+            cluster_asm=self.pathto("cluster_asm"),
+            cluster_tool="isonclust3",
+            threads=threads,
+            rseed=rseed,
+            keeptmp=keeptmp,
             min_clust_size=min_clust_size,
             max_clust_size=max_clust_size,
-            rseed=rseed,
         )
-        self._stats["runstats"].update(
-            {
-                "number of clusters": len(cluster2seq),
-                "number of clusters > 5 reads": len(
-                    [i for i in cluster2seq if len(cluster2seq[i]) > 5],
-                ),
-                "total reads in clusters": sum(
-                    [len(cluster2seq[c]) for c in cluster2seq],
-                ),
-            },
-        )
-        self._stats["cluster2seq"] = cluster2seq
-        logger.info("Assemble consensus from clustered sequences with spoa")
-        with Pool(threads) as pool:
-            cluster_cons_tuples = pool.map(
-                spoa_assemble_fasta,
-                [(c, handle.name) for c, handle in fastq_handles.items()],
-            )
-        # Close NamedTemporaryFile handles
-        for handle in fastq_handles.values():
-            handle.close()
-
-        cluster_cons = dict(cluster_cons_tuples)
-
-        cluster_cons_parsed = {i: parse_spoa_r2(cluster_cons[i]) for i in cluster_cons}
-        cluster_variant_counts = {
-            i: count_spoa_aln_vars(cluster_cons_parsed[i]) for i in cluster_cons_parsed
-        }
-        cluster_persite_variant_counts = {  # WIP
-            i: count_spoa_aln_persite_vars(cluster_cons_parsed[i])
-            for i in cluster_cons_parsed
-        }
-        self._stats.update(
-            {
-                "cluster variant counts": cluster_variant_counts,
-                "cluster persite variant counts": cluster_persite_variant_counts,  # WIP
-                "cluster cons parsed": cluster_cons_parsed,
-            },
-        )
-        with Path.open(self.pathto("cluster_asm"), "w") as fh:
-            fh.writelines(
-                f">cluster_{c!s} Consensus\n"
-                + cluster_cons_parsed[c]["Consensus"].replace("-", "")
-                + "\n"
-                for c in cluster_cons_parsed
-            )
-            logger.info("Assembled sequences written to %s", self.pathto("cluster_asm"))
 
     # TODO: Classify assembled cluster sequences against reference database
 
@@ -467,14 +399,8 @@ class Compare(Pipeline):
         message="Writing report stats in JSON format",
     )
     def write_report_json(self) -> None:
-        """Dump run stats file in JSON format.
-
-        Dump the Run._stats attribute to a JSON file for troubleshooting
-        and comparison of different phyloblitz runs.
-        """
-        self._stats.update({"endtime": str(datetime.now())})
-        with Path.open(self.pathto("report_json"), "w") as fh:
-            json.dump(self._stats, fh, indent=4)
+        """Dump run stats file in JSON format."""
+        return super().write_report_json(out=self.pathto("report_json"))
 
     @check_stage_file(
         stage="report_md",
