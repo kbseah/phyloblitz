@@ -35,7 +35,7 @@ references phyloFlash and [bioblitzes](https://en.wikipedia.org/wiki/BioBlitz).
  * [Installation](install.md)
  * [Reference database](ref.md)
  * [Development](dev.md)
- * Run pipeline usage
+ * [Run pipeline usage](run.md)
  * Compare pipeline usage
 
 
