@@ -9,6 +9,7 @@ from mistune import create_markdown, html
 from mistune.renderers.markdown import MarkdownRenderer
 
 from phyloblitz.__about__ import __version__
+from phyloblitz.utils import png_to_html_embed
 
 logger = logging.getLogger(__name__)
 # mute verbose debug messages from matplotlib and PngImagePlugin
@@ -171,10 +172,8 @@ def generate_report_md(
     """Generate markdown report from stats collected during phyloblitz run.
 
     :param stats: `stats` dict produced in phyloblitz.main.main
-    :param histogram_file_path: Path to histogram image file, relative to
-        report file path
-    :param kmercount_plot_path: Path to k-mer count plot file, relative to
-        report file path
+    :param histogram_file_path: Path to histogram image file
+    :param kmercount_plot_path: Path to k-mer count plot file
     :returns: Report in markdown format
     :rtype: str
     """
@@ -196,6 +195,15 @@ def generate_report_md(
     ]
     if "cluster flanking numclust" in stats:
         cluster_table_fields.append("flanking seq clusters")
+
+    histogram_file_embed = png_to_html_embed(
+        histogram_file_path,
+        alt="Histogram of lowest non-self divergence score per read",
+    )
+    kmer_plot_embed = png_to_html_embed(
+        kmercount_plot_path,
+        alt="K-mer multiplicity plots for flanking sequences of each marker sequence cluster",
+    )
 
     raw = f"""# phyloblitz run report
 
@@ -219,7 +227,7 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 <figure>
 
-![]({histogram_file_path})
+{histogram_file_embed}
 
 <figcaption>Histogram of the lowest non-self divergence score per read from
 all-vs-all mapping of extracted rRNA sequences.</figcaption>
@@ -250,7 +258,7 @@ checked for sequence chimerism or misassembly.
 
 <figure>
 
-![]({kmercount_plot_path})
+{kmer_plot_embed}
 
 <figcaption>K-mer multiplicity plots for flanking sequences of each marker sequence cluster.</figcaption>
 </figure>

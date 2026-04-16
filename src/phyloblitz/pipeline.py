@@ -764,8 +764,8 @@ class Run(Pipeline):
             fh.write(
                 generate_report_md(
                     self._stats,
-                    self.pathto("report_dvs_hist", basename_only=True),
-                    self.pathto("report_kmercount_plot", basename_only=True),
+                    self.pathto("report_dvs_hist"),
+                    self.pathto("report_kmercount_plot"),
                 ),
             )
 
@@ -776,7 +776,7 @@ class Run(Pipeline):
             fh.write(
                 generate_report_html(
                     self._stats,
-                    self.pathto("report_dvs_hist", basename_only=True),
-                    self.pathto("report_kmercount_plot", basename_only=True),
+                    self.pathto("report_dvs_hist"),
+                    self.pathto("report_kmercount_plot"),
                 ),
             )

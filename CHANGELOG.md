@@ -39,10 +39,10 @@
  - [x] Skip duplicate segments extracted from overlapping alignments
  - [x] Downsample clusters with too many reads for assembly (~500 should be ok)
  - [x] Multisample comparison and co-assembly
- - [ ] Gzip JSON output file
+ - [x] Embed graphics as PNGs into HTML
+ - [ ] Detailed documentation
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
- - [ ] Detailed documentation
 
 
 ## Future plans/ideas
@@ -57,6 +57,5 @@
  - [ ] Does extracting flanking sequence context improve strain resolution?
      - [ ] Filter out all-vs-all hits with overhangs
      - [ ] Investigate effect of dv cutoff values and clustering methods
- - [ ] Embed graphics as PNGs into HTML with markdown-embedimages
  - [ ] Benchmarking against defined test datasets
  - [ ] Extract the ITS too?

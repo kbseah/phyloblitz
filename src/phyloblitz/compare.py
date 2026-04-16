@@ -15,7 +15,7 @@ from scipy.spatial.distance import pdist
 
 from phyloblitz.__about__ import __version__
 from phyloblitz.report import HTML_TEMPLATE, dict2markdowntable, dod2markdowntable
-from phyloblitz.utils import Pipeline, check_stage_file, run_md5
+from phyloblitz.utils import Pipeline, check_stage_file, run_md5, png_to_html_embed
 
 logger = logging.getLogger(__name__)
 
@@ -447,7 +447,9 @@ class Compare(Pipeline):
         message="Cluster samples by assembled sequence coverage",
     )
     def cluster_membership_heatmap(
-        self, cluster_method: str = "ward", cluster_metric: str = "euclidean",
+        self,
+        cluster_method: str = "ward",
+        cluster_metric: str = "euclidean",
     ):
         """Cluster sequences and samples by cluster membership and plot heatmap.
 
@@ -523,6 +525,11 @@ class Compare(Pipeline):
             fill_empty="-",
         )
 
+        image_embed = png_to_html_embed(
+            self.pathto("cluster_membership_heatmap"),
+            alt="Cluster membership heatmap",
+        )
+
         raw = f"""# phyloblitz compare report
 
 * Compare started: {self._stats["starttime"]!s}
@@ -552,7 +559,7 @@ phyloblitz [homepage](https://github.com/kbseah/phyloblitz)
 
 <figure>
 
-![]({self.pathto("cluster_membership_heatmap", basename_only=True)!s})
+{image_embed}
 
 <figcaption>Cluster membership heatmap. Rows are clusters, columns are samples,
 and values are relative read abundance from each sample per sequence cluster.
