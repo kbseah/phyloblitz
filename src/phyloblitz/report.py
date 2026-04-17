@@ -1,5 +1,6 @@
 """Functions and templates to generate phyloblitz reports."""
 
+import base64
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -9,7 +10,6 @@ from mistune import create_markdown, html
 from mistune.renderers.markdown import MarkdownRenderer
 
 from phyloblitz.__about__ import __version__
-from phyloblitz.utils import png_to_html_embed
 
 logger = logging.getLogger(__name__)
 # mute verbose debug messages from matplotlib and PngImagePlugin
@@ -162,6 +162,19 @@ def generate_histogram(
     axs.set_title(title)
     fig.tight_layout()
     fig.savefig(outfile)
+
+
+def png_to_html_embed(png: str | Path, alt: str = "Image") -> str:
+    """Convert a PNG file to an HTML image tag with base64-encoded data.
+
+    :param png: Path to PNG file
+    :param alt: Alt text for the image
+    :returns: HTML img tag with embedded PNG image as string
+    :rtype: str
+    """
+    with Path.open(png, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+    return f'<img src="data:image/png;base64,{encoded}" alt="{alt}"/>'
 
 
 def generate_report_md(

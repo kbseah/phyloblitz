@@ -1,6 +1,5 @@
 """Shared utility functions for phyloblitz."""
 
-import base64
 import json
 import logging
 import re
@@ -173,19 +172,6 @@ def run_md5(file: str | Path) -> str:
         for byte_block in iter(lambda: f.read(4096), b""):
             md5_hash.update(byte_block)
     return md5_hash.hexdigest()
-
-
-def png_to_html_embed(png: str | Path, alt: str = "Image") -> str:
-    """Convert a PNG file to an HTML image tag with base64-encoded data.
-
-    :param png: Path to PNG file
-    :param alt: Alt text for the image
-    :returns: HTML img tag with embedded PNG image as string
-    :rtype: str
-    """
-    with Path.open(png, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")
-    return f'<img src="data:image/png;base64,{encoded}" alt="{alt}"/>'
 
 
 def cluster_seqs_from_isonclust3(

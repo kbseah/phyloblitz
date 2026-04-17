@@ -53,7 +53,7 @@ tqdm = ">=4.67.3,<5"
 
 [tasks]
 ## Unit tests ------------------------------------------------------------------
-test = "black ./src; black ./tests; python3 -m unittest tests.utils; python3 -m unittest tests.run"
+test = "black ./src; black ./tests; python3 -m unittest tests.pipeline; python3 -m unittest tests.run"
 ## Download reference databases ------------------------------------------------
 download = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2"""
 download_dry = """phyloblitz download --db_version 138.2 --which_db SSU --outdir 138.2 --dryrun --overwrite --debug"""

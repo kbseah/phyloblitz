@@ -14,8 +14,13 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist
 
 from phyloblitz.__about__ import __version__
-from phyloblitz.report import HTML_TEMPLATE, dict2markdowntable, dod2markdowntable
-from phyloblitz.utils import Pipeline, check_stage_file, run_md5, png_to_html_embed
+from phyloblitz.report import (
+    HTML_TEMPLATE,
+    dict2markdowntable,
+    dod2markdowntable,
+    png_to_html_embed,
+)
+from phyloblitz.pipeline import Pipeline, check_stage_file, run_md5
 
 logger = logging.getLogger(__name__)
 

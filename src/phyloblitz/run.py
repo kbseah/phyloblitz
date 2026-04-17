@@ -20,7 +20,7 @@ from phyloblitz.report import (
     generate_report_html,
     generate_report_md,
 )
-from phyloblitz.utils import (
+from phyloblitz.pipeline import (
     Pipeline,
     check_stage_file,
     filter_paf_overhang,

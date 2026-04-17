@@ -1,6 +1,6 @@
 import unittest
 
-from phyloblitz.utils import (
+from phyloblitz.pipeline import (
     count_spoa_aln_vars,
     filter_paf_overhang,
     lists_common_prefix,
