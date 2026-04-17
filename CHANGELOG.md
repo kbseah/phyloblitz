@@ -29,7 +29,7 @@
  - [x] Account for multiple SSUs in one read; see supplementary alignments
 
 
-## v1.0.0 targets
+## v0.3.0
 
  - [x] Pretty log messages
  - [x] Deprecate two-pass mode
@@ -40,15 +40,20 @@
  - [x] Downsample clusters with too many reads for assembly (~500 should be ok)
  - [x] Multisample comparison and co-assembly
  - [x] Embed graphics as PNGs into HTML
- - [ ] Detailed documentation
+ - [x] Detailed documentation
+
+
+## v1.0.0 targets
+
+ - [ ] Phylogenetic tree of assembled sequences
+ - [ ] Compare samples by Unifrac distances from tree of assembled sequences
+ - [ ] Interactive graphics, deprecate Markdown report
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
 
 
 ## Future plans/ideas
 
- - [ ] Interactive graphics
- - [ ] Phylogenetic tree of assembled sequences
  - [ ] MultiQC integration
  - [ ] Option to search final assembled cluster sequences with vsearch instead
        of minimap2; better handling of divergent sequences: Example, the
