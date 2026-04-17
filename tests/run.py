@@ -1,6 +1,6 @@
 import unittest
 
-from phyloblitz.pipeline import merge_intervals
+from phyloblitz.run import merge_intervals
 
 
 class TestReportFunctions(unittest.TestCase):

@@ -9,7 +9,7 @@ from rich.logging import RichHandler
 from phyloblitz import downloads
 from phyloblitz.__about__ import __version__
 from phyloblitz.compare import Compare
-from phyloblitz.pipeline import Run
+from phyloblitz.run import Run
 from phyloblitz.utils import check_dependencies, check_outdir
 
 logging.basicConfig(level=logging.DEBUG)
