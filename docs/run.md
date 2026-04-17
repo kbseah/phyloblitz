@@ -1,7 +1,10 @@
 # Run pipeline
 
+The `phyloblitz run` subcommand runs the main phyloblitz workflow for marker
+gene extraction, clustering, and targeted assembly.
 
-## Options
+
+## Command line options
 
 
 ### Input
@@ -31,11 +34,13 @@
 ### Run parameters
  * `threads` - Number of parallel threads; for mapping and cluster assembly.
  * `cluster_tool` - Tool to use for sequence clustering. Default is
-    `isonclust3`. The other option using `mcl` is experimental.
+    `isonclust3`. The other option `mcl` is experimental.
  * `align_minlen` - Minimum length of aligned segment.
  * `summary_taxlevel` - Depth of taxonomy string for summary in report. For
     example, `4` (default) will summarize at taxonomic order.
  * `min_clust_size` - Minimum cluster size to assemble a consensus sequence.
+    The default of 5 may be appropriate for high-accuracy reads HiFi reads, but
+    should be higher for other platforms.
  * `max_clust_size` - Clusters above this size will be downsampled for
     consensus assembly.
  * `rseed` - Random seed for subsampling reads and downsampling clusters.
@@ -54,7 +59,7 @@
 
 ### Options for MCL clustering
 
-Only used if `--cluster_tool mcl` is specified. These are experimental for now.
+Only used if `--cluster_tool mcl` is specified (experimental feature).
 
  * `dv_max` - Maximum pairwise sequence divergence in minimap2 all-vs-all
     mapping to retain for clustering.
@@ -104,7 +109,8 @@ Aligned segments are aligned against each other with `minimap2` in all-vs-all
 reads and PacBio HiFi (CCS) reads, the "ava" presets were modified with
 settings for those sequencing modes that reflect the lower sequence error.
 Filter "ava" alignments to remove those that are not end-to-end (allow maximum
-5% soft-clipped unaligned overhangs).
+5% soft-clipped unaligned overhangs). The all-vs-all mapping is also used for
+the experimental clustering with `mcl`.
 
 
 ### Cluster marker segments
@@ -118,13 +124,42 @@ HiFi PacBio reads. The `--post-cluster` option is applied for Nanopore reads.
 
 Clusters comprising total number of reads above the cutoff specified by
 `--min_clust_size` are assembled with `spoa` to a consensus sequence for each
-cluster. If there are too few reads, the cluster consensus will be fragmented
-and contain more errors. If the cluster size is above `--max_clust_size`, the
-reads are downsampled to `--max_clust_size` before assembly. Beyond about 500
-reads, assembly becomes noticeably slower without much improvement in quality.
+cluster. This option depends on the sequencing platform as well as individual
+library characteristics, and may have to be adjusted empirically. If there are
+too few reads in a cluster, the cluster consensus will be fragmented and
+contain more errors.
+
+If the cluster size is above `--max_clust_size`, the reads are downsampled to
+`--max_clust_size` before assembly. Beyond about 500 reads, assembly becomes
+noticeably slower without much improvement in quality.
 
 
 ### Cluster flanking sequences of each cluster
 
+The rRNA genes are typically more conserved than other genes in the genome and
+so may show lower divergence than the flanking sequence. As a result, if only
+the rRNA marker gene is clustered, each cluster may comprise multiple strains
+of the same species whose rRNA genes are identical or very similar. Attempting
+to resolve this variation fully would constitute, essentially, strain-resolved
+metagenomics, outside the scope of rapid screening with the conserved rRNA
+marker gene. Nonetheless we want an indication of how heterogeneous the
+sequence context is. To do so, we extract sequences flanking the aligned
+markers, and cluster them too, and report the number of flanking sequence
+clusters associated with each marker gene cluster. A k-mer multiplicity plot
+(k-mer spectrum) for the flanking sequences is also produced, which can help
+evaluate the diversity and coverage of the putative strains.
+
+Flanking sequences may also differ if the marker sequences represent multiple
+paralogs in the same genome but at distinct genomic locations.
+
 
 ### Map cluster consensus sequences to reference database
+
+The cluster consensus sequences are mapped with `minimap2` to the reference
+database, and the top-scoring hit is reported. The percent identity and
+alignment coverage (relative to both query and target) are reported, along with
+the number of bases matched, mismatched, and indels.
+
+A low alignment coverage or anomalous marker sequence length may indicate
+misassembly, inadequate coverage, pseudogenization or fragmentation, or other
+issues with the assembled sequence.

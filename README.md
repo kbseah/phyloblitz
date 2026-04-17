@@ -16,7 +16,7 @@ that, because of limited resources, we cannot guarantee a quick response.
 
 `phyloblitz` is a tool to rapidly screen long read metagenomes with ribosomal
 RNA genes, generating a taxonomic summary and targeted assemblies of
-full-length SSU rRNA sequences.
+full-length SSU or LSU rRNA sequences.
 
  * Quickly check the composition and complexity of metagenomes before
      committing time and resources to de novo assembly.
