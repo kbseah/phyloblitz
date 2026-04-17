@@ -17,6 +17,10 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pyfastx
+from Bio import AlignIO
+from Bio import __version__ as biopython_version
+from Bio.Phylo.TreeConstruction import DistanceCalculator, DistanceTreeConstructor
+from Bio.Phylo import write as phylo_write
 from matplotlib import __version__ as matplotlib_version
 from mistune import __version__ as mistune_version
 from pymarkovclustering import __version__ as pymcl_version
@@ -649,7 +653,7 @@ class Pipeline:
             )
             logger.info("Assembled sequences written to %s", cluster_asm)
 
-    def mafft_align_cluster_consensus(
+    def cluster_cons_mafft_aln(
         self,
         cluster_asm: str | Path,
         cluster_cons_aln: str | Path,
@@ -679,6 +683,56 @@ class Pipeline:
             for l in proc.stderr:
                 logger.debug("  MAFFT log: %s", l.rstrip())
             return proc.wait()
+
+    def cluster_cons_distance_tree(
+        self,
+        cluster_cons_aln: str | Path,
+        cluster_cons_tree: str | Path,
+    ) -> None:
+        """Generate distance tree from aligned cluster consensus sequences.
+
+        Use Bio.Phylo.TreeConstruction to generate a distance tree from the
+        aligned cluster consensus sequences. Simple tree construction method is
+        adequate for visualization and comparison of sample composition.
+
+        Bio.Phylo.Tree object is written to internal self._constree attribute
+        and also to file in Newick format.
+
+        :param cluster_cons_aln: Path to aligned cluster consensus sequences in Fasta format
+        :param cluster_cons_tree: Path to write distance tree in Newick format
+        """
+        aln = AlignIO.read(cluster_cons_aln, "fasta")
+        calculator = DistanceCalculator("identity")
+        dm = calculator.get_distance(aln)
+        constructor = DistanceTreeConstructor()
+        self._constree = constructor.nj(dm)
+        phylo_write(self._constree, cluster_cons_tree, "newick")
+        logger.info("Distance tree written to %s", cluster_cons_tree)
+
+    def convert_phylo_to_matplotlib_dendrogram(self) -> None:  # WIP
+        """Convert Bio.Phylo tree to format for plotting with matplotlib.
+
+        Convert the Bio.Phylo.Tree object in self._constree to a format that can
+        be plotted with matplotlib. This is a recursive function that traverses
+        the tree and generates a list of coordinates for each node and leaf.
+
+        The output is stored in self._dendro_coords as a list of tuples of the
+        form (x, y, label) where x and y are the coordinates for the node or
+        leaf, and label is the name of the leaf (cluster id) or None for
+        internal nodes.
+        """
+        self._dendro_coords = []
+
+        def traverse(node, x=0, y=0):
+            if node.is_terminal():
+                self._dendro_coords.append((x, y, node.name))
+            else:
+                left = traverse(node.clades[0], x - 1, y - 1)
+                right = traverse(node.clades[1], x + 1, y - 1)
+                self._dendro_coords.append((x, y, None))
+            return x
+
+        traverse(self._constree.root)
 
     def cluster_asm_tophits(
         self,

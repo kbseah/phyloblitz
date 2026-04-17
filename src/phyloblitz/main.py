@@ -463,7 +463,8 @@ def run(ctx, **kwargs):
         max_clust_size=ctx.params["max_clust_size"],
         rseed=ctx.params["rseed"],
     )
-    p.mafft_align_cluster_consensus(threads=ctx.params["threads"])
+    p.cluster_cons_mafft_aln(threads=ctx.params["threads"])
+    p.cluster_cons_distance_tree()
 
     # Cluster flanking sequences
     if ctx.params["flanking"] < MIN_FLANKING:
@@ -655,6 +656,8 @@ def compare(ctx, **kwargs) -> None:
         min_clust_size=ctx.params["min_clust_size"],
         max_clust_size=ctx.params["max_clust_size"],
     )
+    c.cluster_cons_mafft_aln(threads=ctx.params["threads"])
+    c.cluster_cons_distance_tree()
 
     c.db_taxonomy()
 

@@ -234,6 +234,7 @@ class Compare(Pipeline):
         "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
         "cluster_asm": "_final.fasta",
         "cluster_cons_aln": "_final_aln.fasta",
+        "cluster_cons_tree": "_final_tree.nwk",
         "cluster_tophits": "_final_tophits.paf",
         "cluster_membership_heatmap": "_cluster_membership_heatmap.png",
         "report_json": "_report.json",
@@ -384,12 +385,23 @@ class Compare(Pipeline):
         stage="cluster_cons_aln",
         message="Align cluster consensus sequences with mafft",
     )
-    def mafft_align_cluster_consensus(self, threads: int = 12) -> None:
+    def cluster_cons_mafft_aln(self, threads: int = 12) -> None:
         """Align cluster consensus sequences with MAFFT linsi."""
-        return super().mafft_align_cluster_consensus(
+        return super().cluster_cons_mafft_aln(
             self.pathto("cluster_asm"),
             self.pathto("cluster_cons_aln"),
             threads=threads,
+        )
+
+    @check_stage_file(
+        stage="cluster_cons_tree",
+        message="Building tree from cluster consensus sequences",
+    )
+    def cluster_cons_distance_tree(self) -> None:
+        """Build tree from cluster consensus alignment by neighbor-joining."""
+        return super().cluster_cons_distance_tree(
+            self.pathto("cluster_cons_aln"),
+            self.pathto("cluster_cons_tree"),
         )
 
     def cluster_asm_tophits(self, threads: int = 12):
