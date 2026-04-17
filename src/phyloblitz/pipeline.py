@@ -483,7 +483,7 @@ class Pipeline:
                 return Path(Path(self._prefix + self.OUTFILE_SUFFIX[stage]).name)
             return Path(self._outdir) / Path(self._prefix + self.OUTFILE_SUFFIX[stage])
         except KeyError as e:
-            e.add_not(f"Unknown intermediate file {stage}")
+            e.add_note(f"Unknown intermediate file {stage}")
             raise
 
     def db_taxonomy(self) -> None:
