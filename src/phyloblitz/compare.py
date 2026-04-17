@@ -233,6 +233,7 @@ class Compare(Pipeline):
         "pooled_segments": "_segments.fastq",
         "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
         "cluster_asm": "_final.fasta",
+        "cluster_cons_aln": "_final_aln.fasta",
         "cluster_tophits": "_final_tophits.paf",
         "cluster_membership_heatmap": "_cluster_membership_heatmap.png",
         "report_json": "_report.json",
@@ -377,6 +378,18 @@ class Compare(Pipeline):
             keeptmp=keeptmp,
             min_clust_size=min_clust_size,
             max_clust_size=max_clust_size,
+        )
+
+    @check_stage_file(
+        stage="cluster_cons_aln",
+        message="Align cluster consensus sequences with mafft",
+    )
+    def mafft_align_cluster_consensus(self, threads: int = 12) -> None:
+        """Align cluster consensus sequences with MAFFT linsi."""
+        return super().mafft_align_cluster_consensus(
+            self.pathto("cluster_asm"),
+            self.pathto("cluster_cons_aln"),
+            threads=threads,
         )
 
     def cluster_asm_tophits(self, threads: int = 12):

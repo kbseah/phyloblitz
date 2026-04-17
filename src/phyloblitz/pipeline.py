@@ -649,6 +649,37 @@ class Pipeline:
             )
             logger.info("Assembled sequences written to %s", cluster_asm)
 
+    def mafft_align_cluster_consensus(
+        self,
+        cluster_asm: str | Path,
+        cluster_cons_aln: str | Path,
+        threads: int = 12,
+    ) -> int:
+        """Multiple sequence alignment of cluster consensus sequences with MAFFT.
+
+        Alignment will be used to generate a phylogenetic tree of assembled
+        marker sequences to include in report. Use MAFFT `linsi` algorithm
+        because this performs best with sequences with mixture of conserved and
+        variable regions with variable lengths, as expected for rRNA gene.
+
+        :param cluster_asm: Path to assembled cluster consensus sequences in Fasta format
+        :param cluster_cons_aln: Path to write aligned cluster consensus sequences in Fasta format
+        :param threads: Number of threads for MAFFT to use
+        :returns: Return code of the MAFFT process
+        """
+        cmd = [
+            "linsi",
+            "--thread",
+            str(threads),
+            cluster_asm,
+        ]
+        logger.debug("MAFFT command: %s", " ".join([str(i) for i in cmd]))
+        with Path.open(cluster_cons_aln, "w") as fh:
+            proc = Popen(cmd, stdout=fh, stderr=PIPE, text=True)
+            for l in proc.stderr:
+                logger.debug("  MAFFT log: %s", l.rstrip())
+            return proc.wait()
+
     def cluster_asm_tophits(
         self,
         tophits: str | Path,

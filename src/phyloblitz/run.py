@@ -173,6 +173,7 @@ class Run(Pipeline):
         "isonclust3_cluster": "_isonclust3_out/clustering/final_clusters.tsv",
         "cluster_asm": "_final.fasta",
         "cluster_tophits": "_final_tophits.paf",
+        "cluster_cons_aln": "_final_aln.fasta",
         "report_json": "_report.json",
         "report_md": "_report.md",
         "report_html": "_report.html",
@@ -515,6 +516,18 @@ class Run(Pipeline):
             keeptmp=keeptmp,
             min_clust_size=min_clust_size,
             max_clust_size=max_clust_size,
+        )
+
+    @check_stage_file(
+        stage="cluster_cons_aln",
+        message="Align cluster consensus sequences with mafft",
+    )
+    def mafft_align_cluster_consensus(self, threads: int = 12) -> None:
+        """Align cluster consensus sequences with MAFFT linsi."""
+        return super().mafft_align_cluster_consensus(
+            self.pathto("cluster_asm"),
+            self.pathto("cluster_cons_aln"),
+            threads=threads,
         )
 
     def cluster_flanking_isonclust3(self) -> None:
