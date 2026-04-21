@@ -658,7 +658,7 @@ class Pipeline:
         cluster_asm: str | Path,
         cluster_cons_aln: str | Path,
         threads: int = 12,
-    ) -> int:
+    ) -> int | None:
         """Multiple sequence alignment of cluster consensus sequences with MAFFT.
 
         Alignment will be used to generate a phylogenetic tree of assembled
@@ -671,6 +671,9 @@ class Pipeline:
         :param threads: Number of threads for MAFFT to use
         :returns: Return code of the MAFFT process
         """
+        if len(self._stats["cluster cons parsed"]) <= 1:
+            logger.warning("Too few sequences, skipping alignment")
+            return None
         cmd = [
             "linsi",
             "--thread",
@@ -701,6 +704,10 @@ class Pipeline:
         :param cluster_cons_aln: Path to aligned cluster consensus sequences in Fasta format
         :param cluster_cons_tree: Path to write distance tree in Newick format
         """
+        if len(self._stats["cluster cons parsed"]) <= 1:
+            logger.warning("Too few sequences, skipping tree building")
+            self._constree = None
+            return None
         aln = AlignIO.read(cluster_cons_aln, "fasta")
         calculator = DistanceCalculator("identity")
         dm = calculator.get_distance(aln)

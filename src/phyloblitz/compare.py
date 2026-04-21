@@ -508,6 +508,7 @@ class Compare(Pipeline):
     )
     def cluster_tree_heatmap(self) -> None:
         """Plot phylogeny of cluster consensus sequences and heatmap of abundances."""
+        # TODO: Skip if too few clusters found
         _, cluster2sample_norm, row_labels = self.cluster_array()
 
         gs = GridSpec(1, 2, width_ratios=[5, 5], wspace=0.1)

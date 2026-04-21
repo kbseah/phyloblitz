@@ -788,6 +788,9 @@ class Run(Pipeline):
     def write_report_tree(self) -> None:
         """Plot phylogenetic tree of consensus sequences for report."""
         # TODO: Adjust figsize based on number of leaves
+        if self._constree is None:
+            logger.warning("No tree to plot")
+            return
         fig, ax = plt.subplots(1, figsize=(4, 10))
         draw_tree_on_axis(
             self._constree,
