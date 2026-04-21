@@ -45,9 +45,13 @@
 
 ## v1.0.0 targets
 
- - [ ] Phylogenetic tree of assembled sequences
+ - [x] Phylogenetic tree of assembled sequences
+ - [ ] Interactive graphics
+ - [ ] Deprecate Markdown report
+ - [ ] Catch exceptions: zero or only one cluster assembled
+ - [ ] Allow multiple input files
+ - [ ] Check that new dependencies are included in the dependency report
  - [ ] Compare samples by Unifrac distances from tree of assembled sequences
- - [ ] Interactive graphics, deprecate Markdown report
  - [ ] Fix the CSS stylesheet
  - [ ] Greengenes2 database
 
