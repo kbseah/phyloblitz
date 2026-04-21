@@ -8,6 +8,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.gridspec import GridSpec
 from mistune import create_markdown, html
 from mistune.renderers.markdown import MarkdownRenderer
 from scipy.cluster.hierarchy import dendrogram, linkage
@@ -18,6 +19,7 @@ from phyloblitz.report import (
     HTML_TEMPLATE,
     dict2markdowntable,
     dod2markdowntable,
+    draw_tree_on_axis,
     png_to_html_embed,
 )
 from phyloblitz.pipeline import Pipeline, check_stage_file, run_md5
@@ -237,6 +239,7 @@ class Compare(Pipeline):
         "cluster_cons_tree": "_final_tree.nwk",
         "cluster_tophits": "_final_tophits.paf",
         "cluster_membership_heatmap": "_cluster_membership_heatmap.png",
+        "cluster_tree_heatmap": "_cluster_tree_heatmap.png",
         "report_json": "_report.json",
         "report_md": "_report.md",
         "report_html": "_report.html",
@@ -472,23 +475,15 @@ class Compare(Pipeline):
             out[c].update(stats)
         return out, fields
 
-    @check_stage_file(
-        stage="cluster_membership_heatmap",
-        message="Cluster samples by assembled sequence coverage",
-    )
-    def cluster_membership_heatmap(
-        self,
-        cluster_method: str = "ward",
-        cluster_metric: str = "euclidean",
-    ):
-        """Cluster sequences and samples by cluster membership and plot heatmap.
+    def cluster_array(self) -> tuple:
+        """Count read segments per sequence cluster per sample.
 
-        :param cluster_method: Linkage method for hierarchical clustering of
-            rows and columns (passed to scipy.cluster.hierarchy.linkage).
-        :param cluster_metric: Distance metric for hierarchical clustering of
-            rows and columns (passed to scipy.cluster.hierarchy.linkage).
+        :returns: Array of counts per cluster (rows) per sample (columns); the
+            same normalized by column (sample) sums to get relative abundances;
+            list of cluster labels (prefixed with `cluster_` corresponding to
+            the rows.)
+        :rtype tuple:
         """
-        # Generate dendrogram and heatmap of cluster memberships across samples
         # Rows: Clusters, Columns: Samples
         cluster2sample_array = np.array(
             [
@@ -505,6 +500,48 @@ class Compare(Pipeline):
             axis=0,
             keepdims=True,
         )
+        return cluster2sample_array, cluster2sample_norm, row_labels
+
+    @check_stage_file(
+        stage="cluster_tree_heatmap",
+        message="Draw heatmap with clusters ordered by phylogenetic tree",
+    )
+    def cluster_tree_heatmap(self) -> None:
+        """Plot phylogeny of cluster consensus sequences and heatmap of abundances."""
+        _, cluster2sample_norm, row_labels = self.cluster_array()
+
+        gs = GridSpec(1, 2, width_ratios=[5, 5], wspace=0.1)
+        fig = plt.figure(figsize=(6, 4))
+
+        ax_tree = fig.add_subplot(gs[0, 0])
+        ax_hm = fig.add_subplot(gs[0, 1], sharey=ax_tree)
+
+        t_order = draw_tree_on_axis(self._constree, ax_tree, leaf_label=True)
+        leaf_order = [leaf.name for leaf in t_order if leaf.is_terminal()]
+        row_labels_key = {label: i for i, label in enumerate(row_labels)}
+        row_order = [row_labels_key[leaf] for leaf in leaf_order]
+        X = [cluster2sample_norm[i] for i in row_order]
+        _im = ax_hm.imshow(X, aspect="auto", origin="lower")
+        fig.savefig(self.pathto("cluster_tree_heatmap"), bbox_inches="tight")
+
+    @check_stage_file(
+        stage="cluster_membership_heatmap",
+        message="Cluster samples by assembled sequence coverage",
+    )
+    def cluster_membership_heatmap(
+        self,
+        cluster_method: str = "ward",
+        cluster_metric: str = "euclidean",
+    ) -> None:
+        """Cluster sequences and samples by cluster membership and plot heatmap.
+
+        :param cluster_method: Linkage method for hierarchical clustering of
+            rows and columns (passed to scipy.cluster.hierarchy.linkage).
+        :param cluster_metric: Distance metric for hierarchical clustering of
+            rows and columns (passed to scipy.cluster.hierarchy.linkage).
+        """
+        # Generate dendrogram and heatmap of cluster memberships across samples
+        cluster2sample_array, cluster2sample_norm, row_labels = self.cluster_array()
         # Drop rows which sum to < min_clust_size
         row_sums = cluster2sample_array.sum(axis=1)
         keep_rows = row_sums >= self._stats["args"]["min_clust_size"]

@@ -671,6 +671,7 @@ def compare(ctx, **kwargs) -> None:
         cluster_method=ctx.params["cluster_method"],
         cluster_metric=ctx.params["cluster_metric"],
     )
+    c.cluster_tree_heatmap()
 
     c.write_report_json()
     c.write_reports()
