@@ -705,7 +705,9 @@ class Pipeline:
         calculator = DistanceCalculator("identity")
         dm = calculator.get_distance(aln)
         constructor = DistanceTreeConstructor()
-        self._constree = constructor.nj(dm).root_at_midpoint().ladderize()
+        self._constree = constructor.nj(dm)
+        self._constree.root_at_midpoint()
+        self._constree.ladderize()
         phylo_write(self._constree, cluster_cons_tree, "newick")
         logger.info("Distance tree written to %s", cluster_cons_tree)
 
