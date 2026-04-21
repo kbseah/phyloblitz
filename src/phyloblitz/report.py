@@ -6,6 +6,8 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from Bio.Phylo.BaseTree import Tree, Clade
+from matplotlib.axes import Axes
 from mistune import create_markdown, html
 from mistune.renderers.markdown import MarkdownRenderer
 
@@ -321,3 +323,129 @@ def per_cluster_summarize(stats: dict) -> dict:
                 "cluster flanking numclust"
             ][c]
     return out
+
+
+def flatten(lol: list) -> list:
+    """Flatten a list of lists of arbitrary depth.
+
+    :param lol: List with list elements, which may themselves have list
+        elements, to arbitrary depth.
+    :returns: Flattened list in the original order.
+    :rtype: list
+    """
+    out = []
+    for inner in lol:
+        if isinstance(inner, list):
+            out.extend(flatten(inner))
+        else:
+            out.append(inner)
+    return out
+
+
+def nodes_ordered(clade: Clade) -> list | Clade:
+    """Order internal and leaf nodes of a Bio.Phylo clade for plotting.
+
+    Return the descendant clades of a given node (including the node itself) in
+    the order they would be plotted in a rectangular tree. Recursive function.
+
+    :param clade: Biopython Clade object.
+    :returns: Ordered, nested list of Clade objects that are descendants of the
+        input clade.
+    :rtype: list
+    """
+    if clade.is_terminal():
+        return clade
+    return [nodes_ordered(clade.clades[0]), clade, nodes_ordered(clade.clades[1])]
+
+
+def draw_tree_on_axis(
+    t: Tree,
+    ax: Axes,
+    root: str = "left",
+    reverse_order: bool = False,
+    leaf_label: bool = False,
+) -> list:
+    """Draw Bio.Phylo tree object on a specified Axis.
+
+    Modifies the Axis object in-place, and returns list of nodes in order
+    plotted, to align other plots with the tree. Draws tree as a series of line
+    segments. Tree should already be rooted and ladderized if desired.
+
+    :param t: Biopython Tree object.
+    :param ax: Axis to draw tree upon.
+    :param root: Position of the tree's root, one of "left", "bottom", "right", "top".
+    :param reverse_order: Reverse order of the nodes if True.
+    :param leaf_label: Label leaves with node names if True.
+    :returns: Tree nodes in the order plotted (includes internal nodes).
+    :rtype: list
+    """
+    x_lines = {}
+    for clade, depth in t.depths().items():
+        x1 = depth
+        x0 = x1 - clade.branch_length
+        x_lines[clade] = (x0, x1)
+
+    t_nodes_ordered = flatten(nodes_ordered(t.root))
+
+    # Internal nodes will always be at half-integer y positions
+    y_coords = {node: coord / 2 for coord, node in enumerate(t_nodes_ordered)}
+
+    # Horizontal line segments
+    h_y = [y / 2 for y, xx in enumerate(t_nodes_ordered)]
+    h_xmin = [x_lines[node][0] for node in t_nodes_ordered]
+    h_xmax = [x_lines[node][1] for node in t_nodes_ordered]
+
+    # Vertical line segments
+    v_x = []
+    v_ymin = []
+    v_ymax = []
+    for node, coord in y_coords.items():
+        if node.is_terminal():
+            continue
+        # left line
+        v_x.append(x_lines[node][1])
+        v_ymin.append(coord)
+        v_ymax.append(y_coords[node.clades[0]])
+        # right line
+        v_x.append(x_lines[node][1])
+        v_ymin.append(coord)
+        v_ymax.append(y_coords[node.clades[1]])
+
+    if reverse_order:
+        h_y = [-i for i in h_y]
+        v_ymin = [-i for i in v_ymin]
+        v_ymax = [-i for i in v_ymax]
+
+    # Leaf labels coordinates
+    labels = []
+    for node, y_text in y_coords.items():
+        if not node.is_terminal():
+            continue
+        x_text = x_lines[node][1]
+        labels.append((x_text, y_text, node.name))
+    ha, va, rotation = "left", "baseline", "horizontal"
+
+    if root == "left":
+        ax.vlines(x=v_x, ymin=v_ymin, ymax=v_ymax)
+        ax.hlines(y=h_y, xmin=h_xmin, xmax=h_xmax)
+    elif root == "right":
+        ax.vlines(x=[-i for i in v_x], ymin=v_ymin, ymax=v_ymax)
+        ax.hlines(y=h_y, xmin=[-i for i in h_xmin], xmax=[-i for i in h_xmax])
+        labels = [(-x, y, s) for (x, y, s) in labels]
+        ha = "right"
+    elif root == "bottom":
+        ax.vlines(x=h_y, ymin=h_xmin, ymax=h_xmax)
+        ax.hlines(y=v_x, xmin=v_ymin, xmax=v_ymax)
+        labels = [(y, x, s) for (x, y, s) in labels]
+        ha, va, rotation = "center", "bottom", "vertical"
+    elif root == "top":
+        ax.vlines(x=h_y, ymin=[-i for i in h_xmin], ymax=[-i for i in h_xmax])
+        ax.hlines(y=[-i for i in v_x], xmin=v_ymin, xmax=v_ymax)
+        labels = [(y, -x, s) for (x, y, s) in labels]
+        ha, va, rotation = "center", "top", "vertical"
+
+    if leaf_label:
+        for x_text, y_text, s in labels:
+            ax.text(x_text, y_text, s, ha=ha, va=va, rotation=rotation)
+
+    return t_nodes_ordered

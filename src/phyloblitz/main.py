@@ -490,6 +490,7 @@ def run(ctx, **kwargs):
 
     if ctx.params["report"]:
         p.write_report_histogram()
+        p.write_report_tree()
         p.write_report_markdown()
         p.write_report_html()
 

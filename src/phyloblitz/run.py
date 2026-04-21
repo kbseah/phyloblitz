@@ -16,6 +16,7 @@ import pysam
 
 from phyloblitz.__about__ import __version__
 from phyloblitz.report import (
+    draw_tree_on_axis,
     generate_histogram,
     generate_report_html,
     generate_report_md,
@@ -180,6 +181,7 @@ class Run(Pipeline):
         "report_html": "_report.html",
         "report_dvs_hist": "_report_dvs_hist.png",
         "report_kmercount_plot": "_report_kmercount_plot.png",
+        "report_tree": "_report_tree.png",
     }
 
     @check_stage_file(
@@ -781,6 +783,19 @@ class Run(Pipeline):
             outfile=self.pathto("report_dvs_hist"),
             figsize=(3, 2),
         )
+
+    @check_stage_file(stage="report_tree", message="Plotting phylogenetic tree")
+    def write_report_tree(self) -> None:
+        """Plot phylogenetic tree of consensus sequences for report."""
+        # TODO: Adjust figsize based on number of leaves
+        fig, ax = plt.subplots(1, figsize=(4, 10))
+        draw_tree_on_axis(
+            self._constree,
+            ax,
+            leaf_label=True,
+        )
+        fig.tight_layout()
+        fig.savefig(self.pathto("report_tree"))
 
     @check_stage_file(stage="report_md", message="Writing report as Markdown")
     def write_report_markdown(self) -> None:
