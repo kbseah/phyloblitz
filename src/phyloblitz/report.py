@@ -382,7 +382,7 @@ def draw_tree_on_axis(
     x_lines = {}
     for clade, depth in t.depths().items():
         x1 = depth
-        x0 = x1 - clade.branch_length
+        x0 = x1 if clade.branch_length is None else x1 - clade.branch_length
         x_lines[clade] = (x0, x1)
 
     t_nodes_ordered = flatten(nodes_ordered(t.root))
